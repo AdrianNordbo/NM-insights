@@ -18,8 +18,14 @@ Mål: månedsrapport med funn og konkrete forslag til tester, som kan vises til 
   - Sitcom: korte humoristiske episoder fra kontoret, inspirert av The Office
   - Uten kompetanse: golf/turn o.l., erstattet av På Gata fra uke 39 2026
   - På Gata: gateintervjuer med ubehagelige/morsomme spørsmål (#PåGata)
-  - Annet/aktualitet: alt utenfor konseptene, f.eks. VM-innhold juni–juli 2026
+  - CTF (Cut the fluff): relevante nyheter som feed-innlegg (økonomi, lokalnytt, hendelser),
+    avsluttet nylig (siste innlegg 08.09.2026)
+  - Bankinfo: Veksthusets egne informasjons- og reklameinnlegg (ikke et innholdskonsept)
+  - Annet/aktualitet: alt utenfor konseptene, f.eks. VM-Reels juni–juli 2026
+- Merking: concepts.py (automatisk, hashtags + ord i captionen) + concept_overrides.csv (manuell, vinner alltid).
+  Innlegg før 15.06.2026 merkes "Før konsepter".
 - VM-innholdet (juni–juli 2026) er publisert i Adrians periode og har høyest rekkevidde av alle innlegg.
+  Kolonnen is_vm markerer VM-innhold på tvers av konsept (også CTF-innlegg om VM).
   Rapporter Adrians periode både med og uten VM-innhold, og sammenlign med samme periode i 2025.
 
 ## Arkitektur (pipeline)
@@ -43,4 +49,6 @@ Python, Supabase, GitHub Actions (daglig kjøring), Claude API
 - Repoet er privat. data/ og .venv/ skal aldri committes.
 - Tidspunkt analyseres i Europe/Oslo.
 - Bruk median i tillegg til gjennomsnitt. Enkeltinnlegg med ekstrem rekkevidde (f.eks. VM) skal ikke skjule mønstrene.
+- Konsepter i ulike formater (Reels vs. feed) skal ikke sammenlignes direkte på rekkevidde.
+  Sammenlign innenfor samme format, eller bruk relative mål som engasjementsrate.
 - Rapporter alltid antall innlegg per konsept. Funn basert på under 5–6 innlegg merkes "foreløpig".

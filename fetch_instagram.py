@@ -19,6 +19,8 @@ from zoneinfo import ZoneInfo
 import requests
 from dotenv import load_dotenv
 
+from concepts import apply_concepts
+
 load_dotenv()
 
 TOKEN = os.getenv("META_ACCESS_TOKEN")
@@ -42,12 +44,13 @@ WEEKDAYS_NO = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "s
 HASHTAG_RE = re.compile(r"#(\w+)", re.UNICODE)
 
 COLUMN_ORDER = [
-    "id", "timestamp_oslo", "weekday", "hour", "media_type", "media_product_type",
+    "id", "timestamp_oslo", "weekday", "hour", "concept", "concept_source", "is_vm",
+    "media_type", "media_product_type",
     "reach", "views", "like_count", "comments_count", "saved", "shares",
     "total_interactions", "engagement_rate",
     "ig_reels_avg_watch_time", "ig_reels_video_view_total_time",
     "caption_length", "hashtag_count", "hashtags", "first_line", "caption",
-    "permalink", "timestamp",
+    "concept_reason", "permalink", "timestamp",
 ]
 
 
@@ -173,6 +176,7 @@ def main():
         print(f"  {i}/{len(media)}", end="\r", flush=True)
         time.sleep(0.2)  # skånsomt mot Metas rate limits
 
+    apply_concepts(posts)
     save(posts)
     print(f"\nFerdig! Lagret {len(posts)} innlegg i {DATA_DIR}/posts.csv og posts.json")
     print_summary(posts)
