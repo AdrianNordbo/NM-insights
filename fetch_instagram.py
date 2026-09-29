@@ -5,7 +5,7 @@ Henter innlegg + innsiktstall for én Instagram-konto og lagrer dem i Supabase:
   posts             metadata og konsept (alle innlegg, hver kjøring)
   post_insights     dagens tall, med hele API-svaret i raw
   account_insights  følgere, fulgte og antall innlegg (hver kjøring), og
-                    følgerhistorikk for de siste 30 dagene første gang
+                    nye følgere per dag for de siste 30 dagene (Metas maks)
 
 Oppdateringsstrategi: innlegg fra de siste 30 dagene får nye tall hver
 kjøring, eldre innlegg bare hvis de ikke har fått nye tall siste 7 dager.
@@ -240,7 +240,7 @@ def insight_row(post_id, post, raw, today, now_iso):
 
 
 def save_account_insights(account_id, today, now_iso):
-    """Dagens kontotall, og følgerhistorikk første gang. Returnerer (dagens tall, antall historikkrader)."""
+    """Dagens kontotall og nye følgere per dag. Returnerer (kontotall, antall dager med new_followers)."""
     account = fetch_account()
     assert_no_token(account)
     db.upsert("account_insights", [{
@@ -253,47 +253,59 @@ def save_account_insights(account_id, today, now_iso):
         "raw": account,
     }], on_conflict="account_id,snapshot_date")
 
-    has_history = db.select("account_insights", {
-        "select": "snapshot_date",
-        "account_id": f"eq.{account_id}",
-        "snapshot_date": f"lt.{today.isoformat()}",
-        "order": "snapshot_date",
-    })
-    if has_history:
-        return account, 0
-
     try:
         history = fetch_follower_history()
     except MetaApiError as e:
         print(f"Kunne ikke hente følgerhistorikk: {e}")
-        return account, 0
+        history = []
     assert_no_token(history)
 
-    rows = []
+    days = {}
     for metric in history:
         for value in metric.get("values", []):
             # end_time kl. 07:00 UTC markerer slutten av Metas døgn (Stillehavstid),
-            # så verdien gjelder dagen før.
+            # så verdien gjelder dagen før. Dagens døgn er ikke ferdig ennå.
             day = parse_timestamp(value["end_time"]).date() - timedelta(days=1)
-            if day >= today:
-                continue
-            rows.append({
-                "account_id": account_id,
-                "snapshot_date": day.isoformat(),
-                "fetched_at": now_iso,
-                "followers_count": None,  # Meta gir bare nye følgere per dag bakover
-                "follows_count": None,
-                "media_count": None,
-                "raw": {
-                    "source": "follower_count_backfill",
-                    "new_followers": value.get("value"),
-                    "end_time": value.get("end_time"),
-                },
-            })
-    if rows:
-        db.upsert("account_insights", rows, on_conflict="account_id,snapshot_date",
-                  ignore_duplicates=True)
-    return account, len(rows)
+            if day < today:
+                days[day] = value
+
+    if days:
+        # Dager uten rad fra før: ny rad med rått svar (followers_count finnes ikke bakover)
+        db.upsert("account_insights", [{
+            "account_id": account_id,
+            "snapshot_date": day.isoformat(),
+            "fetched_at": now_iso,
+            "new_followers": value.get("value"),
+            "raw": {
+                "source": "follower_count_backfill",
+                "new_followers": value.get("value"),
+                "end_time": value.get("end_time"),
+            },
+        } for day, value in days.items()], on_conflict="account_id,snapshot_date",
+            ignore_duplicates=True)
+        # Alle dager i vinduet: oppdater bare new_followers, resten av raden står urørt
+        db.upsert("account_insights", [{
+            "account_id": account_id,
+            "snapshot_date": day.isoformat(),
+            "new_followers": value.get("value"),
+        } for day, value in days.items()], on_conflict="account_id,snapshot_date")
+
+    # Eldre historikkrader utenfor Metas 30-dagersvindu: fyll new_followers fra raw
+    old = db.select("account_insights", {
+        "select": "snapshot_date,raw",
+        "account_id": f"eq.{account_id}",
+        "new_followers": "is.null",
+        "raw->>source": "eq.follower_count_backfill",
+        "order": "snapshot_date",
+    })
+    if old:
+        db.upsert("account_insights", [{
+            "account_id": account_id,
+            "snapshot_date": r["snapshot_date"],
+            "new_followers": r["raw"].get("new_followers"),
+        } for r in old], on_conflict="account_id,snapshot_date")
+
+    return account, len(days) + len(old)
 
 
 def save_backup(posts):
@@ -377,13 +389,13 @@ def main():
         for p in posts if p["id"] in raw_by_id
     ]
     db.upsert("post_insights", insight_rows, on_conflict="post_id,snapshot_date")
-    account, history_rows = save_account_insights(account_id, today, now_iso)
+    account, follower_days = save_account_insights(account_id, today, now_iso)
 
     save_backup(posts)
     print(f"Ferdig! {len(saved)} innlegg og {len(insight_rows)} innsiktsrader lagret i Supabase.")
     print(f"Kontoen: {account.get('followers_count')} følgere, {account.get('follows_count')} fulgte, "
           f"{account.get('media_count')} innlegg."
-          + (f" Følgerhistorikk: {history_rows} dager." if history_rows else ""))
+          + f" Nye følgere oppdatert for {follower_days} dager.")
     print(f"Lokal backup: {DATA_DIR}/posts.json og posts.csv")
     print_summary(posts)
 

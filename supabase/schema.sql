@@ -108,11 +108,15 @@ create table if not exists public.account_insights (
     followers_count     integer,
     follows_count       integer,
     media_count         integer,                       -- antall innlegg på kontoen
+    new_followers       integer,                       -- nye følgere dette døgnet (Metas follower_count)
 
     raw                 jsonb,                         -- hele API-svaret
 
     primary key (account_id, snapshot_date)            -- ny kjøring samme dag oppdaterer raden
 );
+
+-- Lagt til etter første versjon av skjemaet
+alter table public.account_insights add column if not exists new_followers integer;
 
 create index if not exists account_insights_date_idx
     on public.account_insights (snapshot_date);

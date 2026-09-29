@@ -7,9 +7,24 @@ Mål: månedsrapport med funn og konkrete forslag til tester, som kan vises til 
 - Meta-app "NM Insights" med Instagram API (oppsett med Facebook-innlogging), utviklingsmodus
 - Permanent token fra systembrukeren "NM Insights Bot" ligger i .env (META_ACCESS_TOKEN)
 - Instagram-konto veksthusene: IG_USER_ID 17841450044968553, graph.facebook.com v26.0
-- fetch_instagram.py fungerer: 241 innlegg (nov 2021 – sep 2026), 96 Reels og 145 feed-innlegg
-- Innsikt hentes per innlegg: reach, views, saved, shares, total_interactions (+ watch time for Reels)
-- Data lagres foreløpig i data/posts.csv og data/posts.json
+- GitHub: privat repo AdrianNordbo/NM-insights (branch main)
+- fetch_instagram.py henter 241 innlegg (nov 2021 – sep 2026), 96 Reels og 145 feed-innlegg,
+  og lagrer i Supabase. Tokenet sendes i Authorization-header (Bearer).
+  - Innsikt per innlegg: reach, views, likes, comments, saved, shares, total_interactions
+    (+ watch time for Reels), med hele API-svaret i raw
+  - Oppdatering: innlegg fra siste 30 dager får nye tall hver kjøring, eldre én gang i uken
+  - Kontotall hver kjøring: followers_count, follows_count, media_count, og new_followers per dag
+    (Meta gir bare nye følgere per dag, maks 30 dager bakover; totalen lagres fra 29.09.2026)
+  - data/posts.json og data/posts.csv skrives fortsatt som lokal backup
+- Supabase: skjema i supabase/schema.sql (kjøres manuelt i SQL Editor). Tabeller: accounts, posts,
+  post_insights (én rad per innlegg per dag), account_insights (én rad per konto per dag),
+  visningen posts_latest. RLS på, rettigheter bare til service_role. db.py er REST-klienten.
+- Meta rapporterer media_count 237, men media-listen gir 241 innlegg (ikke undersøkt)
+- concepts.py merker konsept; concept_overrides.csv har 17 manuelle rettelser (alle Folka Først)
+- analyze.py (pandas, ingen LLM) leser posts_latest og skriver data/analysis.md
+- GitHub Actions (.github/workflows/fetch-instagram.yml) kjører fetch_instagram.py kl. 07 norsk tid
+  hver dag, og kan startes manuelt. Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL,
+  SUPABASE_SECRET_KEY
 
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). "Adrians periode" = fra denne datoen.
@@ -41,13 +56,9 @@ Datainnhenter (Python) → Tallanalytiker (pandas, ingen LLM) + Innholdsagent (C
 Python, Supabase, GitHub Actions (daglig kjøring), Claude API
 
 ## Neste steg
-1. Send tokenet i Authorization-header (Bearer) i stedet for URL-parameter
-2. Git + privat GitHub-repo "nm-insights"
-3. Konsept-kolonne med automatisk merking + concept_overrides.csv for manuell retting
-4. Lagring i Supabase i stedet for CSV
-5. Tallanalytiker med pandas
-6. Agenter og månedsrapport
-7. Daglig kjøring med GitHub Actions (token som GitHub Secret)
+Ferdig: Bearer-token, Git/GitHub, konseptmerking, Supabase, tallanalytiker, daglig kjøring i GitHub Actions.
+1. Verifisere at den planlagte kjøringen i GitHub Actions går som den skal
+2. Agenter og månedsrapport
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokenet skal aldri stå i URL-er eller feilmeldinger.
