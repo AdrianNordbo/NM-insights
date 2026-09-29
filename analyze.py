@@ -1,19 +1,20 @@
 """
 NM Insights - tallanalytiker (pandas, ingen LLM).
 
-Leser data/posts.json og skriver en oppsummering av Adrians periode
-(fra 15.06.2026) til data/analysis.md.
+Leser siste tall per innlegg fra Supabase (visningen posts_latest) og skriver
+en oppsummering av Adrians periode (fra 15.06.2026) til data/analysis.md.
 
 Kjør:  python analyze.py
 """
-import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from concepts import CONCEPTS_START
+import db
+from concepts import CONCEPTS_START, VM_EVENT
 
 DATA_DIR = Path("data")
 OSLO = ZoneInfo("Europe/Oslo")
@@ -26,15 +27,26 @@ WEEKDAYS = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søn
 HOUR_BINS = [0, 13, 16, 19, 21, 24]
 HOUR_LABELS = ["før 13", "13–15", "16–18", "19–20", "21–23"]
 FORMATS = {"REELS": "Reels", "FEED": "Feed"}
+NUMERIC_COLUMNS = ["reach", "views", "saved", "shares", "engagement_rate", "avg_watch_time_ms"]
 
 
 def load_posts():
-    with open(DATA_DIR / "posts.json", encoding="utf-8") as f:
-        df = pd.DataFrame(json.load(f))
-    df["time"] = pd.to_datetime(df["timestamp_oslo"]).dt.tz_localize(OSLO)
-    df["date"] = df["timestamp_oslo"].str[:10]
+    account = db.get_account("instagram", os.getenv("IG_USER_ID"))
+    rows = db.select("posts_latest", {
+        "select": "id,published_at,media_product_type,concept,special_event,snapshot_date,"
+                  + ",".join(NUMERIC_COLUMNS),
+        "account_id": f"eq.{account['id']}",
+        "order": "id",
+    })
+    df = pd.DataFrame(rows)
+    df[NUMERIC_COLUMNS] = df[NUMERIC_COLUMNS].apply(pd.to_numeric)
+    df["time"] = pd.to_datetime(df["published_at"], utc=True).dt.tz_convert(OSLO)
+    df["date"] = df["time"].dt.strftime("%Y-%m-%d")
+    df["hour"] = df["time"].dt.hour
+    df["weekday"] = df["time"].dt.weekday.map(lambda i: WEEKDAYS[i])
+    df["is_vm"] = df["special_event"].eq(VM_EVENT)
     df["format"] = df["media_product_type"].map(FORMATS).fillna(df["media_product_type"])
-    df["watch_time_s"] = df["ig_reels_avg_watch_time"] / 1000
+    df["watch_time_s"] = df["avg_watch_time_ms"] / 1000
     df["time_slot"] = pd.cut(df["hour"], HOUR_BINS, labels=HOUR_LABELS, right=False)
     return df
 
@@ -123,6 +135,8 @@ def build_report(df, now):
     w = out.append
     w("# NM Insights – tallanalyse Veksthuset\n")
     w(f"Generert {now:%d.%m.%Y %H:%M} (Europe/Oslo). Automatisk generert av analyze.py, ingen LLM.\n")
+    w(f"- **Kilde:** Supabase, siste øyeblikksbilde per innlegg (posts_latest). "
+      f"Nyeste tall: {df['snapshot_date'].max()}, eldste: {df['snapshot_date'].min()}")
     w(f"- **Periode:** {pd.Timestamp(start):%d.%m.%Y} – {cutoff:%d.%m.%Y} "
       f"({len(period)} innlegg: {(period['format'] == 'Reels').sum()} Reels, "
       f"{(period['format'] == 'Feed').sum()} feed)")

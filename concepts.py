@@ -30,6 +30,9 @@ CONCEPTS = [
 # Adrian tok over kontoen og startet konseptene denne dagen (Oslo-tid).
 CONCEPTS_START = "2026-06-15"
 
+# special_event-verdien i Supabase for innlegg med is_vm = true
+VM_EVENT = "VM 2026"
+
 VM_HASHTAGS = {
     "vm", "fotballvm", "vm2026", "2026worldcup", "fotballfeber", "haaland",
     "vmbilletter", "vmdrama", "norwayvsfrance",
