@@ -27,6 +27,11 @@ Mål: månedsrapport med funn og konkrete forslag til tester, som kan vises til 
 - VM-innholdet (juni–juli 2026) er publisert i Adrians periode og har høyest rekkevidde av alle innlegg.
   Kolonnen is_vm markerer VM-innhold på tvers av konsept (også CTF-innlegg om VM).
   Rapporter Adrians periode både med og uten VM-innhold, og sammenlign med samme periode i 2025.
+- Ingen innlegg er boostet. All rekkevidde er organisk.
+- Roller: Adrian har ansvar for planlegging og publisering (tidspunkt, konseptmiks, frekvens).
+  Innholdet produseres av en annen, så anbefalinger om innhold må formuleres slik at de kan
+  sendes videre til produsenten.
+- Produksjonstid per konsept er ukjent og skal ikke brukes i analysen.
 
 ## Arkitektur (pipeline)
 Datainnhenter (Python) → Tallanalytiker (pandas, ingen LLM) + Innholdsagent (Claude: konsept, tema, hook, hashtags)
