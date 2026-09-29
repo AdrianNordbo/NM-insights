@@ -7,7 +7,7 @@ Tolkning og anbefalinger skrives manuelt i seksjonen «Vurdering og anbefalinger
 Kjør:
   python report.py --periode måned                  (forrige hele måned)
   python report.py --periode måned --måned 2026-09
-  python report.py --periode uke                    (forrige uke, mandag–søndag)
+  python report.py --periode uke                    (forrige uke; på søndager inneværende uke)
   python report.py --periode uke --uke 2026-W39
 
 Skriver data/rapport_maaned_<ÅÅÅÅ-MM>.html eller data/rapport_uke_<ÅÅÅÅ-Www>.html.
@@ -688,7 +688,8 @@ def main():
     parser = argparse.ArgumentParser(description="Lag uke- eller månedsrapport som HTML.")
     parser.add_argument("--periode", required=True, choices=["uke", "måned", "maned", "mnd"])
     parser.add_argument("--måned", "--maned", dest="month", help="ÅÅÅÅ-MM (standard: forrige måned)")
-    parser.add_argument("--uke", dest="week", help="ÅÅÅÅ-Www (standard: forrige uke)")
+    parser.add_argument("--uke", dest="week",
+                        help="ÅÅÅÅ-Www (standard: forrige uke, på søndager inneværende uke)")
     args = parser.parse_args()
 
     now = datetime.now(OSLO)
@@ -696,7 +697,9 @@ def main():
     DATA_DIR.mkdir(exist_ok=True)
 
     if args.periode == "uke":
-        iso = args.week or "{}-W{:02d}".format(*(now.date() - timedelta(days=7)).isocalendar()[:2])
+        # Ukentlig gjennomgang skjer på søndager: da er det uken som slutter i dag som gjelder
+        week_day = now.date() if now.date().weekday() == 6 else now.date() - timedelta(days=7)
+        iso = args.week or "{}-W{:02d}".format(*week_day.isocalendar()[:2])
         title, body = week_report(posts, hist, followers, now, iso)
         path = DATA_DIR / f"rapport_uke_{iso}.html"
     else:

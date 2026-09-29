@@ -16,14 +16,14 @@ Mål: månedsrapport med funn og konkrete forslag til tester, som kan vises til 
   - Kontotall hver kjøring: followers_count, follows_count, media_count, og new_followers per dag
     (Meta gir bare nye følgere per dag, maks 30 dager bakover; totalen lagres fra 29.09.2026)
   - data/posts.json og data/posts.csv skrives fortsatt som lokal backup
-- Supabase: skjema i supabase/schema.sql (kjøres manuelt i SQL Editor). Tabeller: accounts, posts,
-  post_insights (én rad per innlegg per dag), account_insights (én rad per konto per dag),
+- Supabase: skjema i supabase/schema.sql, endringer i supabase/migrations/ (kjøres manuelt i SQL Editor). Tabeller: accounts, posts,
+  post_insights (én rad per innlegg per dag og slot morgen/kveld), account_insights (én rad per konto per dag),
   visningen posts_latest. RLS på, rettigheter bare til service_role. db.py er REST-klienten.
 - Meta rapporterer media_count 237, men media-listen gir 241 innlegg (ikke undersøkt)
 - concepts.py merker konsept; concept_overrides.csv har 17 manuelle rettelser (alle Folka Først)
 - analyze.py (pandas, ingen LLM) leser posts_latest og skriver data/analysis.md
-- GitHub Actions (.github/workflows/fetch-instagram.yml) kjører fetch_instagram.py kl. 07 norsk tid
-  hver dag, og kan startes manuelt. Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL,
+- GitHub Actions (.github/workflows/fetch-instagram.yml) kjører fetch_instagram.py kl. 07 og 20 norsk tid
+  hver dag, og kan startes manuelt. Kveldskjøringen gir mer presise målinger etter 24 og 48 timer. Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL,
   SUPABASE_SECRET_KEY
 
 ## Veksthuset: kontekst
@@ -60,7 +60,7 @@ Fase 2 (når det finnes betalende kunder): agenter med Claude API
 (innholdsagent, mønsteragent, strategiagent + kritiker).
 
 ## Arbeidsflyt
-- Ukentlig gjennomgang hver søndag (report.py --periode uke): justeringer av tidspunkt,
+- Ukentlig gjennomgang hver søndag (report.py --periode uke, standard er inneværende uke på søndager): justeringer av tidspunkt,
   rekkefølge og tester. Ukens innlegg sammenlignes med konseptets vanlige nivå på samme alder.
   Ingen konseptbeslutninger i ukesrapporten.
 - Månedlig rapport (report.py --periode måned): beslutninger om konsepter og rapportering

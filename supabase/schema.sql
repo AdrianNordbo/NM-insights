@@ -70,6 +70,8 @@ comment on column public.posts.last_seen_at is 'Hvis denne henger etter, er innl
 create table if not exists public.post_insights (
     post_id             bigint not null references public.posts (id) on delete cascade,
     snapshot_date       date not null,                 -- dato i kontoens tidssone
+    snapshot_slot       text not null default 'morgen' -- to kjøringer per dag (07 og 20)
+                        check (snapshot_slot in ('morgen', 'kveld')),
     fetched_at          timestamptz not null default now(),
 
     reach               integer,
@@ -88,13 +90,29 @@ create table if not exists public.post_insights (
 
     raw                 jsonb,                         -- hele API-svaret, for metrics vi ikke har kolonner for ennå
 
-    primary key (post_id, snapshot_date)               -- ny kjøring samme dag oppdaterer raden
+    primary key (post_id, snapshot_date, snapshot_slot) -- ny kjøring i samme slot oppdaterer raden
 );
 
 create index if not exists post_insights_date_idx
     on public.post_insights (snapshot_date);
 
-comment on table public.post_insights is 'Én rad per innlegg per dag. Tallene er kumulative per dato.';
+comment on table public.post_insights is 'Én rad per innlegg per dag og slot (morgen/kveld). Tallene er kumulative.';
+
+-- Lagt til etter første versjon: snapshot_slot i nøkkelen (se supabase/migrations/)
+do $$
+begin
+    if not exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'post_insights'
+          and column_name = 'snapshot_slot'
+    ) then
+        alter table public.post_insights
+            add column snapshot_slot text not null default 'morgen'
+            check (snapshot_slot in ('morgen', 'kveld'));
+        alter table public.post_insights drop constraint post_insights_pkey;
+        alter table public.post_insights add primary key (post_id, snapshot_date, snapshot_slot);
+    end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Daglige øyeblikksbilder av kontoen
@@ -136,10 +154,11 @@ select distinct on (p.id)
     i.reach, i.views, i.likes, i.comments, i.saved, i.shares,
     i.total_interactions, i.avg_watch_time_ms, i.total_watch_time_ms,
     i.engagement_rate,
-    i.raw
+    i.raw,
+    i.snapshot_slot
 from public.posts p
 left join public.post_insights i on i.post_id = p.id
-order by p.id, i.snapshot_date desc;
+order by p.id, i.snapshot_date desc, i.fetched_at desc;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security: på, uten policies

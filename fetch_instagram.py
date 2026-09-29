@@ -3,7 +3,7 @@ NM Insights - datainnhenter for Instagram (Meta Graph API).
 
 Henter innlegg + innsiktstall for én Instagram-konto og lagrer dem i Supabase:
   posts             metadata og konsept (alle innlegg, hver kjøring)
-  post_insights     dagens tall, med hele API-svaret i raw
+  post_insights     dagens tall (morgen eller kveld), med hele API-svaret i raw
   account_insights  følgere, fulgte og antall innlegg (hver kjøring), og
                     nye følgere per dag for de siste 30 dagene (Metas maks)
 
@@ -42,6 +42,7 @@ DATA_DIR = Path("data")
 REFRESH_ALWAYS_DAYS = 30  # innlegg yngre enn dette får nye tall hver kjøring
 REFRESH_OLD_DAYS = 7      # eldre innlegg: nye tall hvis siste tall er eldre enn dette
 FOLLOWER_HISTORY_DAYS = 30  # maks Meta gir for follower_count
+EVENING_FROM_HOUR = 14      # kjøringer fra kl. 14 Oslo-tid lagres som kveld, ellers morgen
 
 MEDIA_FIELDS = (
     "id,caption,media_type,media_product_type,timestamp,"
@@ -221,10 +222,15 @@ def post_row(account_id, post, now_iso):
     }
 
 
-def insight_row(post_id, post, raw, today, now_iso):
+def snapshot_slot(now):
+    return "kveld" if now.hour >= EVENING_FROM_HOUR else "morgen"
+
+
+def insight_row(post_id, post, raw, today, slot, now_iso):
     return {
         "post_id": post_id,
         "snapshot_date": today.isoformat(),
+        "snapshot_slot": slot,
         "fetched_at": now_iso,
         "reach": post.get("reach"),
         "views": post.get("views"),
@@ -385,10 +391,10 @@ def main():
     )
     post_ids = {r["platform_post_id"]: r["id"] for r in saved}
     insight_rows = [
-        insight_row(post_ids[p["id"]], p, raw_by_id[p["id"]], today, now_iso)
+        insight_row(post_ids[p["id"]], p, raw_by_id[p["id"]], today, snapshot_slot(now), now_iso)
         for p in posts if p["id"] in raw_by_id
     ]
-    db.upsert("post_insights", insight_rows, on_conflict="post_id,snapshot_date")
+    db.upsert("post_insights", insight_rows, on_conflict="post_id,snapshot_date,snapshot_slot")
     account, follower_days = save_account_insights(account_id, today, now_iso)
 
     save_backup(posts)

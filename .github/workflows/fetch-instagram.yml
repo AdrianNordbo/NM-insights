@@ -1,15 +1,19 @@
 name: Daglig Instagram-henting
 
-# Kjører fetch_instagram.py hver morgen kl. 07 norsk tid, og kan startes manuelt
-# (Actions -> Daglig Instagram-henting -> Run workflow).
+# Kjører fetch_instagram.py kl. 07 og kl. 20 norsk tid hver dag, og kan startes
+# manuelt (Actions -> Daglig Instagram-henting -> Run workflow).
+# Kveldskjøringen gir målinger nærmere 24 og 48 timer etter publisering for
+# innlegg som publiseres på kvelden.
 #
-# Cron i GitHub Actions er alltid UTC. 07:00 i Oslo er 05:00 UTC om sommeren
-# (CEST) og 06:00 UTC om vinteren (CET), så vi planlegger begge og lar et
-# kontrollsteg slippe gjennom bare den som stemmer med dagens sommer-/vintertid.
+# Cron i GitHub Actions er alltid UTC. Hvert tidspunkt planlegges både for
+# sommertid (UTC+2) og vintertid (UTC+1), og et kontrollsteg slipper bare
+# gjennom utløseren som faktisk tilsvarer 07 eller 20 i Oslo i dag.
 on:
   schedule:
-    - cron: "0 5 * * *"   # 07:00 Oslo sommertid
-    - cron: "0 6 * * *"   # 07:00 Oslo vintertid
+    - cron: "0 5 * * *"    # 07:00 Oslo sommertid
+    - cron: "0 6 * * *"    # 07:00 Oslo vintertid
+    - cron: "0 18 * * *"   # 20:00 Oslo sommertid
+    - cron: "0 19 * * *"   # 20:00 Oslo vintertid
   workflow_dispatch:
 
 permissions:
@@ -30,15 +34,14 @@ jobs:
           EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
         run: |
-          offset=$(TZ=Europe/Oslo date +%z)
+          offset=$(TZ=Europe/Oslo date +%z)          # +0200 eller +0100
+          offset_hours=$((10#${offset:1:2}))
           if [ "$EVENT" != "schedule" ]; then
             run=true
-          elif [ "$offset" = "+0200" ] && [ "$SCHEDULE" = "0 5 * * *" ]; then
-            run=true
-          elif [ "$offset" = "+0100" ] && [ "$SCHEDULE" = "0 6 * * *" ]; then
-            run=true
           else
-            run=false
+            utc_hour=$((10#$(echo "$SCHEDULE" | cut -d' ' -f2)))
+            oslo_hour=$(( (utc_hour + offset_hours) % 24 ))
+            if [ "$oslo_hour" = "7" ] || [ "$oslo_hour" = "20" ]; then run=true; else run=false; fi
           fi
           echo "Oslo UTC-offset $offset, utløser '${SCHEDULE:-manuell}': run=$run"
           echo "run=$run" >> "$GITHUB_OUTPUT"
