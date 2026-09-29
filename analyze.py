@@ -28,7 +28,8 @@ HOUR_BINS = [0, 13, 16, 19, 21, 24]
 HOUR_LABELS = ["før 13", "13–15", "16–18", "19–20", "21–23"]
 FORMATS = {"REELS": "Reels", "FEED": "Feed"}
 NUMERIC_COLUMNS = [
-    "reach", "views", "saved", "shares", "total_interactions", "engagement_rate", "avg_watch_time_ms",
+    "reach", "views", "likes", "comments", "saved", "shares", "total_interactions",
+    "engagement_rate", "avg_watch_time_ms",
 ]
 
 

@@ -21,8 +21,10 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import requests
 
 import db
+import fetch_instagram as meta
 from analyze import DATA_DIR, MIN_AGE_DAYS, MIN_POSTS, OSLO, WEEKDAYS, load_posts
 from concepts import CONCEPTS_START, FOR_KONSEPTER, UKJENT
 
@@ -32,6 +34,11 @@ FOLLOWER_COVERAGE = 0.9  # andel dager med følgerdata som kreves for å sammenl
 # Alder i timer for sammenligning på samme alder: (mål, tillatt vindu)
 AGE_POINTS = {"24 t": (24, 12, 36), "48 t": (48, 36, 60)}
 TIME_TESTS_FILE = Path("time_tests.csv")
+UNIQUE_REACH_MAX_DAYS = 30  # Metas grense mellom since og until
+TOTAL_METRICS = [
+    ("Visninger", "views"), ("Likes", "likes"), ("Kommentarer", "comments"),
+    ("Lagringer", "saved"), ("Delinger", "shares"), ("Totale interaksjoner", "total_interactions"),
+]
 MONTHS_NO = ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august",
              "september", "oktober", "november", "desember"]
 NON_CONCEPTS = {FOR_KONSEPTER, UKJENT}
@@ -308,15 +315,22 @@ def month_report(posts, hist, followers, now, ym):
     notes.append("Reels og feed sammenlignes ikke på rekkevidde; konseptene sammenlignes innenfor hvert format.")
     out.append("<ul class='notes'>" + "".join(f"<li>{n}</li>" for n in notes) + "</ul>")
 
+    ur = unique_reach(start, end, today)
+    pur = unique_reach(prev_start, prev_end, today)
+
     # 1. Nøkkeltall
     out.append("<h2>Nøkkeltall</h2>")
     fg_delta = change_cell(change(fg["sum"], pfg["sum"])) if complete(fg) and complete(pfg) else None
     tiles = [
         stat_tile("Innlegg publisert", num(kf["published"]),
                   change_cell(change(kf["published"], pkf["published"]))),
-        stat_tile("Samlet rekkevidde", num(kf["reach_sum"]),
+        stat_tile("Unike kontoer nådd", num(ur["value"]),
+                  change_cell(change(ur["value"], pur["value"])) if pur else None,
+                  f"hele kontoen, {ur['from']:%d.%m}–{ur['to']:%d.%m}")
+        if ur else
+        stat_tile("Rekkevidde, sum per innlegg", num(kf["reach_sum"]),
                   change_cell(change(kf["reach_sum"], pkf["reach_sum"])),
-                  f"sum over {kf['mature']} innlegg ≥ {MIN_AGE_DAYS} dager"),
+                  "samme person kan telles flere ganger"),
         stat_tile("Engasjementsrate (median)", pct(kf["eng_median"]),
                   change_cell(change(kf["eng_median"], pkf["eng_median"])),
                   f"snitt {pct(kf['eng_mean'])}"),
@@ -328,6 +342,8 @@ def month_report(posts, hist, followers, now, ym):
         flags.append(f"Følgervekst sammenlignes ikke med {prev_name}: for få dager med data "
                      f"({pfg['days']} av {pfg['expected']} i {prev_name}, {fg['days']} av {fg['expected']} i {month_name}).")
     out.append(f"<p>{follower_text(fg)}</p>")
+
+    out.append(totals_section(cur_all, prev_all, ur, pur, fg, pfg, month_name, prev_name, cutoff))
 
     # Rekkevidde per format (median), med endring
     vm_cur, vm_prev = cur["is_vm"].sum(), prev["is_vm"].sum()
@@ -424,6 +440,91 @@ def month_report(posts, hist, followers, now, ym):
                if flags else "<p>Ingen flagg.</p>")
     out.append(assessment_section())
     return f"Månedsrapport {month_name}", "\n".join(out)
+
+
+def unique_reach(start, end, today):
+    """Unike kontoer nådd for hele kontoen i perioden (alt innhold), fra Meta.
+
+    Meta tillater maks 30 dager per spørring og har ikke dagens døgn ferdig, så
+    perioden kuttes til de første 30 dagene og til og med i går. Returnerer None
+    hvis API-et ikke svarer."""
+    last = min(end, today - timedelta(days=1), start + timedelta(days=UNIQUE_REACH_MAX_DAYS - 1))
+    if last < start:
+        return None
+
+    def ts(d):
+        return int(datetime.combine(d, datetime.min.time(), OSLO).timestamp())
+    try:
+        data = meta.api_get(f"{meta.IG_USER_ID}/insights", {
+            "metric": "reach", "period": "day", "metric_type": "total_value",
+            "since": ts(start), "until": ts(last + timedelta(days=1)),
+        })
+        value = data["data"][0]["total_value"]["value"]
+    except (meta.MetaApiError, requests.RequestException, KeyError, IndexError, ValueError):
+        return None
+    return {"value": value, "from": start, "to": last,
+            "days": (last - start).days + 1, "month_days": (end - start).days + 1}
+
+
+def totals_section(cur_all, prev_all, ur, pur, fg, pfg, month_name, prev_name, cutoff):
+    """Summer for alle innlegg publisert i måneden, med endring og per innlegg."""
+    n, pn = len(cur_all), len(prev_all)
+
+    def per_post(total, count):
+        return None if not count or total is None or pd.isna(total) else total / count
+
+    def pp(total, count):
+        value = per_post(total, count)
+        return num(value, 1 if value is not None and value < 10 else 0)
+
+    rows = [["<b>Innlegg publisert</b>", num(n), num(pn), change_cell(change(n, pn)), "", ""]]
+    if ur:
+        rows.append(["Unike kontoer nådd <span class='muted'>(hele kontoen)</span>",
+                     num(ur["value"]), num(pur["value"]) if pur else "–",
+                     change_cell(change(ur["value"], pur["value"])) if pur else "–", "–", "–"])
+    else:
+        v, pv = cur_all["reach"].sum(min_count=1), prev_all["reach"].sum(min_count=1)
+        rows.append(["Rekkevidde <span class='tag'>sum per innlegg, samme person kan telles flere ganger</span>",
+                     num(v), num(pv), change_cell(change(v, pv)),
+                     pp(v, n), pp(pv, pn)])
+    for label, col in TOTAL_METRICS:
+        v, pv = cur_all[col].sum(min_count=1), prev_all[col].sum(min_count=1)
+        rows.append([label, num(v), num(pv), change_cell(change(v, pv)),
+                     pp(v, n), pp(pv, pn)])
+    fg_ok = complete(fg) and complete(pfg)
+    rows.append(["Nye følgere", num(fg["sum"]), num(pfg["sum"]),
+                 change_cell(change(fg["sum"], pfg["sum"])) if fg_ok else "–", "–", "–"])
+
+    young = (cur_all["time"] > cutoff).sum()
+    notes = [
+        f"Summene gjelder alle innlegg publisert i måneden, med siste måling. De påvirkes av antall "
+        f"innlegg ({n} mot {pn}), så se også «per innlegg»."
+        + (f" {young} av innleggene er yngre enn {MIN_AGE_DAYS} dager og samler fortsatt tall." if young else ""),
+    ]
+    if ur:
+        def span(u):
+            text = f"{u['from']:%d.%m}–{u['to']:%d.%m}"
+            return text + (f" ({u['days']} av {u['month_days']} dager)" if u["days"] < u["month_days"] else "")
+        notes.append(
+            "Unike kontoer nådd er Metas tall for hele kontoen: alle kontoer som så noe av innholdet "
+            "(også eldre innlegg og historier) i perioden, hver telt én gang. Det er derfor ikke begrenset "
+            f"til innleggene publisert i måneden. Periode: {month_name} {span(ur)}"
+            + (f", {prev_name} {span(pur)}" if pur else "")
+            + f". Meta gir maks {UNIQUE_REACH_MAX_DAYS} dager per spørring, og døgnene følger Metas tidssone.")
+    else:
+        notes.append("Meta svarte ikke med unik rekkevidde for kontoen, så rekkevidde vises som sum per innlegg.")
+    if not fg_ok:
+        notes.append(f"Nye følgere sammenlignes ikke: for få dager med data "
+                     f"({fg['days']} av {fg['expected']} og {pfg['days']} av {pfg['expected']}).")
+
+    return ("<h2>Totalt for måneden</h2>"
+            + table(["", month_name.capitalize(), prev_name.capitalize(), "Endring",
+                     f"Per innlegg {month_abbr(month_name)}", f"Per innlegg {month_abbr(prev_name)}"], rows)
+            + "<ul class='notes'>" + "".join(f"<li>{t}</li>" for t in notes) + "</ul>")
+
+
+def month_abbr(name):
+    return name.split()[0][:3]
 
 
 def assessment_section():
