@@ -27,13 +27,16 @@ WEEKDAYS = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søn
 HOUR_BINS = [0, 13, 16, 19, 21, 24]
 HOUR_LABELS = ["før 13", "13–15", "16–18", "19–20", "21–23"]
 FORMATS = {"REELS": "Reels", "FEED": "Feed"}
-NUMERIC_COLUMNS = ["reach", "views", "saved", "shares", "engagement_rate", "avg_watch_time_ms"]
+NUMERIC_COLUMNS = [
+    "reach", "views", "saved", "shares", "total_interactions", "engagement_rate", "avg_watch_time_ms",
+]
 
 
 def load_posts():
     account = db.get_account("instagram", os.getenv("IG_USER_ID"))
     rows = db.select("posts_latest", {
         "select": "id,published_at,media_product_type,concept,special_event,snapshot_date,"
+                  "permalink,caption,"
                   + ",".join(NUMERIC_COLUMNS),
         "account_id": f"eq.{account['id']}",
         "order": "id",

@@ -48,17 +48,34 @@ Mål: månedsrapport med funn og konkrete forslag til tester, som kan vises til 
   sendes videre til produsenten.
 - Produksjonstid per konsept er ukjent og skal ikke brukes i analysen.
 
-## Arkitektur (pipeline)
-Datainnhenter (Python) → Tallanalytiker (pandas, ingen LLM) + Innholdsagent (Claude: konsept, tema, hook, hashtags)
-→ Mønsteragent → Strategiagent + Kritiker (avviser funn med for lite datagrunnlag) → Månedsrapport
+## Arkitektur
+Fase 1 (nå): ingen Claude API og ingen agenter.
+Datainnhenter (fetch_instagram.py, daglig i GitHub Actions) → Supabase
+→ Tallanalyse (analyze.py, pandas) → Regelbasert rapport (report.py, HTML med grafer)
+- Rapporten lager tall, grafer og automatiske flagg, men ingen tolkning.
+- Den kvalitative delen (hooks, tema, vurdering og anbefalinger til produsenten) gjør Adrian
+  manuelt med Claude Code, i seksjonen «Vurdering og anbefalinger» i rapporten.
+
+Fase 2 (når det finnes betalende kunder): agenter med Claude API
+(innholdsagent, mønsteragent, strategiagent + kritiker).
+
+## Arbeidsflyt
+- Ukentlig gjennomgang hver søndag (report.py --periode uke): justeringer av tidspunkt,
+  rekkefølge og tester. Ukens innlegg sammenlignes med konseptets vanlige nivå på samme alder.
+  Ingen konseptbeslutninger i ukesrapporten.
+- Månedlig rapport (report.py --periode måned): beslutninger om konsepter og rapportering
+  til Veksthuset.
+- Tidspunkt-tester registreres i time_tests.csv og følges opp i ukesrapporten.
 
 ## Stack
-Python, Supabase, GitHub Actions (daglig kjøring), Claude API
+Python, pandas, Supabase, GitHub Actions (daglig kjøring). Claude API først i fase 2.
 
 ## Neste steg
-Ferdig: Bearer-token, Git/GitHub, konseptmerking, Supabase, tallanalytiker, daglig kjøring i GitHub Actions.
+Ferdig: Bearer-token, Git/GitHub, konseptmerking, Supabase, tallanalytiker, daglig kjøring
+i GitHub Actions, rapportgenerator (report.py).
 1. Verifisere at den planlagte kjøringen i GitHub Actions går som den skal
-2. Agenter og månedsrapport
+2. Første ukentlige gjennomgang og månedsrapport med vurdering fylt ut
+3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokenet skal aldri stå i URL-er eller feilmeldinger.
