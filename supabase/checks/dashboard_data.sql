@@ -35,3 +35,16 @@ from (
 ) x
 where rn <= 2
 order by platform, format, period_type, period_start desc;
+
+-- 4. Nye kolonner i content_latest (2026-09-30_content_latest_details.sql).
+--    Forventet: 0 uten title, permalink eller fetched_at på begge plattformer.
+select platform,
+       count(*)                                        as rows,
+       count(*) filter (where title is null)           as without_title,
+       count(*) filter (where permalink is null)       as without_permalink,
+       count(*) filter (where fetched_at is null)      as without_fetched_at,
+       max(length(title))                              as longest_title,
+       max(fetched_at)                                 as latest_fetch
+from dashboard.content_latest
+group by platform
+order by platform;

@@ -363,7 +363,10 @@ select
     p.likes::bigint                                              as likes,
     p.comments::bigint                                           as comments,
     round((extract(epoch from (now() - p.published_at)) / 86400)::numeric, 1) as age_days,
-    (p.published_at <= now() - interval '7 days')                as is_mature
+    (p.published_at <= now() - interval '7 days')                as is_mature,
+    left(nullif(btrim(split_part(coalesce(p.caption, ''), E'\n', 1)), ''), 200) as title,
+    p.permalink,
+    p.fetched_at
 from public.posts_latest p
 union all
 select
@@ -378,12 +381,16 @@ select
     y.likes::bigint,
     y.comments::bigint,
     round((extract(epoch from (now() - y.published_at)) / 86400)::numeric, 1),
-    (y.published_at <= now() - interval '7 days')
+    (y.published_at <= now() - interval '7 days'),
+    y.title,
+    y.permalink,
+    y.fetched_at
 from public.youtube_videos_latest y
 where y.format = 'SHORTS';                                                            -- VIDEO holdes utenfor
 
 comment on view dashboard.content_latest is
-    'Én rad per innlegg/video (siste måling). YouTube: Data API-tall, bare SHORTS. published_at i Europe/Oslo.';
+    'Én rad per innlegg/video (siste måling). YouTube: Data API-tall, bare SHORTS. published_at i Europe/Oslo. '
+    'title = første linje av captionen (Instagram) eller videotittelen (YouTube). fetched_at er timestamptz.';
 
 -- ---------------------------------------------------------------------------
 -- 2. concept_summary: median per plattform + format + konsept, bare modne innlegg
