@@ -13,11 +13,11 @@ import type {
 const PAGE_SIZE = 1000;
 const FRIENDLY_ERROR = "Klarte ikke å hente tallene akkurat nå. Prøv igjen om litt.";
 
-type PostgrestError = { code?: string; message?: string } | null;
+type PostgrestError = { code?: string; message?: string; details?: string; hint?: string } | null;
 
-function fail<T>(where: string, error: PostgrestError): Result<T> {
-  // Detaljene logges på serveren; brukeren får en rolig melding.
-  console.error(`Lesing av ${where} feilet:`, error?.code, error?.message);
+function fail<T>(where: string, error: PostgrestError, status?: number): Result<T> {
+  // Hele feilen logges på serveren (Vercel → Logs); brukeren får en rolig melding.
+  console.error(`Lesing av ${where} feilet:`, JSON.stringify({ status, error }));
   return { ok: false, error: FRIENDLY_ERROR };
 }
 
@@ -26,12 +26,12 @@ async function selectAll<T>(view: DashboardView, columns: string, order: string)
     const supabase = await createClient();
     const rows: T[] = [];
     for (let from = 0; ; from += PAGE_SIZE) {
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from(view)
         .select(columns)
         .order(order)
         .range(from, from + PAGE_SIZE - 1);
-      if (error) return fail(view, error);
+      if (error) return fail(view, error, status);
       rows.push(...((data ?? []) as T[]));
       if (!data || data.length < PAGE_SIZE) return { ok: true, data: rows };
     }
@@ -45,8 +45,9 @@ async function selectAll<T>(view: DashboardView, columns: string, order: string)
 export async function countRows(view: DashboardView): Promise<Result<number>> {
   try {
     const supabase = await createClient();
-    const { count, error } = await supabase.from(view).select("*", { count: "exact", head: true });
-    if (error || count === null) return fail(view, error);
+    // HEAD-svar har ingen body, så ved feil er HTTP-statusen det eneste som finnes. Den logges med.
+    const { count, error, status } = await supabase.from(view).select("*", { count: "exact", head: true });
+    if (error || count === null) return fail(view, error, status);
     return { ok: true, data: count };
   } catch (error) {
     unstable_rethrow(error); // Next sine interne signaler (f.eks. fra cookies()) skal ikke fanges

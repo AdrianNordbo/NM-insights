@@ -176,6 +176,28 @@ a {
   margin: 32px 0 8px;
 }
 
+.warning {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff4d6;
+  color: #5c4400;
+  border: 1px solid #e9c46a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .warning {
+    background: #2a2616;
+    color: #f3d98b;
+    border-color: #7a6424;
+  }
+}
+
+:root[data-theme="dark"] .warning {
+  background: #2a2616;
+  color: #f3d98b;
+  border-color: #7a6424;
+}
+
 .notice {
   padding: 10px 14px;
   border-radius: 8px;

@@ -90,21 +90,31 @@ export default async function Home() {
       )}
 
       <h2>Sjekk: rådata er stengt</h2>
-      {rawAccess.blocked === true && (
+      {rawAccess.verdict === "blocked" && (
         <Notice>
-          ✅ Lesing av <code>public.posts</code> som innlogget bruker ble avvist ({rawAccess.code}, permission denied),
-          som forventet.
+          ✅ Lesing av <code>public.posts</code> som innlogget bruker ble avvist, som forventet (HTTP{" "}
+          {rawAccess.status}
+          {rawAccess.code ? `, ${rawAccess.code}` : ""}
+          {rawAccess.message ? `: ${rawAccess.message}` : ""}).
         </Notice>
       )}
-      {rawAccess.blocked === false && (
-        <p className="error" role="alert">
-          ⚠️ Innlogget bruker kunne lese <code>public.posts</code> ({nb.format(rawAccess.rows)} rader). Dette skal
-          ikke være mulig. Sjekk rettighetene i Supabase.
+      {rawAccess.verdict === "no_rows" && (
+        <p className="warning" role="alert">
+          ⚠️ Forespørselen mot <code>public.posts</code> ble ikke avvist (HTTP {rawAccess.status}, 0 rader). Rollen
+          ser ut til å ha SELECT på tabellen, og bare RLS stopper radene. Det avviker fra oppsettet (ingen grants på
+          rådata).
         </p>
       )}
-      {rawAccess.blocked === null && (
+      {rawAccess.verdict === "data_returned" && (
+        <p className="error" role="alert">
+          ⚠️ Innlogget bruker kunne lese <code>public.posts</code> (HTTP {rawAccess.status}, data kom tilbake). Dette
+          skal ikke være mulig. Sjekk rettighetene i Supabase.
+        </p>
+      )}
+      {rawAccess.verdict === "inconclusive" && (
         <Notice>
-          Sjekken kunne ikke fullføres, så det er uklart om rådata er stengt. Detaljer: {rawAccess.error}
+          Sjekken kunne ikke fullføres, så det er uklart om rådata er stengt
+          {rawAccess.status ? ` (HTTP ${rawAccess.status})` : ""}. Detaljer: {rawAccess.detail}
         </Notice>
       )}
     </main>
