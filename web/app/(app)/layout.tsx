@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Faner } from "@/components/Faner";
 import { getUser } from "@/lib/auth";
 
 /**
@@ -22,6 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </span>
       </header>
+      <div className="tabs-wrap">
+        <Faner />
+      </div>
       {children}
     </>
   );

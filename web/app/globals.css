@@ -72,15 +72,32 @@ a {
   color: var(--ink-2);
 }
 
-.page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 16px 64px;
+.small {
+  font-size: 13px;
 }
 
-.page h1 {
-  font-size: 28px;
-  margin: 0 0 8px;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.error {
+  color: var(--down);
+}
+
+/* --- Ramme ------------------------------------------------------------------ */
+
+.topbar,
+.tabs-wrap,
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .topbar {
@@ -88,10 +105,8 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--grid);
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 .brand {
@@ -121,6 +136,442 @@ a {
   cursor: pointer;
   text-decoration: underline;
 }
+
+.tabs-wrap {
+  border-bottom: 1px solid var(--grid);
+}
+
+.tabs {
+  display: flex;
+  gap: 20px;
+}
+
+.tabs a {
+  padding: 8px 0 10px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--ink);
+}
+
+.page {
+  padding-top: 24px;
+  padding-bottom: 64px;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.page h1 {
+  font-size: 26px;
+  margin: 0;
+}
+
+.page h2 {
+  font-size: 18px;
+  margin: 36px 0 12px;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.notice {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--tag-bg);
+  color: var(--ink-2);
+}
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tag-bg);
+  color: var(--ink-2);
+  vertical-align: 1px;
+}
+
+/* --- Info-ikon (native popover) ------------------------------------------- */
+
+.info {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid var(--axis);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 600 10px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.info:hover,
+.info:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink-2);
+}
+
+.info-pop {
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* --- Anbefalinger ---------------------------------------------------------- */
+
+.recommendations {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: 1px dashed var(--axis);
+  border-radius: 10px;
+}
+
+.recommendations h2 {
+  font-size: 14px;
+  margin: 0 0 2px;
+  color: var(--ink-2);
+}
+
+.recommendations p {
+  margin: 0;
+}
+
+/* --- Kort ------------------------------------------------------------------ */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.card.coming {
+  border-style: dashed;
+  background: transparent;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.card p {
+  margin: 4px 0;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.kv dt {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.kv dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kv.compact {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.kv.compact > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.big {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.week {
+  margin-top: 14px !important;
+  padding-top: 10px;
+  border-top: 1px solid var(--grid);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.format-row {
+  margin-top: 10px;
+}
+
+.format-row h4 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+.arrow {
+  font-size: 10px;
+  margin: 0 2px 0 4px;
+}
+
+.arrow.up {
+  color: var(--up);
+}
+
+.arrow.down {
+  color: var(--down);
+}
+
+.arrow.same {
+  color: var(--muted);
+}
+
+.prev {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.post-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.post-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.post-title a:hover {
+  text-decoration: underline;
+}
+
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px !important;
+}
+
+.metric .big {
+  font-size: 22px;
+}
+
+.ratio {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.ratio.highlight {
+  color: var(--up);
+  font-weight: 600;
+}
+
+/* --- Konsepter ------------------------------------------------------------- */
+
+.concept-block {
+  margin-top: 16px;
+  padding: 14px 16px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.concept-block h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.concept-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) 64px 1.5fr 1.5fr;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid var(--grid);
+  font-size: 14px;
+}
+
+.concept-row.head {
+  border-top: 0;
+  padding-top: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.concept-row .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.concept-row.avsluttet .concept-name,
+.concept-row.forelopig .concept-name {
+  color: var(--ink-2);
+}
+
+.concept-name .muted,
+.concept-name .tag,
+.ratio .tag {
+  margin-left: 4px;
+}
+
+.metric-cell {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-cell .value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-track {
+  display: block;
+  height: 8px;
+}
+
+.bar {
+  display: block;
+  height: 8px;
+  border-radius: 0 4px 4px 0;
+  background: var(--series-1);
+}
+
+.bar.muted-bar {
+  background: var(--series-prev);
+}
+
+.mobile-label {
+  display: none;
+}
+
+.events {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--grid);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.events summary {
+  cursor: pointer;
+}
+
+.events ul {
+  margin: 6px 0 4px;
+  padding-left: 18px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--axis);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: left 0.15s;
+}
+
+.switch.on {
+  background: var(--series-1);
+}
+
+.switch.on::after {
+  left: 14px;
+}
+
+@media (max-width: 600px) {
+  .concept-row.head {
+    display: none;
+  }
+
+  .concept-row {
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+  }
+
+  .concept-row .posts {
+    color: var(--ink-2);
+    font-size: 13px;
+  }
+
+  .metric-cell {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1.2fr 64px;
+  }
+
+  .mobile-label {
+    display: inline;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+}
+
+/* --- Innlogging -------------------------------------------------------------- */
 
 .auth-card {
   max-width: 420px;
@@ -165,73 +616,4 @@ a {
   background: var(--series-1);
   color: #fff;
   cursor: pointer;
-}
-
-.error {
-  color: var(--down);
-}
-
-.page h2 {
-  font-size: 18px;
-  margin: 32px 0 8px;
-}
-
-.warning {
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #fff4d6;
-  color: #5c4400;
-  border: 1px solid #e9c46a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .warning {
-    background: #2a2616;
-    color: #f3d98b;
-    border-color: #7a6424;
-  }
-}
-
-:root[data-theme="dark"] .warning {
-  background: #2a2616;
-  color: #f3d98b;
-  border-color: #7a6424;
-}
-
-.notice {
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: var(--tag-bg);
-  color: var(--ink-2);
-}
-
-.data-table {
-  border-collapse: collapse;
-  width: 100%;
-  max-width: 560px;
-  font-size: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.data-table th,
-.data-table td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--grid);
-}
-
-.data-table tr:last-child td {
-  border-bottom: 0;
-}
-
-.data-table th {
-  color: var(--ink-2);
-  font-weight: 600;
-}
-
-.data-table .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }

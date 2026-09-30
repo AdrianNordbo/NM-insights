@@ -41,20 +41,6 @@ async function selectAll<T>(view: DashboardView, columns: string, order: string)
   }
 }
 
-/** Antall rader i et view, lest som innlogget bruker. */
-export async function countRows(view: DashboardView): Promise<Result<number>> {
-  try {
-    const supabase = await createClient();
-    // HEAD-svar har ingen body, så ved feil er HTTP-statusen det eneste som finnes. Den logges med.
-    const { count, error, status } = await supabase.from(view).select("*", { count: "exact", head: true });
-    if (error || count === null) return fail(view, error, status);
-    return { ok: true, data: count };
-  } catch (error) {
-    unstable_rethrow(error); // Next sine interne signaler (f.eks. fra cookies()) skal ikke fanges
-    return fail(view, { message: error instanceof Error ? error.message : String(error) });
-  }
-}
-
 export function getContentLatest(): Promise<Result<ContentLatestRow[]>> {
   return selectAll<ContentLatestRow>("content_latest", "*", "content_id");
 }
