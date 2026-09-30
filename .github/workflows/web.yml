@@ -1,0 +1,42 @@
+name: Web (dashboard)
+
+# Sjekker frontend i web/ ved endringer: ingen Supabase-nøkkel med full tilgang, lint og bygg.
+# Selve publiseringen gjør Vercel.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["web/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: Ingen Supabase-nøkkel med full tilgang i web/
+        run: npm run check:secrets
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Bygg
+        run: npm run build
