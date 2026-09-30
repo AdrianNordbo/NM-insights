@@ -32,6 +32,7 @@ og en plassholder for TikTok («kommer»).
 | demo_report.py | Anonymisert demo av månedsrapporten (Instagram og YouTube med ekte tall, titler/captions/lenker skjult) der «TikTok kommer» byttes ut med «TikTok (planlagt)» med eksempeltall |
 | record_demo.py | Playwright-videoopptak av demoen → data/demo_tiktok.mp4 (ikke committet ennå) |
 | supabase/schema.sql | Fullt skjema, idempotent. supabase/migrations/ har endringer for eksisterende database |
+| supabase/checks/ | Kontrollspørringer for SQL Editor: dashboard_access.sql (rettigheter, blokk A–G) og dashboard_data.sql (tall i viewene) |
 | .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram og YouTube (egne jobber) |
 | secrets/ | youtube_client_secret.json (OAuth-klient) og youtube_token.json. Gitignored, skal aldri committes |
 
@@ -109,6 +110,11 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   - `youtube_video_daily`: Analytics per video per Stillehavsdøgn (tall per døgn, ikke kumulative).
   - Visningen `youtube_videos_latest`: nyeste måling per video; shares/abonnenter fra nyeste måling der de
     ble hentet (per_video_end_date).
+  - `posts_latest` og `youtube_videos_latest` MÅ ha `security_invoker = false` (satt i
+    2026-09-30_latest_views_owner_rights.sql). Et view med security_invoker = true sjekkes som brukeren
+    som spør, også når det leses gjennom et annet view, og da får authenticated «permission denied» via
+    dashboard-viewene. Eldre migreringer (2026-09-29_snapshot_slot.sql, 2026-09-30_youtube.sql) setter
+    true; kjøres de på nytt, må owner_rights-migreringen kjøres etterpå.
   - YouTube-kanalen bruker `account_insights` (account_id 2): followers_count = abonnenter,
     media_count = videoer, new_followers = subscribersGained per Stillehavsdøgn.
 - Oppdateringsstrategi: innlegg/videoer yngre enn 30 dager får nye tall hver kjøring; eldre bare hvis de ikke
@@ -117,6 +123,32 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   alle én gang i uken. youtube_video_daily hentes på nytt fra publisering for videoer yngre enn 30 dager.
   Backfill (`fetch_youtube.py --backfill`) er kjørt 30.09.2026: daglig historikk fra 15.06 for alle videoer og
   nye abonnenter per døgn fra 04.06.
+- Schema `dashboard` (datalag for dashboardet, 2026-09-30_dashboard.sql):
+  - `dashboard.content_latest`: én rad per innlegg/video på tvers av plattformer (platform, account_id,
+    content_id, published_at i Oslo-tid, format, concept, special_event, views, likes, comments, age_days,
+    is_mature ≥ 7 dager). Instagram fra posts_latest (REELS/FEED); YouTube fra youtube_videos_latest med
+    Data API-tall, bare SHORTS. Ikke youtube_video_daily.
+  - `dashboard.concept_summary`: median views/likes/comments per plattform + konto + format + konsept +
+    special_event, bare modne innlegg, med posts og preliminary (< 6). VM får egne rader.
+  - `dashboard.platform_summary`: per plattform + konto + format + periode (uke/måned, fra første innlegg
+    til i dag): published, mature_posts, median_views (modne), new_followers, days_with_follower_data,
+    followers_end (hele kontoen, likt for alle formater), period_complete og prev_* for forrige periode.
+    Per format fordi Reels og feed ikke skal blandes i en median.
+  - Ingen engasjementsrate i viewene.
+  - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
+    `Accept-Profile: dashboard`. Tallene er verifisert mot en uavhengig beregning (ingen avvik).
+- Rettighetsmodell:
+  - Rådata (tabeller, views, sekvenser, funksjoner i public): ingen rettigheter for anon/authenticated.
+    Standardrettigheter for nye objekter i public er strammet inn for eierrollene (også global
+    EXECUTE-til-PUBLIC på nye funksjoner for eierrollen). En ny funksjon som authenticated skal bruke,
+    trenger derfor eksplisitt grant.
+  - `authenticated` har bare USAGE på schema dashboard og SELECT på de tre viewene. anon har ingenting.
+  - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
+    er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
+    advisor flagger dem som «security definer views»; det er forventet.
+  - Alle innloggede brukere ser alle kunders data i dashboard-viewene. Åpen registrering i Supabase Auth
+    må være slått av, og før neste kunde trengs filtrering per bruker/kunde i viewene.
+  - Verifisert 30.09.2026 med supabase/checks/dashboard_access.sql (blokk A–G).
 - Skjemaendringer: skriv migrering i supabase/migrations/ og oppdater schema.sql. Kode som avhenger av
   endringen pushes først etter at Adrian har kjørt SQL-en, ellers feiler de planlagte kjøringene.
 
@@ -183,6 +215,15 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   historikken mangler. Tydelig avvik = over ±50 %.
 - Tidspunkt-tester fra time_tests.csv (test mot samme konsept/format på andre tidspunkt), følgervekst per dag.
 
+## Frontend-regler (dashboard)
+- Frontend leser bare fra schema `dashboard`, aldri fra public.
+- Plattformer og formater vises hver for seg og sammenlignes aldri med hverandre.
+- Følgertall (new_followers, followers_end) vises som «ikke nok data» når `days_with_follower_data` er
+  lavere enn antall dager i perioden.
+- Konseptet «Før konsepter» er skjult som standard.
+- Grupper med `preliminary = true` merkes «foreløpig».
+- Innhold med special_event (f.eks. VM 2026) vises som egne rader, ikke blandet inn i konseptene.
+
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). «Adrians periode» = fra denne datoen.
 - Konsepter:
@@ -238,7 +279,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
-2. Dashboard for alle plattformer (Instagram, YouTube, senere TikTok), med plattform og format holdt adskilt
+2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert. Gjenstår: slå av åpen registrering i
+   Supabase Auth, og bygge frontend etter frontend-reglene. Plattform og format holdes adskilt.
 3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
@@ -261,5 +303,6 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - YouTube: kommentarer og likes fra Data API er hovedtall. Ikke bland Data API og Analytics i samme beregning.
 - youtube_video_daily (Analytics, Stillehavsdøgn) og youtube_video_insights (øyeblikksbilder) er ulike kilder
   og skal aldri blandes. «Samme alder» fra daily = publiseringsdøgn + neste døgn, ikke eksakte timer.
+- Ingen grants til anon/authenticated på noe i public. Frontend skal bare lese fra schema dashboard.
 - Demo og materiale til tredjeparter skal anonymiseres (kundenavn, captions, lenker), og eksempeltall
   skal merkes tydelig på hvert element.

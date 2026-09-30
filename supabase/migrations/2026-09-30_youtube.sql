@@ -1,3 +1,7 @@
+-- NB (30.09.2026): security_invoker på «latest»-viewet her er overstyrt av
+-- 2026-09-30_latest_views_owner_rights.sql (security_invoker = false). Ikke kjør denne filen på nytt
+-- uten å kjøre den migreringen etterpå, ellers slutter dashboard-viewene å virke for authenticated.
+--
 -- NM Insights - migrering 30.09.2026: YouTube (Shorts)
 --
 -- 1. accounts tillater platform 'youtube', og Veksthusets kanal legges inn
