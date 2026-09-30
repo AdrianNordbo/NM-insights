@@ -130,11 +130,15 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Data API-tall, bare SHORTS. Ikke youtube_video_daily.
   - `dashboard.concept_summary`: median views/likes/comments per plattform + konto + format + konsept +
     special_event, bare modne innlegg, med posts og preliminary (< 6). VM får egne rader.
+    `median_engagement_per_view` = median av (likes + comments) / views per innlegg
+    (2026-09-30_concept_engagement.sql). Bare sammenlignbar innenfor samme plattform og format, og ikke
+    samme definisjon som engasjementsraten i Instagram-rapporten (total_interactions / reach).
   - `dashboard.platform_summary`: per plattform + konto + format + periode (uke/måned, fra første innlegg
     til i dag): published, mature_posts, median_views (modne), new_followers, days_with_follower_data,
     followers_end (hele kontoen, likt for alle formater), period_complete og prev_* for forrige periode.
     Per format fordi Reels og feed ikke skal blandes i en median.
-  - Ingen engasjementsrate i viewene.
+  - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
+    i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
     `Accept-Profile: dashboard`. Tallene er verifisert mot en uavhengig beregning (ingen avvik).
 - Rettighetsmodell:
@@ -147,7 +151,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
     advisor flagger dem som «security definer views»; det er forventet.
   - Alle innloggede brukere ser alle kunders data i dashboard-viewene. Åpen registrering i Supabase Auth
-    må være slått av, og før neste kunde trengs filtrering per bruker/kunde i viewene.
+    er slått av (30.09.2026). Før neste kunde trengs filtrering per bruker/kunde i viewene.
   - Verifisert 30.09.2026 med supabase/checks/dashboard_access.sql (blokk A–G).
 - Skjemaendringer: skriv migrering i supabase/migrations/ og oppdater schema.sql. Kode som avhenger av
   endringen pushes først etter at Adrian har kjørt SQL-en, ellers feiler de planlagte kjøringene.
@@ -219,7 +223,11 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Frontend leser bare fra schema `dashboard`, aldri fra public.
 - Plattformer og formater vises hver for seg og sammenlignes aldri med hverandre.
 - Følgertall (new_followers, followers_end) vises som «ikke nok data» når `days_with_follower_data` er
-  lavere enn antall dager i perioden.
+  lavere enn antall dager i perioden. For en periode som ikke er ferdig (`period_complete = false`)
+  sammenlignes det med antall dager som har gått: fra period_start til og med i går (dagens døgn er
+  aldri ferdig hos Meta eller YouTube). YouTube Analytics ligger 2–3 døgn etter, så YouTube viser
+  «ikke nok data» de første dagene av en ny periode.
+- `median_engagement_per_view` vises bare side om side med konsepter på samme plattform og format.
 - Konseptet «Før konsepter» er skjult som standard.
 - Grupper med `preliminary = true` merkes «foreløpig».
 - Innhold med special_event (f.eks. VM 2026) vises som egne rader, ikke blandet inn i konseptene.
@@ -279,8 +287,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
-2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert. Gjenstår: slå av åpen registrering i
-   Supabase Auth, og bygge frontend etter frontend-reglene. Plattform og format holdes adskilt.
+2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert, og åpen registrering er slått av.
+   Gjenstår: bygge frontend etter frontend-reglene. Plattform og format holdes adskilt.
 3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler

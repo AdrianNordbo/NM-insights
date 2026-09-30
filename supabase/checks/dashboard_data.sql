@@ -15,6 +15,7 @@ select s.platform, s.format, s.concept, s.special_event, s.posts,
        round(s.median_views::numeric) as median_views,
        round(s.median_likes::numeric, 1) as median_likes,
        round(s.median_comments::numeric, 1) as median_comments,
+       round((s.median_engagement_per_view * 100)::numeric, 2) as engagement_per_view_pct,
        s.preliminary
 from dashboard.concept_summary s
 join public.accounts a on a.id = s.account_id
