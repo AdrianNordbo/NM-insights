@@ -8,7 +8,8 @@ og andre kunder. Adrian (Nordbø Marketing) eier prosjektet.
 Fase 1 (nå): ingen Claude API og ingen agenter.
 
 fetch_instagram.py + fetch_youtube.py (GitHub Actions kl. 07 og 20) → Supabase
-→ analyze.py / report.py (pandas, regelbasert). Rapportene dekker foreløpig bare Instagram.
+→ analyze.py / report.py (pandas, regelbasert). Rapportene har egne seksjoner for Instagram og YouTube (Shorts),
+og en plassholder for TikTok («kommer»).
 
 - Rapportene lager tall, grafer og automatiske flagg, men ingen tolkning.
 - Den kvalitative delen (hooks, tema, vurdering, anbefalinger til produsenten) gjør Adrian manuelt med
@@ -28,7 +29,7 @@ fetch_instagram.py + fetch_youtube.py (GitHub Actions kl. 07 og 20) → Supabase
 | analyze.py | Oppsummering av Adrians periode → data/analysis.md. `load_posts()` leser posts_latest og brukes av report.py |
 | report.py | Uke- og månedsrapport som én selvstendig HTML-fil med inline SVG-grafer |
 | time_tests.csv | Register for tidspunkt-tester (`navn;konsept;format;fra;til;tidsrom`, f.eks. `19-21`), tomt foreløpig |
-| demo_report.py | Anonymisert demo av månedsrapporten med «TikTok (planlagt)»-seksjon (eksempeltall) |
+| demo_report.py | Anonymisert demo av månedsrapporten (Instagram og YouTube med ekte tall, titler/captions/lenker skjult) der «TikTok kommer» byttes ut med «TikTok (planlagt)» med eksempeltall |
 | record_demo.py | Playwright-videoopptak av demoen → data/demo_tiktok.mp4 (ikke committet ennå) |
 | supabase/schema.sql | Fullt skjema, idempotent. supabase/migrations/ har endringer for eksisterende database |
 | .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram og YouTube (egne jobber) |
@@ -124,7 +125,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
 - Workflow: cron 05, 06, 18, 19 UTC. Jobben `gate` regner ut Oslo-timen for utløseren og slipper bare
   gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid. Jobbene `instagram` og
   `youtube` avhenger bare av gate, så en feil i den ene stopper ikke den andre.
-- Instagram-kjøringene er verifisert (29.09 kl. 20:13 og 30.09 kl. 07:14).
+- Instagram-kjøringene er verifisert (29.09 kl. 20:13 og 30.09 kl. 07:14), og YouTube-kjøringen fungerer i Actions.
 - Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL, SUPABASE_SECRET_KEY, YOUTUBE_CLIENT_ID,
   YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN.
 - data/posts.json og data/youtube_videos.json finnes ikke i Actions; der er Supabase eneste lager.
@@ -146,6 +147,22 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
 Felles: innlegg yngre enn 7 dager utelates fra sammenligninger av endelige tall. Grupper under 6 innlegg
 merkes «foreløpig». Reels og feed sammenlignes aldri på rekkevidde; konsepter sammenlignes innenfor format.
 Grafer er inline SVG (ingen eksterne avhengigheter), fargetokens med lys/mørk modus.
+Oppbygging: én seksjon per plattform (Instagram, YouTube (Shorts), TikTok «kommer»), deretter den manuelle
+seksjonen. Plattformene sammenlignes aldri med hverandre. Rapportene lager ingen anbefalinger; foreløpig-
+merkede grupper skal ikke ligge til grunn for anbefalingene Adrian skriver.
+
+YouTube-seksjonen (report.py: load_youtube, youtube_month_section, youtube_week_section):
+- Bare format SHORTS. Antall VIDEO som er holdt utenfor (i perioden og totalt) står alltid i rapporten.
+- Hovedtall fra Data API (visninger, likes, kommentarer). Visningstid og andel sett (Analytics) bare for
+  videoer der analytics_end_date dekker de første 7 Stillehavsdøgnene, med eget antall («Med Analytics»).
+- Andel sett over 100 % forklares (Shorts looper) og kappes ikke. Ingen engasjementsrate (ingen rekkevidde
+  per video), og ingen sammenligning med Instagram.
+- Måned: nøkkeltall (Shorts, visninger, median visninger per Short, nye abonnenter), «Totalt for måneden»,
+  konsepter (median/snitt visninger, median likes/kommentarer, visningstid, andel sett), beste/svakeste 3
+  etter visninger, flagg som for Instagram.
+- Uke: visninger i publiseringsdøgn + neste døgn (Stillehavstid) fra youtube_video_daily, mot median for
+  Shorts i samme konsept publisert før uken (krever ≥ 6 med komplette tall). Rapporten sier at det ikke er
+  nøyaktig 24/48 timer. Videoer uten Analytics-tall ennå står som «venter på Analytics».
 
 Månedsrapport:
 - Nøkkeltall (innlegg, unike kontoer nådd, median engasjementsrate, nye følgere) med endring fra forrige måned.
@@ -203,8 +220,7 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Tidspunkt-tester registreres i time_tests.csv og følges opp i ukesrapporten.
 
 ## Kjente problemer og begrensninger
-- GitHub kan forsinke cron, og pauser planlagte workflows etter 60 dager uten commits. YouTube-jobben i
-  Actions er ikke verifisert ennå.
+- GitHub kan forsinke cron, og pauser planlagte workflows etter 60 dager uten commits.
 - post_insights-historikken startet 29.09.2026. Sammenligning på samme alder i ukesrapporten blir først mulig
   når konseptene har ≥ 6 målte innlegg (Sitcom med ett innlegg i uken: ca. 6 uker). Radene fra 29.09 er merket
   'morgen' selv om de ble hentet midt på dagen.
@@ -223,9 +239,7 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
 2. Dashboard for alle plattformer (Instagram, YouTube, senere TikTok), med plattform og format holdt adskilt
-3. Verifisere den første YouTube-kjøringen i GitHub Actions
-4. YouTube inn i uke- og månedsrapporten
-5. Fase 2 (agenter med Claude API) når det finnes betalende kunder
+3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller

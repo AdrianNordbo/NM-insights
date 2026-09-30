@@ -19,6 +19,7 @@ import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -145,6 +146,8 @@ def column_chart(items, title, value_fmt=lambda v: num(v)):
     """Stående søyler per dag. items: [(etikett, verdi eller None)]."""
     if not any(v is not None and not pd.isna(v) for _, v in items):
         return ""
+    if not any(v for _, v in items if v is not None and not pd.isna(v)):
+        return f"<p class='muted'>{esc(title)}: 0 i hele perioden.</p>"
     width, height, top, bottom, left = 640, 180, 18, 24, 32
     plot_h = height - top - bottom
     vmax = max((v for _, v in items if v is not None and not pd.isna(v)), default=0) or 1
@@ -278,7 +281,7 @@ def stat_tile(label, value, delta=None, note=""):
     return f'<div class="tile"><div class="label">{label}</div><div class="value">{value}</div>{delta_html}{note_html}</div>'
 
 
-def month_report(posts, hist, followers, now, ym):
+def month_report(posts, hist, followers, now, ym, youtube=None):
     today = now.date()
     cutoff = now - timedelta(days=MIN_AGE_DAYS)
     start, end = month_bounds(ym)
@@ -298,22 +301,25 @@ def month_report(posts, hist, followers, now, ym):
     flags = []
 
     out = [f"<h1>Månedsrapport {month_name}</h1>",
-           f'<p class="meta">Veksthuset på Instagram · generert {now:%d.%m.%Y %H:%M} · '
+           f'<p class="meta">Veksthuset · Instagram og YouTube · generert {now:%d.%m.%Y %H:%M} · '
            f"regelbasert (report.py), ingen LLM</p>"]
 
-    notes = []
+    notes, ig_notes = [], []
     if end >= today:
         notes.append(f"Måneden er ikke avsluttet. Data til og med {today:%d.%m.%Y}.")
         flags.append(f"{month_name} er ikke avsluttet: antall innlegg og samlet rekkevidde er ikke "
                      f"sammenlignbare med hele {prev_name}. Bruk medianene.")
     young = cur_all[cur_all["time"] > cutoff]
     if len(young):
-        notes.append(f"{len(young)} innlegg yngre enn {MIN_AGE_DAYS} dager er utelatt fra "
-                     f"sammenligningene av endelige tall (publisert etter {cutoff:%d.%m %H:%M}).")
+        ig_notes.append(f"{len(young)} innlegg yngre enn {MIN_AGE_DAYS} dager er utelatt fra "
+                        f"sammenligningene av endelige tall (publisert etter {cutoff:%d.%m %H:%M}).")
     notes.append(f"Grupper med under {MIN_POSTS} innlegg er merket «foreløpig». Endringer over "
                  f"±{int(CHANGE_FLAG * 100)} % fra forrige måned er fremhevet.")
-    notes.append("Reels og feed sammenlignes ikke på rekkevidde; konseptene sammenlignes innenfor hvert format.")
+    notes.append("Plattformene og formatene sammenlignes aldri med hverandre; hver plattform har sin egen seksjon.")
+    ig_notes.append("Reels og feed sammenlignes ikke på rekkevidde; konseptene sammenlignes innenfor hvert format.")
     out.append("<ul class='notes'>" + "".join(f"<li>{n}</li>" for n in notes) + "</ul>")
+    header_len = len(out)
+    out.append("<ul class='notes'>" + "".join(f"<li>{n}</li>" for n in ig_notes) + "</ul>")
 
     ur = unique_reach(start, end, today)
     pur = unique_reach(prev_start, prev_end, today)
@@ -438,8 +444,13 @@ def month_report(posts, hist, followers, now, ym):
     out.append("<h2>Automatiske flagg</h2>")
     out.append("<ul class='flags'>" + "".join(f"<li>{f}</li>" for f in flags) + "</ul>"
                if flags else "<p>Ingen flagg.</p>")
-    out.append(assessment_section())
-    return f"Månedsrapport {month_name}", "\n".join(out)
+
+    parts = out[:header_len] + [platform_section("Instagram", demote_headings("\n".join(out[header_len:])))]
+    if youtube is not None:
+        parts.append(platform_section("YouTube (Shorts)", youtube_month_section(
+            youtube, now, start, end, prev_start, prev_end, month_name, prev_name)))
+    parts += [tiktok_coming_section(), assessment_section()]
+    return f"Månedsrapport {month_name}", "\n".join(parts)
 
 
 def unique_reach(start, end, today):
@@ -567,7 +578,7 @@ def baseline_for(concept, fmt, ages, posts, before):
     return result
 
 
-def week_report(posts, hist, followers, now, iso):
+def week_report(posts, hist, followers, now, iso, youtube=None):
     today = now.date()
     start, end = week_bounds(iso)
     week_start_dt = datetime.combine(start, datetime.min.time(), OSLO)
@@ -576,15 +587,18 @@ def week_report(posts, hist, followers, now, iso):
     _, week_no = iso.split("-W")
 
     out = [f"<h1>Ukesrapport uke {int(week_no)} ({start:%d.%m}–{end:%d.%m.%Y})</h1>",
-           f'<p class="meta">Veksthuset på Instagram · generert {now:%d.%m.%Y %H:%M} · '
+           f'<p class="meta">Veksthuset · Instagram og YouTube · generert {now:%d.%m.%Y %H:%M} · '
            "regelbasert (report.py), ingen LLM</p>",
            "<ul class='notes'>"
-           "<li>Ukens innlegg sammenlignes med konseptets vanlige nivå <b>på samme alder</b> "
-           "(rekkevidde ca. 24 og 48 timer etter publisering), fra historikken i post_insights.</li>"
            f"<li>Konseptets nivå krever minst {MIN_POSTS} tidligere innlegg med måling på samme alder. "
            "Ellers står det at historikken mangler, i stedet for et anslag.</li>"
-           f"<li>Tydelig avvik: over ±{int(DEVIATION_FLAG * 100)} % fra konseptets nivå.</li>"
+           "<li>Plattformene sammenlignes aldri med hverandre; hver plattform har sin egen seksjon.</li>"
            "<li>Konseptbeslutninger tas i månedsrapporten, ikke her.</li></ul>"]
+    header_len = len(out)
+    out.append("<ul class='notes'>"
+               "<li>Ukens innlegg sammenlignes med konseptets vanlige nivå <b>på samme alder</b> "
+               "(rekkevidde ca. 24 og 48 timer etter publisering), fra historikken i post_insights.</li>"
+               f"<li>Tydelig avvik: over ±{int(DEVIATION_FLAG * 100)} % fra konseptets nivå.</li></ul>")
 
     # 1. Ukens innlegg mot konseptets nivå
     out.append(f"<h2>Ukens innlegg ({len(week)})</h2>")
@@ -651,12 +665,16 @@ def week_report(posts, hist, followers, now, iso):
     out.append(column_chart([(f"{WEEKDAYS[d.weekday()][:3]} {d:%d}", fmap.get(d)) for d in days],
                             f"Nye følgere per dag, uke {int(week_no)}"))
 
-    out.append("""<h2>Justeringer neste uke</h2>
+    parts = out[:header_len] + [platform_section("Instagram", demote_headings("\n".join(out[header_len:])))]
+    if youtube is not None:
+        parts.append(platform_section("YouTube (Shorts)", youtube_week_section(youtube, now, start, end, week_no)))
+    parts.append(tiktok_coming_section())
+    parts.append("""<h2>Justeringer neste uke</h2>
 <section class="assessment">
 <!-- VURDERING: fylles ut manuelt. Tidspunkt, rekkefølge og tester, ikke konsepter. -->
 <p class="placeholder">Fylles ut manuelt.</p>
 </section>""")
-    return f"Ukesrapport uke {int(week_no)}", "\n".join(out)
+    return f"Ukesrapport uke {int(week_no)}", "\n".join(parts)
 
 
 def time_tests_section(posts, ages, now):
@@ -695,6 +713,334 @@ def time_tests_section(posts, ages, now):
                      f"{len(test)} / {len(control)}", *cells, final])
     return table(["Test", "Konsept", "Periode og tid", "Status", "Test / kontroll",
                   "Median 24 t", "Median 48 t", "Median endelig rekkevidde"], rows, numeric_from=4)
+
+
+# --- Plattformseksjoner -------------------------------------------------------
+
+def demote_headings(html_text):
+    """Flytter overskrifter ett nivå ned (h2→h3 osv.), for innhold som legges under en plattform."""
+    for level in (4, 3, 2):
+        html_text = (html_text.replace(f"<h{level}", f"<h{level + 1}")
+                     .replace(f"</h{level}>", f"</h{level + 1}>"))
+    return html_text
+
+
+def platform_section(title, body, css_class="platform"):
+    return f'<section class="{css_class}"><h2 class="platform-title">{title}</h2>\n{body}\n</section>'
+
+
+def tiktok_coming_section():
+    """Plassholder. demo_report.py bytter den ut med eksempelseksjonen."""
+    return ('<section class="platform platform-coming" id="tiktok">'
+            '<h2 class="platform-title">TikTok <span class="tag">kommer</span></h2>'
+            '<p class="muted">TikTok kobles til når API-tilgangen er godkjent. Seksjonen får samme oppsett '
+            'som YouTube: nøkkeltall, konsepter og beste og svakeste innlegg.</p></section>')
+
+
+# --- YouTube -----------------------------------------------------------------
+
+PACIFIC = ZoneInfo("America/Los_Angeles")
+YT_NUMERIC = ["views", "likes", "comments", "a_views", "estimated_minutes_watched",
+              "average_view_duration_s", "average_view_percentage"]
+
+
+def load_youtube(instagram_account):
+    """YouTube-kontoen til samme kunde. Returnerer None hvis kunden ikke har YouTube."""
+    accounts = db.select("accounts", {"select": "id", "platform": "eq.youtube",
+                                      "client_name": f"eq.{instagram_account['client_name']}",
+                                      "order": "id"})
+    if not accounts:
+        return None
+    account_id = accounts[0]["id"]
+    videos = pd.DataFrame(db.select("youtube_videos_latest", {
+        "select": "id,published_at,title,format,concept,special_event,permalink,analytics_end_date,"
+                  + ",".join(YT_NUMERIC),
+        "account_id": f"eq.{account_id}",
+        "order": "id",
+    }))
+    if not len(videos):
+        return None
+    videos[YT_NUMERIC] = videos[YT_NUMERIC].apply(pd.to_numeric)
+    published = pd.to_datetime(videos["published_at"], utc=True)
+    videos["time"] = published.dt.tz_convert(OSLO)
+    videos["day"] = videos["time"].dt.date
+    videos["pday"] = published.dt.tz_convert(PACIFIC).dt.date   # Analytics-døgn
+    videos["weekday"] = videos["time"].dt.weekday.map(lambda i: WEEKDAYS[i])
+    videos["analytics_end_date"] = pd.to_datetime(videos["analytics_end_date"]).dt.date
+    videos["title"] = videos["title"].fillna("")
+
+    daily = pd.DataFrame(db.select("youtube_video_daily", {
+        "select": "video_id,day,views,youtube_videos!inner(account_id)",
+        "youtube_videos.account_id": f"eq.{account_id}",
+        "order": "video_id,day",
+    }))
+    if len(daily):
+        daily = daily.drop(columns="youtube_videos")
+        daily["day"] = pd.to_datetime(daily["day"]).dt.date
+        daily["views"] = pd.to_numeric(daily["views"])
+
+    followers = pd.DataFrame(db.select("account_insights", {
+        "select": "snapshot_date,followers_count,new_followers",
+        "account_id": f"eq.{account_id}",
+        "order": "snapshot_date",
+    }))
+    if len(followers):
+        followers["day"] = pd.to_datetime(followers["snapshot_date"]).dt.date
+    return {"videos": videos, "daily": daily, "followers": followers,
+            "analytics_last": daily["day"].max() if len(daily) else None}
+
+
+def yt_deep_covered(videos):
+    """Dype mål brukes bare når Analytics dekker videoens første 7 døgn (Stillehavstid)."""
+    return videos["analytics_end_date"].notna() & (
+        videos["analytics_end_date"] >= videos["pday"] + timedelta(days=MIN_AGE_DAYS))
+
+
+def yt_notes(analytics_end, excluded_period, excluded_total, young, extra=()):
+    notes = [
+        "Hovedtall fra YouTube Data API (visninger, likes, kommentarer), hentet i sanntid.",
+        f"Gjennomsnittlig visningstid og andel sett er fra YouTube Analytics, og brukes bare for videoer "
+        f"der Analytics dekker de første {MIN_AGE_DAYS} døgnene (Analytics har tall til og med "
+        f"{analytics_end:%d.%m.%Y})." if analytics_end else "YouTube Analytics har ingen tall ennå.",
+        "Andel sett kan være over 100 %, fordi Shorts spilles i loop. Tallet er ikke kappet.",
+        "YouTube har ikke rekkevidde per video, så engasjementsrate sammenlignes ikke med Instagram.",
+    ]
+    if young:
+        notes.append(f"{young} Shorts yngre enn {MIN_AGE_DAYS} dager er utelatt fra sammenligningene.")
+    notes.append(f"Videoer med format VIDEO (vanlige videoer, ikke Shorts) holdes utenfor Shorts-analysen: "
+                 f"{excluded_period} i perioden, {excluded_total} totalt på kanalen.")
+    notes += list(extra)
+    return "<ul class='notes'>" + "".join(f"<li>{n}</li>" for n in notes) + "</ul>"
+
+
+def yt_rank_rows(d):
+    return [[f'<a href="{esc(r.permalink)}">{esc(r.title) or "(uten tittel)"}</a>', esc(r.concept),
+             f"{r.time:%d.%m}", num(r.views), num(r.likes)] for r in d.itertuples()]
+
+
+def youtube_month_section(yt, now, start, end, prev_start, prev_end, month_name, prev_name):
+    today = now.date()
+    cutoff = now - timedelta(days=MIN_AGE_DAYS)
+    v = yt["videos"]
+    analytics_end = v["analytics_end_date"].dropna().max() if v["analytics_end_date"].notna().any() else None
+
+    def period(s, e):
+        p = v[(v["day"] >= s) & (v["day"] <= e)]
+        shorts = p[p["format"] == "SHORTS"]
+        return p, shorts, shorts[shorts["time"] <= cutoff]
+
+    cur_all, cur_shorts, cur = period(start, end)
+    prev_all, prev_shorts, prev = period(prev_start, prev_end)
+    excluded = int((cur_all["format"] != "SHORTS").sum())
+    excluded_total = int((v["format"] != "SHORTS").sum())
+    young = int((cur_shorts["time"] > cutoff).sum())
+    fg = follower_growth(yt["followers"], start, end, today)
+    pfg = follower_growth(yt["followers"], prev_start, prev_end, today)
+    fg_ok = complete(fg) and complete(pfg)
+    flags = []
+    if end >= today:
+        flags.append(f"{month_name} er ikke avsluttet: antall Shorts og summer er ikke sammenlignbare med hele "
+                     f"{prev_name}. Bruk medianene.")
+    out = [yt_notes(analytics_end, excluded, excluded_total, young)]
+
+    # Nøkkeltall
+    out.append("<h3>Nøkkeltall (Shorts)</h3>")
+    tiles = [
+        stat_tile("Shorts publisert", num(len(cur_shorts)), change_cell(change(len(cur_shorts), len(prev_shorts)))),
+        stat_tile("Visninger", num(cur_shorts["views"].sum(min_count=1)),
+                  change_cell(change(cur_shorts["views"].sum(), prev_shorts["views"].sum())),
+                  "sum for Shorts publisert i måneden"),
+        stat_tile("Visninger per Short (median)", num(cur["views"].median()),
+                  change_cell(change(cur["views"].median(), prev["views"].median())),
+                  f"{len(cur)} Shorts ≥ {MIN_AGE_DAYS} dager"),
+        stat_tile("Nye abonnenter", num(fg["sum"]),
+                  change_cell(change(fg["sum"], pfg["sum"])) if fg_ok else None,
+                  f"{fg['days']} av {fg['expected']} døgn med data"),
+    ]
+    out.append('<div class="tiles">' + "".join(tiles) + "</div>")
+    ch = change(cur["views"].median(), prev["views"].median())
+    if ch is not None and abs(ch) > CHANGE_FLAG:
+        flags.append(f"Median visninger per Short {change_cell(ch)} fra {prev_name}"
+                     + (" (foreløpig)" if min(len(cur), len(prev)) < MIN_POSTS else "") + ".")
+    if not fg_ok:
+        flags.append(f"Nye abonnenter sammenlignes ikke med {prev_name}: for få døgn med data "
+                     f"({pfg['days']} av {pfg['expected']} og {fg['days']} av {fg['expected']}).")
+
+    # Totalt for måneden
+    n, pn = len(cur_shorts), len(prev_shorts)
+
+    def pp(total, count):
+        value = None if not count or pd.isna(total) else total / count
+        return num(value, 1 if value is not None and value < 10 else 0)
+
+    rows = [["<b>Shorts publisert</b>", num(n), num(pn), change_cell(change(n, pn)), "", ""]]
+    for label, col in [("Visninger", "views"), ("Likes", "likes"), ("Kommentarer", "comments")]:
+        a, b = cur_shorts[col].sum(min_count=1), prev_shorts[col].sum(min_count=1)
+        rows.append([label, num(a), num(b), change_cell(change(a, b)), pp(a, n), pp(b, pn)])
+    rows.append(["Nye abonnenter <span class='muted'>(hele kanalen)</span>", num(fg["sum"]), num(pfg["sum"]),
+                 change_cell(change(fg["sum"], pfg["sum"])) if fg_ok else "–", "–", "–"])
+    out.append("<h3>Totalt for måneden</h3>")
+    out.append(table(["", month_name.capitalize(), prev_name.capitalize(), "Endring",
+                      f"Per Short {month_abbr(month_name)}", f"Per Short {month_abbr(prev_name)}"], rows))
+    out.append(f"<ul class='notes'><li>Summene gjelder alle Shorts publisert i måneden (Data API, siste "
+               f"måling), også de som er yngre enn {MIN_AGE_DAYS} dager. De påvirkes av antall videoer "
+               f"({n} mot {pn}), så se også «per Short».</li></ul>")
+
+    # Konsepter
+    out.append("<h3>Konsepter (Shorts)</h3>")
+    if len(cur):
+        deep = yt_deep_covered(cur)
+        rows, chart = [], []
+        for concept, g in sorted(cur.groupby("concept"), key=lambda kv: -len(kv[1])):
+            pg = prev[prev["concept"] == concept]
+            gd = g[deep.loc[g.index]]
+            count = len(g)
+            ch = change(g["views"].median(), pg["views"].median()) if len(pg) else None
+            rows.append([
+                esc(concept) + prelim(count), num(count), num(g["views"].median()), num(g["views"].mean()),
+                num(g["likes"].median()), num(g["comments"].median()),
+                num(len(gd)) + prelim(len(gd)) if len(gd) else "0",
+                f"{num(gd['average_view_duration_s'].median(), 1)} s" if len(gd) else "–",
+                f"{num(gd['average_view_percentage'].median(), 1)} %" if len(gd) else "–",
+                f"{num(len(pg))} / {num(pg['views'].median())}" if len(pg) else "–",
+                change_cell(ch),
+            ])
+            chart.append((concept, g["views"].median(), pg["views"].median() if len(pg) else None))
+            if count < MIN_POSTS:
+                flags.append(f"Shorts – {concept}: {count} videoer, foreløpig.")
+            if ch is not None and abs(ch) > CHANGE_FLAG:
+                flags.append(f"Shorts – {concept}: median visninger {change_cell(ch)} fra {prev_name}"
+                             + (" (foreløpig)" if min(count, len(pg)) < MIN_POSTS else "") + ".")
+        out.append(hbar_chart(chart, num, "Median visninger per konsept, Shorts", prev_name))
+        out.append(table(["Konsept", "Videoer", "Median visninger", "Snitt visninger", "Median likes",
+                          "Median kommentarer", "Med Analytics", "Median visningstid", "Median andel sett",
+                          f"{prev_name}: videoer / median", "Endring"], rows))
+        out.append("<p class='muted'>«Med Analytics» = antall videoer der Analytics dekker de første "
+                   f"{MIN_AGE_DAYS} døgnene. Visningstid og andel sett er beregnet bare på dem.</p>")
+    else:
+        out.append(f"<p>Ingen Shorts ≥ {MIN_AGE_DAYS} dager i {month_name}.</p>")
+
+    # Beste og svakeste
+    out.append("<h3>Beste og svakeste Shorts</h3>")
+    ranked = cur.sort_values("views", ascending=False)
+    headers = ["Video", "Konsept", "Dato", "Visninger", "Likes"]
+    if len(ranked) >= 6:
+        out.append("<h4>Beste</h4>" + table(headers, yt_rank_rows(ranked.head(3)), numeric_from=3))
+        out.append("<h4>Svakeste</h4>" + table(headers, yt_rank_rows(ranked.tail(3).iloc[::-1]), numeric_from=3))
+    elif len(ranked):
+        out.append(f"<h4>Alle {len(ranked)} Shorts, rangert{prelim(len(ranked))}</h4>"
+                   + table(headers, yt_rank_rows(ranked), numeric_from=3))
+    out.append(f"<p class='muted'>Rangert etter visninger (Data API), blant Shorts ≥ {MIN_AGE_DAYS} dager.</p>")
+
+    # Konsepter uten nye Shorts
+    active = v[(v["day"] >= date.fromisoformat(CONCEPTS_START)) & (v["format"] == "SHORTS")
+               & (~v["concept"].isin(NON_CONCEPTS))]
+    for concept in sorted(set(active["concept"]) - set(cur_shorts["concept"])):
+        last = active[active["concept"] == concept]["time"].max()
+        flags.append(f"{concept}: ingen nye Shorts i {month_name} (siste {last:%d.%m.%Y}).")
+
+    # Nye abonnenter per døgn
+    fmap = dict(zip(yt["followers"]["day"], yt["followers"]["new_followers"])) if len(yt["followers"]) else {}
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    out.append("<h3>Nye abonnenter</h3>")
+    out.append(column_chart([(f"{d:%d}", fmap.get(d)) for d in days],
+                            f"Nye abonnenter per døgn (Stillehavstid), {month_name}"))
+
+    out.append("<h3>Automatiske flagg</h3>")
+    out.append("<ul class='flags'>" + "".join(f"<li>{f}</li>" for f in flags) + "</ul>"
+               if flags else "<p>Ingen flagg.</p>")
+    return "\n".join(out)
+
+
+def yt_views_day01(yt):
+    """Visninger i publiseringsdøgnet + neste døgn (Stillehavstid) per video, fra youtube_video_daily.
+    Bare videoer der Analytics dekker begge døgnene."""
+    v, daily, last = yt["videos"], yt["daily"], yt["analytics_last"]
+    if not len(daily) or last is None:
+        return pd.Series(dtype=float)
+    first_day = v.set_index("id")["pday"]
+    d = daily.merge(first_day.rename("pday"), left_on="video_id", right_index=True)
+    d = d[(d["day"] >= d["pday"]) & (d["day"] <= d["pday"] + timedelta(days=1))]
+    sums = d.groupby("video_id")["views"].sum()
+    covered = first_day[first_day + timedelta(days=1) <= last].index
+    return sums.reindex(covered).fillna(0)
+
+
+def youtube_week_section(yt, now, start, end, week_no):
+    today = now.date()
+    v = yt["videos"]
+    week_all = v[(v["day"] >= start) & (v["day"] <= end)].sort_values("time")
+    week = week_all[week_all["format"] == "SHORTS"]
+    excluded = int((week_all["format"] != "SHORTS").sum())
+    excluded_total = int((v["format"] != "SHORTS").sum())
+    last = yt["analytics_last"]
+    day01 = yt_views_day01(yt)
+    week_start_dt = datetime.combine(start, datetime.min.time(), OSLO)
+    prior = v[(v["format"] == "SHORTS") & (v["time"] < week_start_dt)]
+
+    out = [yt_notes(last, excluded, excluded_total, 0, extra=[
+        "<b>Samme alder</b> = visninger i publiseringsdøgnet pluss neste døgn, i Stillehavstid "
+        "(America/Los_Angeles), fra YouTube Analytics (youtube_video_daily). Det er <b>ikke</b> nøyaktig "
+        "24 eller 48 timer: hvor mange timer det dekker, avhenger av når på døgnet videoen ble publisert.",
+        f"Konseptets nivå = median for tidligere Shorts i samme konsept, og krever minst {MIN_POSTS}. "
+        f"Tydelig avvik: over ±{int(DEVIATION_FLAG * 100)} %.",
+    ])]
+
+    out.append(f"<h3>Ukens Shorts ({len(week)})</h3>")
+    rows, deviations, missing, waiting = [], [], set(), 0
+    for r in week.itertuples():
+        base_values = day01.reindex(prior[prior["concept"] == r.concept]["id"]).dropna()
+        median = base_values.median() if len(base_values) >= MIN_POSTS else None
+        if r.id not in day01.index:
+            cell = "<span class='muted'>venter på Analytics</span>"
+            waiting += 1
+        elif median is None:
+            cell = f"{num(day01[r.id])} <span class='muted'>(nivå mangler: {len(base_values)} av {MIN_POSTS})</span>"
+            missing.add(r.concept)
+        else:
+            dev = change(day01[r.id], median)
+            cell = f"{num(day01[r.id])} mot {num(median)}: {change_cell(dev, DEVIATION_FLAG)}"
+            if dev is not None and abs(dev) > DEVIATION_FLAG:
+                deviations.append((r, day01[r.id], median, dev))
+        age_days = (now - r.time).total_seconds() / 86400
+        rows.append([f'<a href="{esc(r.permalink)}">{esc(r.title) or "(uten tittel)"}</a>', esc(r.concept),
+                     f"{r.weekday[:3]} {r.time:%d.%m %H:%M}", cell,
+                     f"{num(r.views)} ({num(age_days, 0)} d)"])
+    if len(week):
+        out.append(table(["Video", "Konsept", "Publisert", "Visninger døgn 0–1 mot konseptets nivå",
+                          "Visninger nå (alder)"], rows, numeric_from=3))
+    else:
+        out.append("<p>Ingen Shorts denne uken.</p>")
+    if waiting:
+        out.append(f"<p class='muted'>{waiting} av ukens Shorts venter på Analytics (tall til og med "
+                   f"{last:%d.%m.%Y} i Stillehavstid).</p>" if last else "")
+    if missing:
+        out.append("<p class='callout'><b>Ikke nok historikk</b> for sammenligning på samme alder: "
+                   + ", ".join(sorted(missing)) + f" (krever {MIN_POSTS} tidligere Shorts).</p>")
+
+    out.append("<h3>Tydelige avvik</h3>")
+    if deviations:
+        out.append("<ul class='flags'>" + "".join(
+            f"<li>{'Over' if d > 0 else 'Under'} nivå: «{esc(r.title)}» ({esc(r.concept)}): "
+            f"{num(val)} mot {num(m)} visninger døgn 0–1 ({change_cell(d, DEVIATION_FLAG)})</li>"
+            for r, val, m, d in sorted(deviations, key=lambda x: -x[3])) + "</ul>")
+    elif waiting == len(week) and len(week):
+        out.append("<p>Kan ikke vurderes ennå: Analytics har ikke tall for ukens Shorts.</p>")
+    else:
+        out.append(f"<p>Ingen Shorts med tall avviker mer enn ±{int(DEVIATION_FLAG * 100)} % fra konseptets nivå."
+                   + (" Noen venter fortsatt på Analytics." if waiting else "") + "</p>")
+
+    out.append("<h3>Tidspunkt-tester</h3><p class='muted'>Tidspunkt-tester følges foreløpig bare opp for Instagram.</p>")
+
+    g = follower_growth(yt["followers"], start, end, today)
+    fmap = dict(zip(yt["followers"]["day"], yt["followers"]["new_followers"])) if len(yt["followers"]) else {}
+    days = [start + timedelta(days=i) for i in range(7)]
+    out.append("<h3>Nye abonnenter</h3>")
+    text = follower_text(g).replace("følgere", "abonnenter").replace("Følgere", "Abonnenter")
+    out.append(f"<p>{text.replace('dager', 'døgn')}</p>")
+    out.append(column_chart([(f"{WEEKDAYS[d.weekday()][:3]} {d:%d}", fmap.get(d)) for d in days],
+                            f"Nye abonnenter per døgn (Stillehavstid), uke {int(week_no)}"))
+    return "\n".join(out)
 
 
 # --- HTML-ramme --------------------------------------------------------------
@@ -763,6 +1109,11 @@ svg { width: 100%; height: auto; display: block; overflow: visible; }
 .legend { display: flex; gap: 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .swatch.current { background: var(--series-1); } .swatch.prev { background: var(--series-prev); }
+.platform-title { font-size: 26px; margin: 56px 0 4px; padding-top: 20px; border-top: 3px solid var(--ink); }
+.platform h3 { font-size: 20px; margin: 40px 0 12px; padding-top: 16px; border-top: 1px solid var(--grid); }
+.platform h4 { font-size: 16px; margin: 24px 0 8px; }
+.platform h5 { font-size: 13px; margin: 16px 0 6px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+.platform-coming .platform-title .tag { font-size: 13px; vertical-align: 4px; }
 .assessment { background: var(--surface); border: 1px dashed var(--axis); border-radius: 10px; padding: 4px 16px 12px; }
 .placeholder { color: var(--muted); font-style: italic; }
 @media print { h2 { break-after: avoid; } figure, .table-wrap { break-inside: avoid; } }
@@ -794,18 +1145,19 @@ def main():
     args = parser.parse_args()
 
     now = datetime.now(OSLO)
-    posts, hist, followers, _ = load_all()
+    posts, hist, followers, account = load_all()
+    youtube = load_youtube(account)
     DATA_DIR.mkdir(exist_ok=True)
 
     if args.periode == "uke":
         # Ukentlig gjennomgang skjer på søndager: da er det uken som slutter i dag som gjelder
         week_day = now.date() if now.date().weekday() == 6 else now.date() - timedelta(days=7)
         iso = args.week or "{}-W{:02d}".format(*week_day.isocalendar()[:2])
-        title, body = week_report(posts, hist, followers, now, iso)
+        title, body = week_report(posts, hist, followers, now, iso, youtube)
         path = DATA_DIR / f"rapport_uke_{iso}.html"
     else:
         ym = args.month or f"{now.date().replace(day=1) - timedelta(days=1):%Y-%m}"
-        title, body = month_report(posts, hist, followers, now, ym)
+        title, body = month_report(posts, hist, followers, now, ym, youtube)
         path = DATA_DIR / f"rapport_maaned_{ym}.html"
 
     path.write_text(render(title, body), encoding="utf-8")

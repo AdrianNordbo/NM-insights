@@ -20,8 +20,8 @@ from datetime import datetime, timedelta
 import db
 from analyze import DATA_DIR, OSLO
 from report import (
-    MONTHS_NO, change, change_cell, esc, hbar_chart, load_all, month_bounds, month_report,
-    num, pct, prelim, render, stat_tile, table,
+    MONTHS_NO, change, change_cell, esc, hbar_chart, load_all, load_youtube, month_bounds, month_report,
+    num, pct, prelim, render, stat_tile, table, tiktok_coming_section,
 )
 
 EXAMPLE_TAG = '<span class="example-tag">Eksempeltall</span>'
@@ -122,7 +122,7 @@ def anonymize(body):
     """Skjuler captions og lenker til innlegg, og bytter ut kundenavnet."""
     body = re.sub(r'<a href="[^"]*">.*?</a>', HIDDEN_POST, body)
     body = body.replace(CLIENT_NAME, CLIENT_ALIAS)
-    leftovers = [w for w in ("instagram.com/p/", "instagram.com/reel/", CLIENT_NAME.lower())
+    leftovers = [w for w in ("instagram.com/p/", "instagram.com/reel/", "youtube.com/", CLIENT_NAME.lower())
                  if w in body.lower()]
     if leftovers:
         raise RuntimeError(f"Anonymiseringen etterlot {leftovers}. Avbryter.")
@@ -135,20 +135,24 @@ def main():
     args = parser.parse_args()
 
     now = datetime.now(OSLO)
-    posts, hist, followers, _ = load_all()
-    title, body = month_report(posts, hist, followers, now, args.month)
+    posts, hist, followers, account = load_all()
+    title, body = month_report(posts, hist, followers, now, args.month, load_youtube(account))
 
     start, _ = month_bounds(args.month)
     prev_start, _ = month_bounds(f"{start - timedelta(days=1):%Y-%m}")
     month_name = f"{MONTHS_NO[start.month - 1]} {start.year}"
     prev_name = f"{MONTHS_NO[prev_start.month - 1]} {prev_start.year}"
 
-    banner = ('<p class="demo-banner">DEMO-versjon. Instagram-delen viser ekte tall fra Instagram Graph API, '
-              "anonymisert: kundenavn er byttet ut, og captions og lenker til innlegg er skjult. "
-              "Seksjonen «TikTok (planlagt)» viser en planlagt integrasjon med <b>eksempeltall</b>.</p>")
+    banner = ('<p class="demo-banner">DEMO-versjon. Instagram- og YouTube-delen viser ekte tall fra '
+              "Instagram Graph API og YouTube API, anonymisert: kundenavn er byttet ut, og captions, titler "
+              "og lenker til innlegg er skjult. Seksjonen «TikTok (planlagt)» viser en planlagt integrasjon "
+              "med <b>eksempeltall</b>.</p>")
     body = body.replace("</h1>", "</h1>\n" + banner, 1)
-    marker = "<h2>Vurdering og anbefalinger</h2>"
-    body = body.replace(marker, tiktok_section(month_name, prev_name) + "\n" + marker, 1)
+    # Den vanlige rapporten har en «TikTok kommer»-boks; demoen bytter den ut med eksempelseksjonen
+    coming = tiktok_coming_section()
+    if coming not in body:
+        raise RuntimeError("Fant ikke TikTok-plassholderen i rapporten.")
+    body = body.replace(coming, tiktok_section(month_name, prev_name), 1)
     body = anonymize(body)
 
     path = DATA_DIR / f"rapport_maaned_{args.month}_demo_tiktok.html"
