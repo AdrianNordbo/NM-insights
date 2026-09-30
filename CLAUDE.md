@@ -166,6 +166,39 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN.
 - data/posts.json og data/youtube_videos.json finnes ikke i Actions; der er Supabase eneste lager.
 
+### Innlogging i dashboardet (web/)
+- Supabase Auth med innloggingslenke på e-post. Åpen registrering er av; `signInWithOtp` bruker
+  `shouldCreateUser: false`. Innloggingskravet ligger både i `web/proxy.ts` (fornyer sesjonen, rask
+  sjekk) og i server-layouten `web/app/(app)/layout.tsx` (`getUser()` mot Supabase Auth).
+- Nå (uten egen SMTP): Supabase sin standardmal (`{{ .ConfirmationURL }}`) sender lenken via
+  Supabase til `/auth/callback?code=` (PKCE, `exchangeCodeForSession`). Lenken må åpnes i samme
+  nettleser som den ble bedt om fra, og e-postskannere kan bruke opp lenken. `/logg-inn` sender
+  `emailRedirectTo: ${NEXT_PUBLIC_SITE_URL}/auth/callback`. Testbrukere opprettes med «Create new
+  user» + Auto Confirm.
+- `/auth/confirm` (token_hash) finnes allerede: GET viser bare en knapp, og `verifyOtp` skjer først
+  ved POST, så skannere som Microsoft Safe Links ikke bruker opp engangskoden.
+- **Før Veksthuset inviteres må dette på plass:**
+  1. Egen SMTP i Supabase (standardavsenderen har lav grense og tillater ikke egne maler).
+  2. E-postmalene i Supabase (Authentication → Emails → Templates):
+     - Magic Link, emne «Din innloggingslenke til NM Insights»:
+       `<h2>Logg inn på NM Insights</h2>`
+       `<p>Klikk på lenken for å logge inn. Lenken kan brukes én gang og utløper etter en time.</p>`
+       `<p><a href="{{ .RedirectTo }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Logg inn</a></p>`
+       `<p>Ba du ikke om denne e-posten, kan du se bort fra den.</p>`
+     - Invite user, emne «Du er invitert til NM Insights»:
+       `<h2>Du er invitert til NM Insights</h2>`
+       `<p>Klikk på lenken for å aktivere tilgangen og logge inn. Lenken kan brukes én gang.</p>`
+       `<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite">Aktiver tilgang</a></p>`
+  3. I `web/app/logg-inn/actions.ts`: `emailRedirectTo` endres til `siteUrl()` alene, fordi
+     Magic Link-malen legger til `/auth/confirm` selv. `/auth/callback` kan da fjernes.
+  4. Email OTP Expiration = 3600 sekunder (samsvarer med «utløper etter en time» i malene).
+- Supabase URL-innstillinger: Site URL `https://nm-insights-seven.vercel.app`; Redirect URLs
+  produksjonsadressen og `http://localhost:3000`, begge med og uten `/**`.
+- Vercel: prosjekt med Root Directory `web`, Node 24.x, funksjonsregion dub1 (samme sted som
+  Supabase eu-west-1), Ignored Build Step og Deployment Protection på preview. Miljøvariabler:
+  NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SITE_URL.
+  `web/scripts/check-no-secrets.mjs` stopper bygget hvis nøkkelen med full tilgang finnes i web/.
+
 ### TikTok (planlagt, ikke implementert)
 - TikTok API for Business, Accounts API v1.3. Søkte tilganger i portalen: TikTok accounts →
   «Get account user basic info», «Get account user insights», «Get account media».
@@ -288,7 +321,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
 2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert, og åpen registrering er slått av.
-   Gjenstår: bygge frontend etter frontend-reglene. Plattform og format holdes adskilt.
+   Skjelett og innlogging i web/ er bygget. Gjenstår: frontend etter frontend-reglene, og egen SMTP +
+   token_hash-malene før Veksthuset inviteres (se «Innlogging i dashboardet»).
 3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
