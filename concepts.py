@@ -113,8 +113,11 @@ def is_vm(post):
     return bool(_hashtags(post) & VM_HASHTAGS)
 
 
-def classify(post):
-    """Returnerer (konsept, begrunnelse) for ett innlegg."""
+def classify(post, platform="instagram"):
+    """Returnerer (konsept, begrunnelse) for ett innlegg.
+
+    På YouTube (platform="youtube") er alt video: regler som bare gjelder feed
+    (CTF) hoppes over, og regler som på Instagram bare gjelder Reels, gjelder alle."""
     if post["timestamp_oslo"][:10] < CONCEPTS_START:
         return FOR_KONSEPTER, f"publisert før {CONCEPTS_START}"
 
@@ -122,7 +125,11 @@ def classify(post):
     hashtags = _hashtags(post)
 
     for concept, rule in RULES:
-        if rule.get("media_type") and rule["media_type"] != post.get("media_product_type"):
+        media_type = rule.get("media_type")
+        if platform == "youtube":
+            if media_type == "FEED":
+                continue
+        elif media_type and media_type != post.get("media_product_type"):
             continue
         prefix = "svakt signal: " if rule.get("weak") else ""
         tag_hits = sorted(hashtags & rule["hashtags"])
@@ -154,8 +161,9 @@ def load_overrides(path=OVERRIDES_FILE):
     return overrides
 
 
-def apply_concepts(posts, overrides=None):
-    """Setter concept, concept_source, concept_reason og is_vm på hvert innlegg."""
+def apply_concepts(posts, overrides=None, platform="instagram"):
+    """Setter concept, concept_source, concept_reason og is_vm på hvert innlegg.
+    concept_overrides.csv gjelder alle plattformer (ID-ene overlapper ikke)."""
     if overrides is None:
         overrides = load_overrides()
     for post in posts:
@@ -165,7 +173,7 @@ def apply_concepts(posts, overrides=None):
             post["concept_source"] = "manuell"
             post["concept_reason"] = str(OVERRIDES_FILE)
         else:
-            post["concept"], post["concept_reason"] = classify(post)
+            post["concept"], post["concept_reason"] = classify(post, platform)
             post["concept_source"] = "auto"
     return posts
 

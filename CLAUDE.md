@@ -7,7 +7,8 @@ og andre kunder. Adrian (Nordbø Marketing) eier prosjektet.
 ## Arkitektur
 Fase 1 (nå): ingen Claude API og ingen agenter.
 
-fetch_instagram.py (GitHub Actions kl. 07 og 20) → Supabase → analyze.py / report.py (pandas, regelbasert)
+fetch_instagram.py + fetch_youtube.py (GitHub Actions kl. 07 og 20) → Supabase
+→ analyze.py / report.py (pandas, regelbasert). Rapportene dekker foreløpig bare Instagram.
 
 - Rapportene lager tall, grafer og automatiske flagg, men ingen tolkning.
 - Den kvalitative delen (hooks, tema, vurdering, anbefalinger til produsenten) gjør Adrian manuelt med
@@ -19,20 +20,24 @@ fetch_instagram.py (GitHub Actions kl. 07 og 20) → Supabase → analyze.py / r
 | Fil | Rolle |
 |---|---|
 | fetch_instagram.py | Henter fra Meta Graph API, merker konsept, skriver til Supabase + lokal backup data/posts.json/.csv |
+| fetch_youtube.py | Henter fra YouTube Data API + Analytics API, merker konsept, skriver til Supabase + data/youtube_videos.json. `--backfill` = full daglig historikk |
+| youtube_auth.py | Engangs OAuth-innlogging (kanaleier), lagrer secrets/youtube_token.json og skriver YOUTUBE_* til .env |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
-| concepts.py | Regelbasert konseptmerking + is_vm. `python concepts.py` merker data/posts.json på nytt lokalt |
-| concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken |
+| concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube). `python concepts.py` merker data/posts.json på nytt lokalt |
+| concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Gjelder begge plattformer (ID-ene overlapper ikke) |
 | analyze.py | Oppsummering av Adrians periode → data/analysis.md. `load_posts()` leser posts_latest og brukes av report.py |
 | report.py | Uke- og månedsrapport som én selvstendig HTML-fil med inline SVG-grafer |
 | time_tests.csv | Register for tidspunkt-tester (`navn;konsept;format;fra;til;tidsrom`, f.eks. `19-21`), tomt foreløpig |
 | demo_report.py | Anonymisert demo av månedsrapporten med «TikTok (planlagt)»-seksjon (eksempeltall) |
 | record_demo.py | Playwright-videoopptak av demoen → data/demo_tiktok.mp4 (ikke committet ennå) |
 | supabase/schema.sql | Fullt skjema, idempotent. supabase/migrations/ har endringer for eksisterende database |
-| .github/workflows/fetch-instagram.yml | Daglig kjøring |
+| .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram og YouTube (egne jobber) |
+| secrets/ | youtube_client_secret.json (OAuth-klient) og youtube_token.json. Gitignored, skal aldri committes |
 
 Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i terminalen):
 ```
 .venv/Scripts/python fetch_instagram.py
+.venv/Scripts/python fetch_youtube.py [--backfill]
 .venv/Scripts/python analyze.py
 .venv/Scripts/python report.py --periode måned [--måned 2026-09]   # standard: forrige måned
 .venv/Scripts/python report.py --periode uke [--uke 2026-W39]      # standard: forrige uke, på søndager inneværende
@@ -60,13 +65,31 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   until, data bare 2 år tilbake. Dekker alt innhold som ble sett i perioden, også eldre innlegg og historier.
   Hentes live av report.py (lagres ikke).
 
+### YouTube (Data API v3 + Analytics API v2)
+- Google Cloud-prosjekt «NM Insights» (Adrians konto). OAuth-app External, In production (uverifisert),
+  klienttype Desktop. Kanalen eies av veksthuset.sosial@gmail.com. Kanal-ID UChv7DsnM326j78XEZBWyTPg,
+  opprettet 04.06.2026, videoer fra 15.06.2026.
+- Scopes kun youtube.readonly og yt-analytics.readonly. Refresh token fra youtube_auth.py (access_type=offline,
+  prompt=consent). fetch_youtube.py fornyer access token i minnet; tokens og Authorization-headere lagres
+  aldri i raw, og koden sjekker det før lagring.
+- Data API (sanntid): uploads-spillelisten → videos.list (tittel, beskrivelse, publishedAt, duration,
+  viewCount, likeCount, commentCount). tags er alltid tom, favoriteCount alltid 0.
+- Analytics (kumulativt, 2–3 dagers forsinkelse): én `dimensions=video`-rapport for views, engagedViews,
+  estimatedMinutesWatched, averageViewDuration, averageViewPercentage. likes/comments/shares/subscribers*
+  støttes ikke i den listen, bare per video (`filters=video==ID`). Format fra `creatorContentType`
+  (to listekall: shorts og videoOnDemand).
+- Analytics gir nuller (ikke tomt) for videoer den ikke har behandlet ennå: per-video-tall lagres derfor
+  bare for videoer som finnes i video-rapporten, ellers null.
+- Analytics-døgn følger Stillehavstid (America/Los_Angeles).
+
 ### Supabase
 - REST (PostgREST) via db.py. SUPABASE_SECRET_KEY (sb_secret_…) sendes bare i `apikey`-headeren.
 - Automatisk eksponering av nye tabeller er slått av i prosjektet: alle rettigheter gis eksplisitt, og bare
   til service_role. RLS er på uten policies. anon/authenticated har ingen tilgang.
 - Adrian kjører all SQL selv i SQL Editor. Ikke test med Docker. DDL kan ikke kjøres via REST.
 - Tabeller:
-  - `accounts`: én rad per kundekonto (Veksthuset = id 1, concepts_start 2026-06-15). Unik (platform, platform_account_id).
+  - `accounts`: én rad per kundekonto og plattform (Veksthuset: id 1 = instagram, id 2 = youtube; concepts_start
+    2026-06-15). Unik (platform, platform_account_id). Plattformer: instagram, facebook, tiktok, linkedin, youtube.
   - `posts`: metadata + concept, concept_source (auto/manuell), concept_reason, special_event
     ('VM 2026' der is_vm er true, generisk for andre kunders kampanjer), first_seen_at, last_seen_at.
     Unik (account_id, platform_post_id). Avledede felt (ukedag, time, lengde) lagres ikke.
@@ -76,17 +99,35 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   - `account_insights`: én rad per konto per dag. followers_count, follows_count, media_count,
     new_followers, raw.
   - Visningen `posts_latest` (security_invoker): hvert innlegg med nyeste måling (dato, så fetched_at).
-- Oppdateringsstrategi: innlegg yngre enn 30 dager får nye tall hver kjøring; eldre bare hvis de ikke har
-  fått tall de siste 7 dagene. Samme dag + slot oppdaterer raden (idempotent).
+  - `youtube_videos`: én rad per video. format 'SHORTS'/'VIDEO' fra creatorContentType, format_source
+    'analytics' eller 'varighet' (foreløpig ≤ 180 s til Analytics har klassifisert), konsept, special_event.
+  - `youtube_video_insights`: én rad per video per dag og slot. views/likes/comments = Data API sanntid
+    (hovedtall). a_views, engaged_views (sekundær), estimated_minutes_watched, average_view_duration_s,
+    average_view_percentage = Analytics kumulativt til og med analytics_end_date. shares/subscribers_* fra
+    per-video-kall; null = ikke hentet i den kjøringen. raw = {video, analytics, per_video}.
+  - `youtube_video_daily`: Analytics per video per Stillehavsdøgn (tall per døgn, ikke kumulative).
+  - Visningen `youtube_videos_latest`: nyeste måling per video; shares/abonnenter fra nyeste måling der de
+    ble hentet (per_video_end_date).
+  - YouTube-kanalen bruker `account_insights` (account_id 2): followers_count = abonnenter,
+    media_count = videoer, new_followers = subscribersGained per Stillehavsdøgn.
+- Oppdateringsstrategi: innlegg/videoer yngre enn 30 dager får nye tall hver kjøring; eldre bare hvis de ikke
+  har fått tall de siste 7 dagene. Samme dag + slot oppdaterer raden (idempotent).
+- YouTube i tillegg: per-video Analytics (shares, abonnenter) for videoer yngre enn 30 dager hver kjøring og
+  alle én gang i uken. youtube_video_daily hentes på nytt fra publisering for videoer yngre enn 30 dager.
+  Backfill (`fetch_youtube.py --backfill`) er kjørt 30.09.2026: daglig historikk fra 15.06 for alle videoer og
+  nye abonnenter per døgn fra 04.06.
 - Skjemaendringer: skriv migrering i supabase/migrations/ og oppdater schema.sql. Kode som avhenger av
   endringen pushes først etter at Adrian har kjørt SQL-en, ellers feiler de planlagte kjøringene.
 
 ### GitHub
 - Privat repo AdrianNordbo/NM-insights, branch main. `gh` er ikke installert: Actions-logger kan ikke leses herfra.
-- Workflow: cron 05, 06, 18, 19 UTC. Et kontrollsteg regner ut Oslo-timen for utløseren og slipper bare
-  gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid.
-- Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL, SUPABASE_SECRET_KEY.
-- data/posts.json finnes ikke i Actions; der er Supabase eneste lager.
+- Workflow: cron 05, 06, 18, 19 UTC. Jobben `gate` regner ut Oslo-timen for utløseren og slipper bare
+  gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid. Jobbene `instagram` og
+  `youtube` avhenger bare av gate, så en feil i den ene stopper ikke den andre.
+- Instagram-kjøringene er verifisert (29.09 kl. 20:13 og 30.09 kl. 07:14).
+- Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL, SUPABASE_SECRET_KEY, YOUTUBE_CLIENT_ID,
+  YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN.
+- data/posts.json og data/youtube_videos.json finnes ikke i Actions; der er Supabase eneste lager.
 
 ### TikTok (planlagt, ikke implementert)
 - TikTok API for Business, Accounts API v1.3. Søkte tilganger i portalen: TikTok accounts →
@@ -150,9 +191,11 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   #veksthuset, #cutthefluff, nyhets-hashtags) → Folka Først (podkast-hashtags, gjestenavn, «snakker om») →
   Bankinfo («vi skaper mer sammen», «ta kontakt», «sponsorturnering» …) → Annet (VM-hashtags) →
   Folka Først svakt signal (arbeidslivs-hashtags, bare Reels).
+- YouTube (`platform="youtube"`, på tittel + beskrivelse): feed-regler (CTF) hoppes over, og Reels-regler
+  gjelder alle videoer. Testet mot de 83 videoene 30.09.2026: ingen avvik fra bekreftede Instagram-konsepter.
 - De 15 innleggene fra det svake signalet og de to ukjente (28.06 og 29.06) er bekreftet av Adrian og låst
   i concept_overrides.csv (17 rader, alle Folka Først).
-- Endringer i merkingen når Supabase ved neste kjøring av fetch_instagram.py.
+- Endringer i merkingen når Supabase ved neste kjøring av fetch_instagram.py / fetch_youtube.py.
 
 ## Arbeidsflyt
 - Ukentlig gjennomgang hver søndag (ukesrapport): justeringer av tidspunkt, rekkefølge og tester.
@@ -160,8 +203,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Tidspunkt-tester registreres i time_tests.csv og følges opp i ukesrapporten.
 
 ## Kjente problemer og begrensninger
-- Den planlagte kjøringen i GitHub Actions er ikke verifisert ennå. GitHub kan forsinke cron, og pauser
-  planlagte workflows etter 60 dager uten commits.
+- GitHub kan forsinke cron, og pauser planlagte workflows etter 60 dager uten commits. YouTube-jobben i
+  Actions er ikke verifisert ennå.
 - post_insights-historikken startet 29.09.2026. Sammenligning på samme alder i ukesrapporten blir først mulig
   når konseptene har ≥ 6 målte innlegg (Sitcom med ett innlegg i uken: ca. 6 uker). Radene fra 29.09 er merket
   'morgen' selv om de ble hentet midt på dagen.
@@ -170,20 +213,25 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Metas døgn for følgere og unik rekkevidde følger Stillehavstid, ikke Oslo-tid.
 - Meta rapporterer media_count 237, men media-listen gir 241 innlegg (ikke undersøkt).
 - Unik rekkevidde per måned lagres ikke, og er bare tilgjengelig 2 år bakover.
+- YouTube: to videoer (02.07, begge «Kom han seg opp til slutt?», 211 s) er VIDEO, ikke Shorts. De to nyeste
+  videoene mangler Analytics til den har tatt dem igjen. Rekkevidde per video finnes ikke i YouTube-API-et.
+- YouTube Analytics `views` teller alle avspillinger (som YouTube Studio); `engagedViews` er ca. 53 % av dette.
+- average_view_percentage kan være over 100 % fordi Shorts looper (kappes ikke).
 - db.select overstyrer en eventuell «limit» i params med sin egen sidedeling.
 - Rapportene er på norsk; bare videoens tekster er på engelsk.
 
 ## Neste steg
-1. Verifisere at kjøringene kl. 07 og 20 i GitHub Actions går (Adrian må lese loggene i GitHub)
-2. Første ukentlige gjennomgang og månedsrapport med vurdering fylt ut
-3. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
-4. Vurdere å lagre unik rekkevidde per måned i Supabase
+1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
+2. Dashboard for alle plattformer (Instagram, YouTube, senere TikTok), med plattform og format holdt adskilt
+3. Verifisere den første YouTube-kjøringen i GitHub Actions
+4. YouTube inn i uke- og månedsrapporten
 5. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller
-  feilmeldinger. Før hver commit: søk i stagede filer etter META_ACCESS_TOKEN- og SUPABASE_SECRET_KEY-verdiene.
-- Repoet er privat. data/, .venv/ og .env skal aldri committes. Commit og push bare når Adrian ber om det.
+  feilmeldinger. Før hver commit: søk i stagede filer etter verdiene til META_ACCESS_TOKEN, SUPABASE_SECRET_KEY,
+  YOUTUBE_CLIENT_SECRET og YOUTUBE_REFRESH_TOKEN.
+- Repoet er privat. data/, .venv/, .env og secrets/ skal aldri committes. Commit og push bare når Adrian ber om det.
 - Commit-meldinger på engelsk, med Co-Authored-By-linje.
 - Tidspunkt analyseres i Europe/Oslo.
 - Bruk median i tillegg til gjennomsnitt. Enkeltinnlegg med ekstrem rekkevidde (f.eks. VM) skal ikke skjule mønstrene.
@@ -192,5 +240,12 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Rapporter alltid antall innlegg per konsept. Funn basert på under 6 innlegg merkes «foreløpig».
 - Innlegg yngre enn 7 dager utelates fra sammenligninger av endelige tall.
 - Rekkevidde summert over innlegg er ikke unike personer, og skal merkes slik hvis den vises.
+- Sammenlign bare innenfor samme plattform og format. YouTube-videoer med format VIDEO holdes utenfor
+  Shorts-analysen.
+- YouTube: utelat-regelen (yngre enn 7 dager) gjelder Data API-tallene. Dype mål (seertid, visningstid,
+  andel sett) brukes bare når analytics_end_date dekker innlegget, så ulik alder ikke sammenlignes.
+- YouTube: kommentarer og likes fra Data API er hovedtall. Ikke bland Data API og Analytics i samme beregning.
+- youtube_video_daily (Analytics, Stillehavsdøgn) og youtube_video_insights (øyeblikksbilder) er ulike kilder
+  og skal aldri blandes. «Samme alder» fra daily = publiseringsdøgn + neste døgn, ikke eksakte timer.
 - Demo og materiale til tredjeparter skal anonymiseres (kundenavn, captions, lenker), og eksempeltall
   skal merkes tydelig på hvert element.

@@ -1,7 +1,8 @@
-name: Daglig Instagram-henting
+name: Daglig henting (Instagram og YouTube)
 
-# Kjører fetch_instagram.py kl. 07 og kl. 20 norsk tid hver dag, og kan startes
-# manuelt (Actions -> Daglig Instagram-henting -> Run workflow).
+# Kjører fetch_instagram.py og fetch_youtube.py kl. 07 og kl. 20 norsk tid hver dag,
+# og kan startes manuelt (Actions -> Daglig henting (Instagram og YouTube) -> Run workflow).
+# Instagram og YouTube er egne jobber: feiler den ene, kjører den andre likevel.
 # Kveldskjøringen gir målinger nærmere 24 og 48 timer etter publisering for
 # innlegg som publiseres på kvelden.
 #
@@ -24,9 +25,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  fetch:
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
     steps:
       - name: Velg riktig tidspunkt for sommer-/vintertid
         id: gate
@@ -46,21 +48,23 @@ jobs:
           echo "Oslo UTC-offset $offset, utløser '${SCHEDULE:-manuell}': run=$run"
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
+  instagram:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - uses: actions/checkout@v5
-        if: steps.gate.outputs.run == 'true'
 
       - uses: actions/setup-python@v6
-        if: steps.gate.outputs.run == 'true'
         with:
           python-version: "3.14"
           cache: pip
 
       - name: Installer avhengigheter
-        if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements.txt
 
       - name: Hent fra Instagram og lagre i Supabase
-        if: steps.gate.outputs.run == 'true'
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
@@ -68,3 +72,29 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           PYTHONIOENCODING: utf-8
         run: python fetch_instagram.py
+
+  youtube:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Installer avhengigheter
+        run: pip install -r requirements.txt
+
+      - name: Hent fra YouTube og lagre i Supabase
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python fetch_youtube.py
