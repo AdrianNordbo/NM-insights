@@ -1,67 +1,69 @@
-/* Fargetokens fra v5-forhåndsvisningen. Mørk modus følger prefers-color-scheme (ingen egen bryter). */
+/* Fargetokens. Siden er alltid lys når den åpnes; knappen i toppfeltet setter data-theme="dark" på
+   <html> mens siden er åpen (ingen lagring). Toppfeltet er det samme mørkeblå i begge temaene. */
 :root {
   color-scheme: light;
   --page: #eef1f6;
   --surface: #ffffff;
-  --ink: #0d0f12;
-  --ink-2: #4d5159;
-  --muted: #6f747d;
-  --grid: #e6e9ef;
-  --axis: #c3c8d1;
+  --ink: #0d1220;
+  --ink-2: #4b5263;
+  --muted: #6b7385;
+  --grid: #e3e7ee;
+  --axis: #c3c9d4;
   --border: rgba(16, 24, 40, 0.08);
   --chip: #eef1f6;
-  --series-1: #2a78d6;
-  --series-prev: #c3c8d1;
+  --series-1: #2a6fd6;
+  --series-prev: #c3c9d4;
   --up: #157f3b;
   --up-bg: #e3f4e8;
   --down: #b42828;
   --down-bg: #fbe6e6;
-  --same: #5f646d;
-  --same-bg: #eceef2;
-  --tag-bg: #eceef2;
-  /* Plattformfarger: én aksent per plattform */
+  --same: #5f6677;
+  --same-bg: #eceff4;
+  --tag-bg: #eceff4;
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  /* Plattformfarger på lys bakgrunn */
   --ig: #c2307a;
   --ig-2: #7d3cc4;
-  --yt: #e0261e;
-  /* Mørkt toppfelt */
-  --band: #0e1014;
-  --band-surface: #171a20;
-  --band-ink: #f3f4f6;
-  --band-ink-2: #a7adb8;
-  --band-border: rgba(255, 255, 255, 0.08);
-  --ig-on-dark: #f2629f;
-  --ig-2-on-dark: #a678f0;
-  --yt-on-dark: #ff5a52;
+  --yt: #d1221a;
+  /* Mørkeblått toppfelt (likt i begge temaene) */
+  --band: #121a2b;
+  --band-surface: #1b2438;
+  --band-ink: #f3f5f9;
+  --band-ink-2: #a9b3c6;
+  --band-border: rgba(255, 255, 255, 0.09);
+  --hero-shadow: 0 18px 40px -12px rgba(18, 26, 43, 0.45);
+  /* Plattformfarger på mørk bakgrunn (toppfeltet og mørk modus) */
+  --ig-on-dark: #f472b0;
+  --ig-2-on-dark: #b18cf5;
+  --yt-on-dark: #ff6b63;
   --overlap: 70px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page: #14171d;
-    --surface: #1c2027;
-    --ink: #f3f4f6;
-    --ink-2: #b4b9c2;
-    --muted: #8e939d;
-    --grid: #23262d;
-    --axis: #3a3e46;
-    --border: rgba(255, 255, 255, 0.07);
-    --chip: #23262d;
-    --series-1: #3987e5;
-    --series-prev: #3a3e46;
-    --up: #4cc274;
-    --up-bg: rgba(76, 194, 116, 0.14);
-    --down: #f07a7a;
-    --down-bg: rgba(240, 122, 122, 0.14);
-    --same: #9aa0aa;
-    --same-bg: rgba(255, 255, 255, 0.07);
-    --tag-bg: #23262d;
-    --ig: #f2629f;
-    --ig-2: #a678f0;
-    --yt: #ff5a52;
-    --band: #060708;
-    --band-surface: #121418;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0c111c;
+  --surface: #161d2c;
+  --ink: #eef1f6;
+  --ink-2: #aab3c4;
+  --muted: #8a93a5;
+  --grid: #232c3d;
+  --axis: #3a4558;
+  --border: rgba(255, 255, 255, 0.08);
+  --chip: #1f2738;
+  --series-1: #6aa5f5;
+  --series-prev: #3a4558;
+  --up: #4cc274;
+  --up-bg: rgba(76, 194, 116, 0.14);
+  --down: #f07a7a;
+  --down-bg: rgba(240, 122, 122, 0.14);
+  --same: #a3abba;
+  --same-bg: rgba(255, 255, 255, 0.07);
+  --tag-bg: #1f2738;
+  --card-shadow: none;
+  --hero-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.6);
+  --ig: #f472b0;
+  --ig-2: #b18cf5;
+  --yt: #ff6b63;
 }
 
 * {
@@ -194,6 +196,31 @@ a {
 
 .band-head .link-button {
   color: var(--band-ink);
+}
+
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--band-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--band-ink);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.theme-toggle:focus-visible,
+.band a:focus-visible,
+.band-head a:focus-visible,
+.band-head button:focus-visible {
+  outline: 2px solid var(--band-ink);
+  outline-offset: 2px;
 }
 
 .tabs {
@@ -354,7 +381,7 @@ a {
   border-radius: 16px;
   background: var(--band-surface);
   color: var(--band-ink);
-  box-shadow: 0 18px 40px -12px rgba(14, 16, 20, 0.45);
+  box-shadow: var(--hero-shadow);
 }
 
 .hero::before {
@@ -610,7 +637,7 @@ a {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: var(--card-shadow);
   color: var(--accent);
 }
 
@@ -636,6 +663,24 @@ a {
   .page {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  /* Logo og knappene på første linje, fanene under. E-posten skjules for å få plass. */
+  .topline {
+    row-gap: 6px;
+  }
+
+  .topbar-right {
+    margin-left: auto;
+  }
+
+  .topbar-right .user {
+    display: none;
+  }
+
+  .tabs {
+    order: 3;
+    width: 100%;
   }
 
   .band {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Faner } from "@/components/Faner";
+import { TemaKnapp } from "@/components/TemaKnapp";
 import { getUser } from "@/lib/auth";
 import { KUNDE } from "@/lib/navn";
 
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Logg ut
               </button>
             </form>
+            <TemaKnapp />
           </span>
         </div>
       </header>
