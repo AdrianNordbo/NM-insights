@@ -84,10 +84,6 @@ body {
 .metric-value,
 .pill,
 .delta,
-.big,
-.kv dd,
-.num,
-.value,
 .stepper-label,
 .hero-foot b {
   font-variant-numeric: tabular-nums;
@@ -1132,12 +1128,6 @@ a.fresh-title:hover {
   border-radius: 10px;
 }
 
-.recommendations h2 {
-  font-size: 14px;
-  margin: 0 0 2px;
-  color: var(--ink-2);
-}
-
 .recommendations p {
   margin: 0;
 }
@@ -1266,7 +1256,7 @@ a.recent-title:hover {
   color: var(--ink-2);
 }
 
-.ctable tr.avsluttet th {
+.ctable tr.inaktiv th {
   color: var(--ink-2);
 }
 

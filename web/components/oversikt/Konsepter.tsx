@@ -7,12 +7,14 @@ import { BEFORE_CONCEPTS, barScale, type ConceptBlock, type ConceptLine } from "
 
 function Status({ line }: { line: ConceptLine }) {
   if (line.status === "forelopig") return <Forelopig />;
-  if (line.status === "avsluttet" && line.lastPublished)
+  if (line.status === "inaktiv")
     return (
-      <span className="muted small" title={KILDER.avsluttet}>
-        {" "}
-        · siste {formatDayMonth(line.lastPublished)}
-      </span>
+      <>
+        <span className="tag" title={KILDER.inaktiv}>
+          inaktiv
+        </span>
+        {line.lastPublished && <span className="muted small"> · siste {formatDayMonth(line.lastPublished)}</span>}
+      </>
     );
   return null;
 }

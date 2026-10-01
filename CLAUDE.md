@@ -35,6 +35,7 @@ og en plassholder for TikTok («kommer»).
 | supabase/schema.sql | Fullt skjema, idempotent. supabase/migrations/ har endringer for eksisterende database |
 | supabase/checks/ | Kontrollspørringer for SQL Editor: dashboard_access.sql (rettigheter, blokk A–G) og dashboard_data.sql (tall i viewene) |
 | .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram og YouTube (egne jobber) |
+| web/ | Dashboardet (Next.js på Vercel), se «Dashboard (web/)» |
 | secrets/ | youtube_client_secret.json (OAuth-klient) og youtube_token.json. Gitignored, skal aldri committes |
 
 Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i terminalen):
@@ -279,18 +280,57 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Konseptet «Før konsepter» er skjult som standard.
 - Grupper med `preliminary = true` merkes «foreløpig».
 - Innhold med special_event (f.eks. VM 2026) vises som egne rader, ikke blandet inn i konseptene.
+- Konsepter er «inaktiv» når det er 21 dager eller mer siden siste innlegg (`INACTIVE_AFTER_DAYS` i
+  web/lib/oversikt/konsepter.ts), og aktive igjen ved neste innlegg. Ingen manuell statusliste.
+- Instagram Feed er av som standard i alle seksjoner og slås på med `?feed=1`.
+- Endring mot forrige periode vises i prosent bare når forrige verdi er minst 1 000; ellers pil + forrige verdi.
+- Annonsevisninger (AD) holdes utenfor, og døgnene er Stillehavsdøgn (sagt i info-ikonene).
+- Etiketter ved topper i grafene er «Mulig årsak: …», aldri en fasit.
+
+## Dashboard (web/)
+Next.js 16 (App Router) på Vercel, Recharts for grafer, Vitest for tester (`npm test` i web/). Design etter
+v5-forhåndsvisningen (data/forhandsvisning/, lokal og gitignored). Siden er alltid lys når den åpnes;
+sol/måne-knappen øverst til høyre slår mørk modus av og på mens siden er åpen (ingen lagring).
+
+Oversikt (`/`), i rekkefølge:
+1. Mørkeblått toppfelt: Uke/Måned og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
+   Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
+   så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
+   trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = siste periode der
+   alle viste plattformer har `data_through` ≥ periodens siste dag; uferdige perioder merkes «hittil, t.o.m.»
+   og sammenlignes med like mange dager i forrige periode.
+2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
+3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
+4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,
+   ikke Metas total_interactions) i to synkroniserte grafer, 7d/30d/90d/Alt (uavhengig av Uke/Måned),
+   forrige periode stiplet, opptil 3 toppetiketter i rader, markering fra `takeover_date`. Plattformene
+   rapporterer nettotall per døgn som kan være negative (f.eks. −1 like); grafen klipper ved 0, tooltipen
+   viser faktisk verdi.
+5. Hva funket sist (beste innlegg 7–14 dager gammelt, «×N av vanlig for konseptet»).
+6. Konsepttabellen (median, modne innlegg, aktive → inaktive → foreløpige, trendlinje siste 10 innlegg,
+   spesielle hendelser sammenfoldet, «Før konsepter» bak bryter `?vis=alle`).
+
+Struktur: all logikk i rene funksjoner i web/lib/oversikt/ (periode, aktivitet, endring, kort, sammendrag,
+graf, ferske, sist, konsepter, adresse, side) med tester ved siden av; komponentene i web/components/ bare
+viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
+Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
+testet med en midlertidig, ikke-committet side som viser samme komponent med tall fra viewene.
+«Trender og idéer» (`/trender`) er en tom plassholder.
 
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). «Adrians periode» = fra denne datoen.
 - Konsepter:
-  - Folka Først: intervjuer om arbeidsrelevante temaer (podkast-format), avsluttet uke 39 2026
+  - Folka Først: intervjuer om arbeidsrelevante temaer (podkast-format), aktiv
   - Sitcom: korte humoristiske episoder fra kontoret, inspirert av The Office (publiseres tirsdager)
-  - Uten kompetanse: golf/turn o.l., erstattet av På Gata fra uke 39 2026 (publisert torsdager)
+  - Uten kompetanse: golf/turn o.l., byttet ut med På Gata fra uke 39 2026 (publisert torsdager). Blir
+    inaktiv i dashboardet 21 dager etter siste innlegg
   - På Gata: gateintervjuer med ubehagelige/morsomme spørsmål (#PåGata)
-  - CTF (Cut the fluff): relevante nyheter som feed-innlegg, avsluttet (siste innlegg 08.09.2026)
+  - CTF (Cut the fluff): relevante nyheter som feed-innlegg, inaktiv (siste innlegg 08.09.2026)
   - Bankinfo: Veksthusets egne informasjons- og reklameinnlegg (ikke et innholdskonsept)
   - Annet/aktualitet: alt utenfor konseptene, i praksis VM-Reels juni–juli 2026
   - Før konsepter: alle innlegg før 15.06.2026. Ukjent: ingen regel traff (ingen per 30.09.2026)
+- Aktiv/inaktiv bestemmes av publisering, ikke av en manuell liste: et konsept er inaktivt når det har gått
+  21 dager eller mer siden siste innlegg, og blir aktivt igjen ved neste innlegg.
 - Konseptene har faste publiseringsdager, så ukedagseffekter for Reels er i praksis konsepteffekter.
 - VM-innholdet (juni–juli 2026, 9 innlegg) har høyest rekkevidde av alle innlegg. is_vm/special_event
   markerer det på tvers av konsept. Rapporter Adrians periode med og uten VM, og mot samme periode i 2025
@@ -337,16 +377,16 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
-2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert, og åpen registrering er slått av.
-   Skjelett og innlogging i web/ er bygget. Gjenstår: frontend etter frontend-reglene, og egen SMTP +
-   token_hash-malene før Veksthuset inviteres (se «Innlogging i dashboardet»).
-3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
+2. Før Veksthuset inviteres: egen SMTP i Supabase + token_hash-malene (se «Innlogging i dashboardet»).
+   Oversiktssiden er ferdig (se «Dashboard (web/)»).
+3. Anbefalingslinje på Oversikt: planlagt, ikke bygget. Innhold og regler avklares før bygging.
+4. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
    konsept per dag og tidsrom.
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
    - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,
      og om Instagram fortsatt gir `online_followers`.
-4. Fase 2 (agenter med Claude API) når det finnes betalende kunder
+5. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller

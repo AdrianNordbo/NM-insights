@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConceptSummaryRow } from "../data/types";
-import { barScale, buildConceptBlocks, sparkFor } from "./konsepter";
+import { barScale, buildConceptBlocks, daysSince, INACTIVE_AFTER_DAYS, isActive, sparkFor } from "./konsepter";
 import { buildRecent } from "./sist";
 import { post } from "./testdata";
 
@@ -28,7 +28,7 @@ const content = [
     post("instagram", "REELS", `2026-07-${String(i + 1).padStart(2, "0")}T19:00:00`, 100 + i, { concept: "Sitcom", age_days: 80 }),
   ),
   post("instagram", "REELS", "2026-09-29T19:00:00", 1008, { concept: "Sitcom", is_mature: false, age_days: 1 }),
-  // Uten kompetanse: aktiv, men Folka Først er avsluttet (siste innlegg i juli)
+  // Uten kompetanse: aktiv, men Folka Først er inaktiv i testdataene (siste innlegg i juli)
   post("instagram", "REELS", "2026-09-17T19:00:00", 1934, { concept: "Uten kompetanse", age_days: 13.5 }),
   post("instagram", "REELS", "2026-09-18T19:00:00", 500, { concept: "Uten kompetanse", age_days: 12.5 }),
   post("instagram", "REELS", "2026-07-20T19:00:00", 652, { concept: "Folka Først", age_days: 72 }),
@@ -39,11 +39,11 @@ const content = [
 describe("konsepttabellen", () => {
   const [reels] = buildConceptBlocks(concepts, content, "2026-10-01", false, false);
 
-  it("aktive først, så avsluttede, så foreløpige nederst, etter median innenfor hver gruppe", () => {
+  it("aktive først, så inaktive, så foreløpige nederst, etter median innenfor hver gruppe", () => {
     expect(reels.lines.map((l) => [l.concept, l.status])).toEqual([
       ["Uten kompetanse", "aktiv"],
       ["Sitcom", "aktiv"],
-      ["Folka Først", "avsluttet"],
+      ["Folka Først", "inaktiv"],
       ["Bankinfo", "forelopig"],
     ]);
   });
@@ -104,5 +104,35 @@ describe("hva funket sist", () => {
     const feedPost = post("instagram", "FEED", "2026-09-01T10:00:00", 50, { age_days: 30 });
     expect(buildRecent([feedPost], concepts, false)).toEqual([]);
     expect(buildRecent([feedPost], concepts, true)[0].state).toBe("none");
+  });
+});
+
+describe("aktiv eller inaktiv", () => {
+  const today = "2026-10-01";
+  const block = (published: string) =>
+    buildConceptBlocks(
+      [summary("CTF", 20, 100)],
+      [post("instagram", "REELS", `${published}T10:00:00`, 100, { concept: "CTF", age_days: 30 })],
+      today,
+      false,
+      false,
+    )[0].lines[0].status;
+
+  it("grensen er 21 dager uten innlegg", () => {
+    expect(INACTIVE_AFTER_DAYS).toBe(21);
+    expect(daysSince("2026-09-11T10:00:00", today)).toBe(20);
+    expect(block("2026-09-11")).toBe("aktiv"); // 20 dager
+    expect(block("2026-09-10")).toBe("inaktiv"); // 21 dager
+    expect(block("2026-09-09")).toBe("inaktiv"); // 22 dager
+    expect(isActive("2026-10-01T08:00:00", today)).toBe(true); // publisert i dag
+  });
+
+  it("et inaktivt konsept blir aktivt igjen når det publiseres", () => {
+    const old = post("instagram", "REELS", "2026-09-08T10:00:00", 100, { concept: "CTF", age_days: 23 });
+    const again = post("instagram", "REELS", "2026-09-30T10:00:00", 100, { concept: "CTF", age_days: 1, is_mature: false });
+    const status = (content: ReturnType<typeof post>[]) =>
+      buildConceptBlocks([summary("CTF", 20, 100)], content, today, false, false)[0].lines[0];
+    expect(status([old]).status).toBe("inaktiv");
+    expect(status([old, again])).toMatchObject({ status: "aktiv", lastPublished: "2026-09-30T10:00:00" });
   });
 });

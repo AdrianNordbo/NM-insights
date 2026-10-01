@@ -2,15 +2,16 @@
 // (median, bare innlegg som er minst 7 dager gamle). Sammenlign bare innenfor samme blokk.
 
 import type { ConceptSummaryRow, ContentLatestRow, Format, Platform } from "../data/types";
-import { addDays, formatDayMonth } from "../format";
+import { daysInclusive, formatDayMonth } from "../format";
 import { FORMAT_NAME, FORMAT_ORDER, PLATFORM_NAME } from "../navn";
 import { formatVisible } from "./adresse";
 
 export const BEFORE_CONCEPTS = "Før konsepter";
-export const ACTIVE_DAYS = 30;
+/** Et konsept er inaktivt når det har gått så mange dager eller mer siden siste innlegg. */
+export const INACTIVE_AFTER_DAYS = 21;
 export const SPARK_POSTS = 10;
 
-export type ConceptStatus = "aktiv" | "avsluttet" | "forelopig";
+export type ConceptStatus = "aktiv" | "inaktiv" | "forelopig";
 
 export type SparkPoint = { key: string; label: string; value: number };
 
@@ -45,6 +46,12 @@ export type ConceptBlock = {
   hidden: number;
 };
 
+/** Dager siden siste innlegg (publiseringsdato i Oslo-tid til i dag). */
+export const daysSince = (lastPublished: string, today: string) => daysInclusive(lastPublished.slice(0, 10), today) - 1;
+
+/** Aktiv = færre enn INACTIVE_AFTER_DAYS dager siden siste innlegg. Publiseres det igjen, blir konseptet aktivt igjen. */
+export const isActive = (lastPublished: string, today: string) => daysSince(lastPublished, today) < INACTIVE_AFTER_DAYS;
+
 const byViews = (a: ConceptLine, b: ConceptLine) => (b.medianViews ?? -1) - (a.medianViews ?? -1);
 
 /** Siste 10 modne innlegg i konseptet (uten spesielle hendelser), eldst først. */
@@ -61,8 +68,8 @@ export function sparkFor(content: ContentLatestRow[], platform: Platform, format
 }
 
 /**
- * Én blokk per plattform og format. Rekkefølge: aktive konsepter, så avsluttede (ingen innlegg
- * siste 30 dager), så foreløpige (under 6 innlegg) nederst; innenfor hver gruppe etter median
+ * Én blokk per plattform og format. Rekkefølge: aktive konsepter, så inaktive (ingen innlegg de
+ * siste 21 dagene), så foreløpige (under 6 innlegg) nederst; innenfor hver gruppe etter median
  * visninger. Spesielle hendelser (special_event) ligger i egen liste. Feed bare med bryteren på.
  */
 export function buildConceptBlocks(
@@ -72,7 +79,6 @@ export function buildConceptBlocks(
   showBeforeConcepts: boolean,
   feed: boolean,
 ): ConceptBlock[] {
-  const activeFrom = addDays(today, -ACTIVE_DAYS);
   const combos = [...new Map(concepts.map((c) => [`${c.platform}|${c.format}`, c])).values()]
     .map((c) => ({ platform: c.platform, format: c.format }))
     .filter((c) => formatVisible(c.format, feed))
@@ -90,7 +96,7 @@ export function buildConceptBlocks(
           .map((p) => p.published_at)
           .sort()
           .at(-1) ?? null;
-      const status: ConceptStatus = c.preliminary ? "forelopig" : last && last.slice(0, 10) >= activeFrom ? "aktiv" : "avsluttet";
+      const status: ConceptStatus = c.preliminary ? "forelopig" : last && isActive(last, today) ? "aktiv" : "inaktiv";
       return {
         concept: c.concept ?? "Uten konsept",
         posts: c.posts,
@@ -102,7 +108,7 @@ export function buildConceptBlocks(
       };
     });
 
-    const order: ConceptStatus[] = ["aktiv", "avsluttet", "forelopig"];
+    const order: ConceptStatus[] = ["aktiv", "inaktiv", "forelopig"];
     lines.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || byViews(a, b));
 
     const events: EventLine[] = own
