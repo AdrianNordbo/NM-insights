@@ -1,19 +1,16 @@
-import Link from "next/link";
-import { HvaFunketSistKort } from "@/components/HvaFunketSist";
-import { InfoIkon } from "@/components/InfoIkon";
-import { KonseptBlokk } from "@/components/Konsepter";
 import { Utvikling } from "@/components/grafer/Utvikling";
 import { Engasjement } from "@/components/oversikt/Engasjement";
 import { Ferske } from "@/components/oversikt/Ferske";
+import { HvaFunketSist } from "@/components/oversikt/HvaFunketSist";
+import { Konsepter } from "@/components/oversikt/Konsepter";
 import { Plattformkort } from "@/components/oversikt/Plattformkort";
 import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
 import type { ConceptSummaryRow, ContentLatestRow, Result } from "@/lib/data/types";
 import { formatFetched } from "@/lib/format";
-import { BEFORE_CONCEPTS, buildConceptBlocks } from "@/lib/forside/konsepter";
-import { buildRecent } from "@/lib/forside/sist";
-import { KILDER } from "@/lib/kilder";
-import { formatVisible, hrefFor } from "@/lib/oversikt/adresse";
+import { hrefFor } from "@/lib/oversikt/adresse";
+import { buildConceptBlocks } from "@/lib/oversikt/konsepter";
 import type { OversiktTopp } from "@/lib/oversikt/side";
+import { buildRecent } from "@/lib/oversikt/sist";
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
@@ -38,10 +35,6 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
   const lastFetched = content.ok
     ? content.data.map((p) => p.fetched_at).filter((t): t is string => Boolean(t)).sort().at(-1)
     : undefined;
-  const conceptBlocks = (
-    concepts.ok && content.ok ? buildConceptBlocks(concepts.data, content.data, today, showBeforeConcepts) : []
-  ).filter((b) => formatVisible(b.format, feed));
-  const hiddenCount = conceptBlocks.reduce((sum, b) => sum + b.hidden, 0);
   const beforeConceptsHref = topp.ok
     ? hrefFor(topp.data.state, showBeforeConcepts ? {} : { vis: "alle" })
     : showBeforeConcepts ? "/" : "/?vis=alle";
@@ -83,42 +76,18 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
         {topp.ok && <Ferske groups={topp.data.fresh} />}
         {topp.ok && <Utvikling series={topp.data.utvikling.series} posts={topp.data.utvikling.posts} />}
 
-        <section className="block" aria-labelledby="sist">
-          <div className="block-head">
-            <h2 id="sist">
-              Hva funket sist? <InfoIkon id="sist" text={KILDER.sist} />
-            </h2>
-            <p className="block-sub">Innlegg publisert for 7–14 dager siden</p>
-          </div>
-          {content.ok && concepts.ok ? (
-            <div className="card-grid">
-              {buildRecent(content.data, concepts.data)
-                .filter((item) => formatVisible(item.format, feed))
-                .map((item) => (
-                  <HvaFunketSistKort key={`${item.platform}-${item.format}`} item={item} />
-                ))}
-            </div>
-          ) : (
-            <Notice>{!content.ok ? content.error : !concepts.ok ? concepts.error : ""}</Notice>
-          )}
-        </section>
-
-        <section className="block" aria-labelledby="konsepter">
-          <div className="block-head">
-            <h2 id="konsepter">Hvilket konsept bør vi lage mer av?</h2>
-            {(hiddenCount > 0 || showBeforeConcepts) && (
-              <Link className="toggle" href={beforeConceptsHref} scroll={false}>
-                <span className={showBeforeConcepts ? "switch on" : "switch"} aria-hidden="true" />
-                Vis «{BEFORE_CONCEPTS}»
-              </Link>
-            )}
-          </div>
-          {concepts.ok && content.ok ? (
-            conceptBlocks.map((block) => <KonseptBlokk key={`${block.platform}-${block.format}`} block={block} />)
-          ) : (
-            <Notice>{!concepts.ok ? concepts.error : !content.ok ? content.error : ""}</Notice>
-          )}
-        </section>
+        {content.ok && concepts.ok ? (
+          <>
+            <HvaFunketSist items={buildRecent(content.data, concepts.data, feed)} />
+            <Konsepter
+              blocks={buildConceptBlocks(concepts.data, content.data, today, showBeforeConcepts, feed)}
+              showBeforeConcepts={showBeforeConcepts}
+              toggleHref={beforeConceptsHref}
+            />
+          </>
+        ) : (
+          <Notice>{!content.ok ? content.error : !concepts.ok ? concepts.error : ""}</Notice>
+        )}
       </main>
     </>
   );

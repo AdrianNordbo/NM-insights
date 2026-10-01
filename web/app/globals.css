@@ -1068,23 +1068,6 @@ a.fresh-title:hover {
   }
 }
 
-.page-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 16px;
-}
-
-
-.section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
 .notice {
   padding: 10px 14px;
   border-radius: 8px;
@@ -1164,227 +1147,161 @@ a.fresh-title:hover {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
   min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
 }
 
-.card.coming {
-  border-style: dashed;
-  background: transparent;
-}
+/* --- Hva funket sist? ------------------------------------------------------ */
 
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.recent-kicker {
   margin-bottom: 8px;
-}
-
-.card h3 {
-  font-size: 15px;
-  margin: 0;
-}
-
-.card p {
-  margin: 4px 0;
-}
-
-.kv {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-  margin: 0;
-}
-
-.kv dt {
-  font-size: 13px;
-  color: var(--ink-2);
-}
-
-.kv dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.kv.compact {
-  grid-template-columns: 1fr;
-  gap: 2px;
-}
-
-.kv.compact > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.big {
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.week {
-  margin-top: 14px !important;
-  padding-top: 10px;
-  border-top: 1px solid var(--grid);
-  font-size: 13px;
-  color: var(--ink-2);
-}
-
-.format-row {
-  margin-top: 10px;
-}
-
-.format-row h4 {
-  font-size: 13px;
-  margin: 0 0 4px;
-}
-
-.arrow {
-  font-size: 10px;
-  margin: 0 2px 0 4px;
-}
-
-.arrow.up {
-  color: var(--up);
-}
-
-.arrow.down {
-  color: var(--down);
-}
-
-.arrow.same {
-  color: var(--muted);
-}
-
-.prev {
-  color: var(--muted);
   font-size: 12px;
 }
 
-.post-title {
+.recent-kicker .plat {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.recent-title {
+  display: block;
+  color: var(--ink);
   font-weight: 600;
+  line-height: 1.35;
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
 
-.post-title a {
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.post-title a:hover {
+a.recent-title:hover {
   text-decoration: underline;
 }
 
-.label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 11px !important;
-}
-
-.metric .big {
-  font-size: 22px;
-}
-
-.ratio {
+.recent-meta {
+  margin-top: 2px;
+  font-size: 13px;
   color: var(--ink-2);
-  font-size: 14px;
 }
 
-.ratio.highlight {
-  color: var(--up);
-  font-weight: 600;
+.recent-views {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-views span {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+.recent-ratio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* --- Konsepter ------------------------------------------------------------- */
 
-.concept-block {
-  margin-top: 16px;
-  padding: 14px 16px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.concept-block h3 {
-  font-size: 15px;
-  margin: 0 0 8px;
-}
-
-.concept-row {
+.concepts {
   display: grid;
-  grid-template-columns: minmax(140px, 1.4fr) 64px 1.5fr 1.5fr;
-  gap: 12px;
-  align-items: center;
-  padding: 7px 0;
-  border-top: 1px solid var(--grid);
+  gap: 14px;
+}
+
+.concept-card {
+  padding: 18px 20px 12px;
+}
+
+.concept-plat {
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.ctable {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 14px;
 }
 
-.concept-row.head {
-  border-top: 0;
-  padding-top: 0;
+.ctable thead th {
+  padding: 0 8px 8px;
+  color: var(--ink-2);
   font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ctable td,
+.ctable tbody th {
+  padding: 10px 8px;
+  border-top: 1px solid var(--grid);
+  vertical-align: middle;
+}
+
+.ctable tbody th {
+  font-weight: 500;
+  text-align: left;
+}
+
+.ctable .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ctable tr.forelopig td,
+.ctable tr.forelopig th {
   color: var(--ink-2);
 }
 
-.concept-row .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.concept-row.avsluttet .concept-name,
-.concept-row.forelopig .concept-name {
+.ctable tr.avsluttet th {
   color: var(--ink-2);
 }
 
-.concept-name .muted,
-.concept-name .tag,
-.ratio .tag {
-  margin-left: 4px;
+.ctable .tag {
+  margin-left: 6px;
 }
 
-.metric-cell {
-  display: grid;
-  grid-template-columns: 1fr 64px;
-  align-items: center;
-  gap: 8px;
+.cbar {
+  display: inline-block;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 3px;
+  background: var(--accent);
+  vertical-align: middle;
 }
 
-.metric-cell .value {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.cbar.muted-bar {
+  background: var(--axis);
 }
 
-.bar-track {
-  display: block;
-  height: 8px;
+.spark-cell {
+  width: 110px;
+  color: var(--accent);
 }
 
-.bar {
-  display: block;
-  height: 8px;
-  border-radius: 0 4px 4px 0;
-  background: var(--series-1);
+.spark-cell.muted-spark {
+  color: var(--axis);
 }
 
-.bar.muted-bar {
-  background: var(--series-prev);
-}
-
-.mobile-label {
+.show-m {
   display: none;
 }
 
 .events {
-  margin-top: 6px;
+  margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--grid);
   font-size: 13px;
@@ -1425,7 +1342,7 @@ a.fresh-title:hover {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--surface);
+  background: #ffffff;
   transition: left 0.15s;
 }
 
@@ -1437,30 +1354,49 @@ a.fresh-title:hover {
   left: 14px;
 }
 
-@media (max-width: 600px) {
-  .concept-row.head {
+@media (max-width: 760px) {
+  .ctable .hide-m {
     display: none;
   }
 
-  .concept-row {
-    grid-template-columns: 1fr auto;
-    gap: 4px 12px;
-  }
-
-  .concept-row .posts {
-    color: var(--ink-2);
-    font-size: 13px;
-  }
-
-  .metric-cell {
-    grid-column: 1 / -1;
-    grid-template-columns: 1fr 1.2fr 64px;
-  }
-
-  .mobile-label {
+  .show-m {
     display: inline;
-    font-size: 12px;
-    color: var(--ink-2);
+  }
+
+  .ctable thead th,
+  .ctable td,
+  .ctable tbody th {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .ctable thead th .info {
+    display: none;
+  }
+
+  /* Overskriftene får bryte linjen, ellers blir tabellen bredere enn skjermen. */
+  .ctable {
+    table-layout: fixed;
+  }
+
+  .ctable thead th,
+  .ctable thead th.n {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  .ctable thead th:first-child,
+  .ctable tbody th {
+    width: 44%;
+  }
+
+  .concept-card {
+    padding: 16px 14px 10px;
+  }
+
+  .cbar {
+    display: none;
   }
 }
 
