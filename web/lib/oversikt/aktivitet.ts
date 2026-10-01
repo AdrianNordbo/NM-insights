@@ -123,3 +123,16 @@ export function trend(s: Series, p: Period, metric: MetricKey, n = 12): TrendPoi
     value: q.end < s.firstData || q.start > s.through ? null : sumRange(s, q.start, q.end).metrics[metric],
   }));
 }
+
+/** Serien i en form som kan sendes til en klientkomponent (uten Map). */
+export type PlainSeries = Omit<Series, "byDay"> & { days: [string, Metrics][] };
+
+export const toPlain = (s: Series): PlainSeries => {
+  const { byDay, ...rest } = s;
+  return { ...rest, days: [...byDay.entries()] };
+};
+
+export const fromPlain = (p: PlainSeries): Series => {
+  const { days, ...rest } = p;
+  return { ...rest, byDay: new Map(days) };
+};

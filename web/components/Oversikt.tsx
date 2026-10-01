@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HvaFunketSistKort } from "@/components/HvaFunketSist";
 import { InfoIkon } from "@/components/InfoIkon";
 import { KonseptBlokk } from "@/components/Konsepter";
+import { Utvikling } from "@/components/grafer/Utvikling";
 import { Engasjement } from "@/components/oversikt/Engasjement";
 import { Plattformkort } from "@/components/oversikt/Plattformkort";
 import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
@@ -78,6 +79,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
 
       <main className={topp.ok ? "page under-heroes" : "page"}>
         {topp.ok && <Engasjement rows={topp.data.engagement} trendLabel={topp.data.trendLabel} />}
+        {topp.ok && <Utvikling series={topp.data.utvikling.series} posts={topp.data.utvikling.posts} />}
 
         <section className="block" aria-labelledby="sist">
           <div className="block-head">

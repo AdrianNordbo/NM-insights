@@ -1,9 +1,10 @@
 // Setter sammen alt toppfeltet og «Engasjement i perioden» trenger, fra viewene og adressen.
 
 import type { ContentLatestRow, DailyActivityRow, PlatformSummaryRow } from "../data/types";
-import { buildSeries } from "./aktivitet";
+import { buildSeries, toPlain } from "./aktivitet";
 import { navigation, type Navigation, type OversiktState, readState, type SearchParams, visibleSeries } from "./adresse";
 import { type EngagementRow, engagementRow, type HeroCard, heroCard, seriesId, seriesName } from "./kort";
+import type { ChartPost, UtviklingSerie } from "./graf";
 import { periodLabel, trendLabel } from "./periode";
 import { summarySentence } from "./sammendrag";
 
@@ -17,6 +18,7 @@ export type OversiktTopp = {
   summaries: Summary[];
   heroes: HeroCard[];
   engagement: EngagementRow[];
+  utvikling: { series: UtviklingSerie[]; posts: ChartPost[] };
 };
 
 export function buildTopp(
@@ -40,5 +42,17 @@ export function buildTopp(
     }),
     heroes: shown.map((s) => heroCard(s, state.period, content, summary, today)),
     engagement: shown.map((s) => engagementRow(s, state.period)).filter((r): r is EngagementRow => r !== null),
+    utvikling: {
+      series: shown.map((s) => ({ id: seriesId(s), name: seriesName(s), platform: s.platform, plain: toPlain(s) })),
+      posts: content
+        .filter((x) => shown.some((s) => s.platform === x.platform && s.format === x.format))
+        .map((x) => ({
+          platform: x.platform,
+          format: x.format,
+          day: x.published_at.slice(0, 10),
+          title: x.title?.split("\n")[0].trim() || "(uten tittel)",
+          views: x.views ?? 0,
+        })),
+    },
   };
 }
