@@ -1,4 +1,4 @@
-import { FORMAT_ORDER } from "./plattform";
+import { FORMAT_ORDER } from "../navn";
 import type { ConceptSummaryRow, ContentLatestRow, Format, Platform } from "../data/types";
 
 export const RECENT_MIN_DAYS = 7;

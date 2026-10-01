@@ -73,7 +73,33 @@ export type PlatformSummaryRow = {
   prev_followers_end: number | null;
 };
 
-export type DashboardView = "content_latest" | "concept_summary" | "platform_summary";
+/** Format i dashboard.daily_activity (AD og OTHER er holdt utenfor i viewet). */
+export type ActivityFormat = "ALL" | "REELS" | "FEED" | "STORY" | "SHORTS" | "VIDEO";
+
+/**
+ * dashboard.daily_activity: aktivitet på hele kontoen per døgn og format, også på eldre innlegg.
+ * Døgnene følger Stillehavstid (Metas og YouTube Analytics' egne døgn).
+ */
+export type DailyActivityRow = {
+  platform: Platform;
+  account_id: number;
+  /** Stillehavsdøgn, "YYYY-MM-DD". */
+  activity_date: string;
+  format: ActivityFormat;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  /** Null for YouTube. */
+  saves: number | null;
+  interactions: number | null;
+  /** Siste døgn med data for kontoen (YouTube ligger 2–3 døgn bak). */
+  data_through: string;
+  /** Når Nordbø Marketing tok over kontoen. */
+  takeover_date: string | null;
+};
+
+export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity";
 
 /** Resultat av en spørring: enten data, eller en feil som kan vises rolig til brukeren. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };

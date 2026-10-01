@@ -1,55 +1,67 @@
-/* Fargetokens som i HTML-rapportene (report.py), med lys og mørk modus. */
+/* Fargetokens fra v5-forhåndsvisningen. Mørk modus følger prefers-color-scheme (ingen egen bryter). */
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
+  --page: #eef1f6;
+  --surface: #ffffff;
+  --ink: #0d0f12;
+  --ink-2: #4d5159;
+  --muted: #6f747d;
+  --grid: #e6e9ef;
+  --axis: #c3c8d1;
+  --border: rgba(16, 24, 40, 0.08);
+  --chip: #eef1f6;
   --series-1: #2a78d6;
-  --series-prev: #c3c2b7;
-  --up: #006300;
+  --series-prev: #c3c8d1;
+  --up: #157f3b;
+  --up-bg: #e3f4e8;
   --down: #b42828;
-  --tag-bg: #f0efec;
+  --down-bg: #fbe6e6;
+  --same: #5f646d;
+  --same-bg: #eceef2;
+  --tag-bg: #eceef2;
+  /* Plattformfarger: én aksent per plattform */
+  --ig: #c2307a;
+  --ig-2: #7d3cc4;
+  --yt: #e0261e;
+  /* Mørkt toppfelt */
+  --band: #0e1014;
+  --band-surface: #171a20;
+  --band-ink: #f3f4f6;
+  --band-ink-2: #a7adb8;
+  --band-border: rgba(255, 255, 255, 0.08);
+  --ig-on-dark: #f2629f;
+  --ig-2-on-dark: #a678f0;
+  --yt-on-dark: #ff5a52;
+  --overlap: 70px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --axis: #383835;
-    --border: rgba(255, 255, 255, 0.1);
+    --page: #14171d;
+    --surface: #1c2027;
+    --ink: #f3f4f6;
+    --ink-2: #b4b9c2;
+    --muted: #8e939d;
+    --grid: #23262d;
+    --axis: #3a3e46;
+    --border: rgba(255, 255, 255, 0.07);
+    --chip: #23262d;
     --series-1: #3987e5;
-    --series-prev: #52514e;
-    --up: #0ca30c;
-    --down: #e66767;
-    --tag-bg: #2c2c2a;
+    --series-prev: #3a3e46;
+    --up: #4cc274;
+    --up-bg: rgba(76, 194, 116, 0.14);
+    --down: #f07a7a;
+    --down-bg: rgba(240, 122, 122, 0.14);
+    --same: #9aa0aa;
+    --same-bg: rgba(255, 255, 255, 0.07);
+    --tag-bg: #23262d;
+    --ig: #f2629f;
+    --ig-2: #a678f0;
+    --yt: #ff5a52;
+    --band: #060708;
+    --band-surface: #121418;
   }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --muted: #898781;
-  --grid: #2c2c2a;
-  --axis: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --series-1: #3987e5;
-  --series-prev: #52514e;
-  --up: #0ca30c;
-  --down: #e66767;
-  --tag-bg: #2c2c2a;
 }
 
 * {
@@ -61,7 +73,22 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.5 var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tall står rett under hverandre */
+.hero-num,
+.metric-value,
+.pill,
+.delta,
+.big,
+.kv dd,
+.num,
+.value,
+.stepper-label,
+.hero-foot b {
+  font-variant-numeric: tabular-nums;
 }
 
 a {
@@ -89,39 +116,67 @@ a {
   color: var(--down);
 }
 
-/* --- Ramme ------------------------------------------------------------------ */
+/* --- Ramme og mørkt toppfelt ------------------------------------------------ */
 
-.topbar,
-.tabs-wrap,
+.wrap,
 .page {
-  max-width: 1040px;
+  max-width: 1160px;
   margin: 0 auto;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
-.topbar {
+.band-head,
+.band {
+  background: var(--band);
+  color: var(--band-ink);
+}
+
+/* Toppfeltet slutter 70 px over kortenes nedre kant, så kortene ligger delvis over den lyse bakgrunnen. */
+.band {
+  display: flow-root;
+  border-radius: 0 0 40px 40px;
+  padding-bottom: 28px;
+}
+
+.band > .wrap {
+  display: flow-root;
+}
+
+.band:has(.heroes) {
+  padding-bottom: 0;
+}
+
+.topline {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  gap: 10px 24px;
+  padding-top: 16px;
 }
 
 .brand {
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.brand span {
+  font-weight: 500;
+  color: var(--band-ink-2);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 13px;
   min-width: 0;
+  color: var(--band-ink-2);
 }
 
-.topbar-right .muted {
+.topbar-right .user {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -137,33 +192,491 @@ a {
   text-decoration: underline;
 }
 
-.tabs-wrap {
-  border-bottom: 1px solid var(--grid);
+.band-head .link-button {
+  color: var(--band-ink);
 }
 
 .tabs {
   display: flex;
-  gap: 20px;
+  gap: 22px;
 }
 
 .tabs a {
-  padding: 8px 0 10px;
-  color: var(--ink-2);
+  padding: 4px 0;
+  color: var(--band-ink-2);
   text-decoration: none;
   font-size: 14px;
   border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
 }
 
 .tabs a[aria-current="page"] {
-  color: var(--ink);
+  color: var(--band-ink);
   font-weight: 600;
-  border-bottom-color: var(--ink);
+  border-bottom-color: var(--band-ink);
 }
 
+.band-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+  padding-top: 32px;
+}
+
+.band-controls h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.seg a {
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--band-ink-2);
+  text-decoration: none;
+}
+
+.seg a[aria-current="true"] {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--band-ink);
+  font-weight: 600;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stepper a,
+.stepper .disabled {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--band-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--band-ink);
+  text-decoration: none;
+  font-size: 16px;
+}
+
+.stepper .disabled {
+  opacity: 0.3;
+}
+
+.stepper-label {
+  min-width: 178px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.feed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--band-ink-2);
+  text-decoration: none;
+}
+
+.feed-toggle .switch {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.feed-toggle .switch.on {
+  background: var(--ig-on-dark);
+}
+
+.band .info {
+  border-color: var(--band-ink-2);
+  color: var(--band-ink-2);
+}
+
+.band-meta {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--band-ink-2);
+}
+
+.chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--band-ink-2);
+}
+
+.band .notice {
+  background: var(--band-surface);
+  color: var(--band-ink-2);
+}
+
+/* --- Plattformkort i toppfeltet ---------------------------------------------- */
+
+.heroes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  margin-bottom: calc(-1 * var(--overlap));
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  padding: 22px 22px 18px;
+  border: 1px solid var(--band-border);
+  border-radius: 16px;
+  background: var(--band-surface);
+  color: var(--band-ink);
+  box-shadow: 0 18px 40px -12px rgba(14, 16, 20, 0.45);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+}
+
+.hero.instagram {
+  --accent: var(--ig-on-dark);
+}
+
+.hero.youtube {
+  --accent: var(--yt-on-dark);
+}
+
+.hero.instagram::before {
+  background: linear-gradient(90deg, var(--ig-2-on-dark), var(--ig-on-dark));
+}
+
+.hero.youtube::before {
+  background: var(--yt-on-dark);
+}
+
+.hero-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hero-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.hero-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.hero-label {
+  font-size: 13px;
+  color: var(--band-ink-2);
+}
+
+.hero-num {
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.hero .delta {
+  margin-top: 6px;
+  color: var(--band-ink-2);
+}
+
+.hero-spark {
+  min-width: 0;
+  color: var(--accent);
+}
+
+.hero-spark-cap {
+  margin-top: 2px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--band-ink-2);
+}
+
+.hero-empty {
+  margin: 16px 0 4px;
+  color: var(--band-ink-2);
+  font-size: 14px;
+}
+
+.hero-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--band-border);
+  font-size: 13px;
+  color: var(--band-ink-2);
+}
+
+.hero-foot b {
+  color: var(--band-ink);
+  font-weight: 600;
+}
+
+/* --- Endring (piller) --------------------------------------------------------- */
+
+.delta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.pill.up {
+  color: var(--up);
+  background: var(--up-bg);
+}
+
+.pill.down {
+  color: var(--down);
+  background: var(--down-bg);
+}
+
+.pill.same {
+  color: var(--same);
+  background: var(--same-bg);
+}
+
+.hero .pill.up {
+  color: #6be38f;
+  background: rgba(76, 194, 116, 0.16);
+}
+
+.hero .pill.down {
+  color: #ff8e8e;
+  background: rgba(240, 122, 122, 0.16);
+}
+
+.hero .pill.same {
+  color: #c3c7cf;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* --- Trendlinjer (Recharts) ----------------------------------------------------- */
+
+.trendlinje {
+  width: 100%;
+  min-width: 0;
+}
+
+.trend-tip {
+  display: grid;
+  gap: 1px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+/* --- Seksjoner under toppfeltet ------------------------------------------------- */
+
 .page {
-  padding-top: 24px;
+  padding-top: 8px;
   padding-bottom: 64px;
+}
+
+.page.under-heroes {
+  padding-top: calc(var(--overlap) + 8px);
+}
+
+.block {
+  margin-top: 36px;
+}
+
+.block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 14px;
+}
+
+.block-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.block-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.plat {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.instagram {
+  --accent: var(--ig);
+}
+
+.youtube {
+  --accent: var(--yt);
+}
+
+.eng-rows {
+  display: grid;
+  gap: 16px;
+}
+
+.eng-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.eng-name {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding-top: 4px;
+}
+
+.eng-name .plat {
+  color: var(--accent);
+}
+
+.eng-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.metric-tile {
+  min-width: 0;
+  padding: 14px 16px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  color: var(--accent);
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.metric-value {
+  margin: 2px 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.metric-tile .trendlinje {
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .wrap,
+  .page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .band {
+    border-radius: 0 0 28px 28px;
+  }
+
+  .band-controls h1 {
+    font-size: 26px;
+  }
+
+  .stepper-label {
+    min-width: 136px;
+  }
+
+  .heroes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .hero-num {
+    font-size: 40px;
+  }
+
+  .eng-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .eng-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .eng-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .page-head {
@@ -174,15 +687,6 @@ a {
   gap: 4px 16px;
 }
 
-.page h1 {
-  font-size: 26px;
-  margin: 0;
-}
-
-.page h2 {
-  font-size: 18px;
-  margin: 36px 0 12px;
-}
 
 .section-head {
   display: flex;

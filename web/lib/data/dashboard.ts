@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   ConceptSummaryRow,
   ContentLatestRow,
+  DailyActivityRow,
   DashboardView,
   PlatformSummaryRow,
   Result,
@@ -21,16 +22,15 @@ function fail<T>(where: string, error: PostgrestError, status?: number): Result<
   return { ok: false, error: FRIENDLY_ERROR };
 }
 
+/** order: én eller flere kolonner, kommaseparert. Må gi en entydig rekkefølge, ellers blir sidedelingen ustabil. */
 async function selectAll<T>(view: DashboardView, columns: string, order: string): Promise<Result<T[]>> {
   try {
     const supabase = await createClient();
     const rows: T[] = [];
     for (let from = 0; ; from += PAGE_SIZE) {
-      const { data, error, status } = await supabase
-        .from(view)
-        .select(columns)
-        .order(order)
-        .range(from, from + PAGE_SIZE - 1);
+      let query = supabase.from(view).select(columns);
+      for (const column of order.split(",")) query = query.order(column.trim());
+      const { data, error, status } = await query.range(from, from + PAGE_SIZE - 1);
       if (error) return fail(view, error, status);
       rows.push(...((data ?? []) as T[]));
       if (!data || data.length < PAGE_SIZE) return { ok: true, data: rows };
@@ -42,13 +42,17 @@ async function selectAll<T>(view: DashboardView, columns: string, order: string)
 }
 
 export function getContentLatest(): Promise<Result<ContentLatestRow[]>> {
-  return selectAll<ContentLatestRow>("content_latest", "*", "content_id");
+  return selectAll<ContentLatestRow>("content_latest", "*", "platform,content_id");
 }
 
 export function getConceptSummary(): Promise<Result<ConceptSummaryRow[]>> {
-  return selectAll<ConceptSummaryRow>("concept_summary", "*", "concept");
+  return selectAll<ConceptSummaryRow>("concept_summary", "*", "platform,account_id,format,concept,special_event");
 }
 
 export function getPlatformSummary(): Promise<Result<PlatformSummaryRow[]>> {
-  return selectAll<PlatformSummaryRow>("platform_summary", "*", "period_start");
+  return selectAll<PlatformSummaryRow>("platform_summary", "*", "account_id,format,period_type,period_start");
+}
+
+export function getDailyActivity(): Promise<Result<DailyActivityRow[]>> {
+  return selectAll<DailyActivityRow>("daily_activity", "*", "account_id,activity_date,format");
 }
