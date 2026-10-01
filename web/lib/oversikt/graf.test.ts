@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSeries, fromPlain, toPlain } from "./aktivitet";
-import { type ChartPost, chartData, interactions, peaks, placeablePeaks, rangeStart } from "./graf";
+import { type ChartPost, chartData, interactions, peaks, placePeaks, rangeStart } from "./graf";
 import { days } from "./testdata";
 
 const rows = [
@@ -78,9 +78,9 @@ describe("utvikling per dag", () => {
     expect(chartData(back, "30", posts)).toEqual(chartData(reels, "30", posts));
   });
 
-  it("etiketter som ligger for tett på skjermen fjernes, og den største toppen beholdes", () => {
+  it("etiketter som ligger tett på skjermen legges i hver sin rad, den største øverst", () => {
     const c = chartData(reels, "alt", posts); // 04.07 og 24.09 ligger 82 døgn fra hverandre av 214
-    expect(placeablePeaks(c, 1000).map((p) => p.date)).toEqual(["2026-07-04", "2026-09-24"]);
-    expect(placeablePeaks(c, 300).map((p) => p.date)).toEqual(["2026-07-04"]);
+    expect(placePeaks(c, 1000).map((p) => [p.date, p.row])).toEqual([["2026-07-04", 0], ["2026-09-24", 0]]);
+    expect(placePeaks(c, 300).map((p) => [p.date, p.row])).toEqual([["2026-07-04", 0], ["2026-09-24", 1]]);
   });
 });

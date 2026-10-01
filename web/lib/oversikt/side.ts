@@ -2,6 +2,7 @@
 
 import type { ContentLatestRow, DailyActivityRow, PlatformSummaryRow } from "../data/types";
 import { buildSeries, toPlain } from "./aktivitet";
+import { type FreshGroup, freshGroups } from "./ferske";
 import { navigation, type Navigation, type OversiktState, readState, type SearchParams, visibleSeries } from "./adresse";
 import { type EngagementRow, engagementRow, type HeroCard, heroCard, seriesId, seriesName } from "./kort";
 import type { ChartPost, UtviklingSerie } from "./graf";
@@ -19,6 +20,7 @@ export type OversiktTopp = {
   heroes: HeroCard[];
   engagement: EngagementRow[];
   utvikling: { series: UtviklingSerie[]; posts: ChartPost[] };
+  fresh: FreshGroup[];
 };
 
 export function buildTopp(
@@ -42,6 +44,7 @@ export function buildTopp(
     }),
     heroes: shown.map((s) => heroCard(s, state.period, content, summary, today)),
     engagement: shown.map((s) => engagementRow(s, state.period)).filter((r): r is EngagementRow => r !== null),
+    fresh: freshGroups(content, state.feed),
     utvikling: {
       series: shown.map((s) => ({ id: seriesId(s), name: seriesName(s), platform: s.platform, plain: toPlain(s) })),
       posts: content

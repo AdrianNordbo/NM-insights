@@ -4,6 +4,7 @@ import { InfoIkon } from "@/components/InfoIkon";
 import { KonseptBlokk } from "@/components/Konsepter";
 import { Utvikling } from "@/components/grafer/Utvikling";
 import { Engasjement } from "@/components/oversikt/Engasjement";
+import { Ferske } from "@/components/oversikt/Ferske";
 import { Plattformkort } from "@/components/oversikt/Plattformkort";
 import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
 import type { ConceptSummaryRow, ContentLatestRow, Result } from "@/lib/data/types";
@@ -79,6 +80,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
 
       <main className={topp.ok ? "page under-heroes" : "page"}>
         {topp.ok && <Engasjement rows={topp.data.engagement} trendLabel={topp.data.trendLabel} />}
+        {topp.ok && <Ferske groups={topp.data.fresh} />}
         {topp.ok && <Utvikling series={topp.data.utvikling.series} posts={topp.data.utvikling.posts} />}
 
         <section className="block" aria-labelledby="sist">

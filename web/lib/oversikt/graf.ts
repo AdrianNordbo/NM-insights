@@ -117,20 +117,25 @@ export function chartData(s: Series, range: Range, posts: ChartPost[], maxPeaks 
   };
 }
 
-/** Minste avstand i piksler mellom to etiketter (etikettene er opptil ca. 200 px brede). */
+/** Minste avstand i piksler mellom to etiketter i samme rad (etikettene er opptil ca. 200 px brede). */
 export const LABEL_MIN_PX = 210;
 
+export type PlacedPeak = Peak & { row: number };
+
 /**
- * Etikettene som får plass: går gjennom toppene fra størst til minst og hopper over en topp som
- * ligger nærmere enn minPx (i piksler) en som allerede har fått etikett.
+ * Plasserer etikettene i rader øverst i grafen: den største toppen får rad 0, og en topp som ligger
+ * nærmere enn minPx (i piksler) en etikett i samme rad, flyttes ned til neste ledige rad.
+ * Alle toppene fra chartData får etikett; antallet styres med maxPeaks der.
  */
-export function placeablePeaks(data: ChartData, plotWidth: number, minPx = LABEL_MIN_PX): Peak[] {
+export function placePeaks(data: ChartData, plotWidth: number, minPx = LABEL_MIN_PX): PlacedPeak[] {
   const n = data.days.length;
   const index = new Map(data.days.map((d, i) => [d.date, i]));
   const x = (date: string) => (n <= 1 ? 0 : ((index.get(date) ?? 0) / (n - 1)) * plotWidth);
-  const placed: Peak[] = [];
+  const placed: PlacedPeak[] = [];
   for (const p of [...data.peaks].sort((a, b) => b.views - a.views)) {
-    if (placed.every((q) => Math.abs(x(q.date) - x(p.date)) >= minPx)) placed.push(p);
+    let row = 0;
+    while (placed.some((q) => q.row === row && Math.abs(x(q.date) - x(p.date)) < minPx)) row++;
+    placed.push({ ...p, row });
   }
   return placed.sort((a, b) => a.date.localeCompare(b.date));
 }

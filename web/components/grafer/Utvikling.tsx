@@ -24,7 +24,7 @@ import {
   type ChartPost,
   DEFAULT_RANGE,
   type Peak,
-  placeablePeaks,
+  placePeaks,
   type Range,
   RANGES,
   type UtviklingSerie,
@@ -110,19 +110,36 @@ function Tips({ active, payload, peaks, takeover }: TooltipContentProps & { peak
 
 type LabelProps = { viewBox?: { x?: number; y?: number; width?: number; height?: number } };
 
-/** Tekst ved siden av en topp: til høyre for punktet, eller til venstre når den ellers går utenfor. */
-function SideLabel({ viewBox, text, chartWidth, top }: LabelProps & { text: string; chartWidth: number; top?: boolean }) {
-  const x = viewBox?.x ?? 0;
-  const y = viewBox?.y ?? 0;
-  const left = x > chartWidth - 230;
+const ROW_HEIGHT = 16;
+const FIRST_ROW_Y = 14;
+
+/**
+ * Etikett for en topp: i sin rad øverst i grafen, med en tynn stiplet linje ned til punktet.
+ * Teksten står til høyre for linjen, eller til venstre når den ellers går utenfor grafen.
+ */
+function PeakLabel({ viewBox, text, row, chartWidth }: LabelProps & { text: string; row: number; chartWidth: number }) {
+  const cx = (viewBox?.x ?? 0) + (viewBox?.width ?? 0) / 2;
+  const cy = (viewBox?.y ?? 0) + (viewBox?.height ?? 0) / 2;
+  const y = FIRST_ROW_Y + row * ROW_HEIGHT;
+  const left = cx > chartWidth - 230;
   return (
-    <text
-      x={left ? x - 8 : x + 8}
-      y={top ? 12 : Math.max(14, y - 8)}
-      textAnchor={left ? "end" : "start"}
-      className={top ? "chart-marker-label" : "chart-peak-label"}
-    >
-      {text}
+    <g>
+      {cy - 6 > y + 4 && <line x1={cx} x2={cx} y1={y + 4} y2={cy - 6} className="chart-leader" />}
+      <text x={left ? cx - 6 : cx + 6} y={y} textAnchor={left ? "end" : "start"} className="chart-peak-label">
+        {text}
+      </text>
+    </g>
+  );
+}
+
+/** «Nordbø Marketing starter» nederst ved markeringslinjen, så den aldri kolliderer med etikettene. */
+function MarkerLabel({ viewBox, chartWidth }: LabelProps & { chartWidth: number }) {
+  const x = viewBox?.x ?? 0;
+  const bottom = (viewBox?.y ?? 0) + (viewBox?.height ?? 0);
+  const left = x > chartWidth - 180;
+  return (
+    <text x={left ? x - 6 : x + 6} y={bottom - 6} textAnchor={left ? "end" : "start"} className="chart-marker-label">
+      Nordbø Marketing starter
     </text>
   );
 }
@@ -138,7 +155,8 @@ export function Utvikling({ series, posts }: { series: UtviklingSerie[]; posts: 
   const data = useMemo(() => (s ? chartData(s, range, posts, maxPeaks) : null), [s, range, posts, maxPeaks]);
   if (!current || !s || !data) return null;
   // Plottbredden er grafens bredde minus y-aksen (44 px) og høyremargen (8 px).
-  const labelled = placeablePeaks(data, Math.max(0, width - 52));
+  const labelled = placePeaks(data, Math.max(0, width - 52));
+  const rows = Math.max(1, ...labelled.map((p) => p.row + 1));
 
   const tickDate = (d: string) => (range === "alt" ? `${formatDayMonth(d)}.${d.slice(2, 4)}` : formatDayMonth(d));
   const tooltip = (props: TooltipContentProps) => <Tips {...props} peaks={data.peaks} takeover={data.takeover} />;
@@ -203,7 +221,7 @@ export function Utvikling({ series, posts }: { series: UtviklingSerie[]; posts: 
           ref={chartRef}
         >
           <ResponsiveContainer width="100%" height={250}>
-            <ComposedChart data={data.days} syncId={SYNC_ID} margin={{ top: 24, right: 8, bottom: 0, left: 0 }}>
+            <ComposedChart data={data.days} syncId={SYNC_ID} margin={{ top: 8 + rows * ROW_HEIGHT, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="utvikling-fyll" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0" stopColor="currentColor" stopOpacity={0.3} />
@@ -218,7 +236,7 @@ export function Utvikling({ series, posts }: { series: UtviklingSerie[]; posts: 
                 <ReferenceLine
                   x={data.takeover}
                   className="chart-marker"
-                  label={(p: LabelProps) => <SideLabel {...p} text="Nordbø Marketing starter" chartWidth={width} top />}
+                  label={(p: LabelProps) => <MarkerLabel {...p} chartWidth={width} />}
                 />
               )}
               {data.prevRange && (
@@ -241,7 +259,7 @@ export function Utvikling({ series, posts }: { series: UtviklingSerie[]; posts: 
                   r={4}
                   fill="currentColor"
                   className="chart-peak"
-                  label={(lp: LabelProps) => <SideLabel {...lp} text={`Mulig årsak: ${p.title}`} chartWidth={width} />}
+                  label={(lp: LabelProps) => <PeakLabel {...lp} text={`Mulig årsak: ${p.title}`} row={p.row} chartWidth={width} />}
                 />
               ))}
             </ComposedChart>
