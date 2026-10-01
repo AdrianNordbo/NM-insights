@@ -24,6 +24,8 @@ og en plassholder for TikTok («kommer»).
 | fetch_youtube.py | Henter fra YouTube Data API + Analytics API, merker konsept, skriver til Supabase + data/youtube_videos.json. `--backfill` = full daglig historikk |
 | fetch_daily.py | Daglig aktivitet per konto og format → account_daily (Instagram + YouTube). Siste 7 døgn hver kjøring; `--backfill` = Instagram 730 døgn, YouTube fra 04.06.2026; `--only instagram\|youtube`; `--dry-run` uten Supabase |
 | youtube_auth.py | Engangs OAuth-innlogging (kanaleier), lagrer secrets/youtube_token.json og skriver YOUTUBE_* til .env |
+| retry.py | Felles retry (2, 5 og 10 s ved forbigående feil) og `Failures` (enkeltkall hoppes over og logges; rød kjøring bare ved > 3 feilede kall eller ingenting lagret). Brukes av fetch_instagram/youtube/daily |
+| tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering, uten nettverk) |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
 | concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube). `python concepts.py` merker data/posts.json på nytt lokalt |
 | concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Gjelder begge plattformer (ID-ene overlapper ikke) |
@@ -42,6 +44,7 @@ Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i termin
 ```
 .venv/Scripts/python fetch_instagram.py
 .venv/Scripts/python fetch_youtube.py [--backfill]
+.venv/Scripts/python -m unittest -v                              # Python-tester (retry)
 .venv/Scripts/python analyze.py
 .venv/Scripts/python report.py --periode måned [--måned 2026-09]   # standard: forrige måned
 .venv/Scripts/python report.py --periode uke [--uke 2026-W39]      # standard: forrige uke, på søndager inneværende
@@ -360,6 +363,13 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 
 ## Kjente problemer og begrensninger
 - GitHub kan forsinke cron, og pauser planlagte workflows etter 60 dager uten commits.
+- API-ene gir av og til forbigående feil (f.eks. «Internal error encountered» fra YouTube Analytics).
+  Alle Meta- og YouTube-kall prøves på nytt etter 2, 5 og 10 s ved nettverksfeil, HTTP 5xx/429,
+  Googles backendError/rateLimitExceeded og Metas is_transient/rate limit-koder. Varige feil (ugyldig
+  metric, brukt opp dagskvote) prøves ikke på nytt. Kanal-, videoliste- og innleggslistekallene er
+  nødvendige; resten hoppes over enkeltvis og logges som «FEIL (hopper over)». Supabase-kall har ikke retry.
+  Terskelen for rød kjøring (> 3 feilede kall, MAX_FAILED_CALLS i retry.py) er et fast antall. Den bør
+  bli prosentbasert hvis antall videoer/innlegg (og dermed per-video-kall) vokser mye.
 - post_insights-historikken startet 29.09.2026. Sammenligning på samme alder i ukesrapporten blir først mulig
   når konseptene har ≥ 6 målte innlegg (Sitcom med ett innlegg i uken: ca. 6 uker). Radene fra 29.09 er merket
   'morgen' selv om de ble hentet midt på dagen.

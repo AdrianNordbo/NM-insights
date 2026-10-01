@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 
 import db
 from concepts import VM_EVENT, apply_concepts
+from retry import Failures, retry
 
 load_dotenv()
 
@@ -71,19 +72,44 @@ COLUMN_ORDER = [
 
 
 class MetaApiError(RuntimeError):
-    pass
+    """transient = forbigående (nettverk, HTTP 5xx, rate limit, Metas is_transient) og verdt å prøve igjen."""
+
+    def __init__(self, message, transient=False):
+        super().__init__(message)
+        self.transient = transient
+
+
+# Metas feilkoder som går over av seg selv: ukjent/midlertidig feil (1, 2) og rate limits (4, 17, 32, 341, 613).
+TRANSIENT_CODES = {1, 2, 4, 17, 32, 341, 613}
+
+
+def is_transient(error):
+    return getattr(error, "transient", False)
 
 
 # --- Meta Graph API ----------------------------------------------------------
 
-def api_get(path, params=None):
-    """GET mot Graph API. Tokenet sendes i header, aldri i URL, print eller logg."""
+def _api_get_once(path, params):
     headers = {"Authorization": f"Bearer {TOKEN}"}
-    resp = requests.get(f"{BASE_URL}/{path}", params=params, headers=headers, timeout=30)
-    data = resp.json()
+    try:
+        resp = requests.get(f"{BASE_URL}/{path}", params=params, headers=headers, timeout=30)
+    except requests.RequestException as e:  # meldingen kan inneholde URL, så bare typen vises
+        raise MetaApiError(f"Nettverksfeil ({type(e).__name__})", transient=True) from None
+    try:
+        data = resp.json()
+    except ValueError:
+        raise MetaApiError(f"Ugyldig svar fra Meta (HTTP {resp.status_code})",
+                           transient=resp.status_code >= 500 or resp.status_code == 429) from None
     if "error" in data:
-        raise MetaApiError(data["error"].get("message", "Ukjent feil fra Meta"))
+        err = data["error"]
+        transient = bool(err.get("is_transient")) or err.get("code") in TRANSIENT_CODES or resp.status_code >= 500
+        raise MetaApiError(err.get("message", "Ukjent feil fra Meta"), transient=transient)
     return data
+
+
+def api_get(path, params=None):
+    """GET mot Graph API med retry ved forbigående feil. Tokenet sendes i header, aldri i URL, print eller logg."""
+    return retry(lambda: _api_get_once(path, params), what=f"Meta {path}", is_transient=is_transient)
 
 
 def fetch_all_media():
@@ -118,7 +144,9 @@ def fetch_insights(media):
     try:
         data = api_get(f"{media['id']}/insights", {"metric": ",".join(metrics)})
         return parse_insights(data), data.get("data", [])
-    except MetaApiError:
+    except MetaApiError as e:
+        if e.transient:
+            raise  # forbigående feil som ikke gikk over etter retry: innlegget hoppes over
         # Én ugyldig metric stopper hele kallet, så vi prøver én og én.
         result, raw = {}, []
         for metric in metrics:
@@ -245,25 +273,22 @@ def insight_row(post_id, post, raw, today, slot, now_iso):
     }
 
 
-def save_account_insights(account_id, today, now_iso):
+def save_account_insights(account_id, today, now_iso, failures):
     """Dagens kontotall og nye følgere per dag. Returnerer (kontotall, antall dager med new_followers)."""
-    account = fetch_account()
+    account = failures.soft("kontotall", fetch_account, {})
     assert_no_token(account)
-    db.upsert("account_insights", [{
-        "account_id": account_id,
-        "snapshot_date": today.isoformat(),
-        "fetched_at": now_iso,
-        "followers_count": account.get("followers_count"),
-        "follows_count": account.get("follows_count"),
-        "media_count": account.get("media_count"),
-        "raw": account,
-    }], on_conflict="account_id,snapshot_date")
+    if account:
+        db.upsert("account_insights", [{
+            "account_id": account_id,
+            "snapshot_date": today.isoformat(),
+            "fetched_at": now_iso,
+            "followers_count": account.get("followers_count"),
+            "follows_count": account.get("follows_count"),
+            "media_count": account.get("media_count"),
+            "raw": account,
+        }], on_conflict="account_id,snapshot_date")
 
-    try:
-        history = fetch_follower_history()
-    except MetaApiError as e:
-        print(f"Kunne ikke hente følgerhistorikk: {e}")
-        history = []
+    history = failures.soft("følgerhistorikk", fetch_follower_history, [])
     assert_no_token(history)
 
     days = {}
@@ -351,9 +376,10 @@ def main():
     now_iso = now.isoformat()
     today = now.date()
     account_id = db.get_account("instagram", IG_USER_ID)["id"]
+    failures = Failures(MetaApiError)
 
     print("Henter innlegg ...")
-    media = fetch_all_media()
+    media = fetch_all_media()  # nødvendig: feiler den etter retry, stopper kjøringen
     fresh = recently_refreshed(account_id, today - timedelta(days=REFRESH_OLD_DAYS - 1))
     backup = load_backup()
 
@@ -367,7 +393,10 @@ def main():
     raw_by_id = {}
     for i, m in enumerate(to_refresh, 1):
         raw_media = dict(m)
-        insights, raw_insights = fetch_insights(m)
+        result = failures.soft(f"innsikt for innlegg {m['id']}", lambda: fetch_insights(m))
+        if result is None:
+            continue  # beholder forrige tall i backupen; nye tall neste kjøring
+        insights, raw_insights = result
         m.update(insights)
         m["insights_date"] = today.isoformat()
         raw_by_id[m["id"]] = {"media": raw_media, "insights": raw_insights}
@@ -395,7 +424,7 @@ def main():
         for p in posts if p["id"] in raw_by_id
     ]
     db.upsert("post_insights", insight_rows, on_conflict="post_id,snapshot_date,snapshot_slot")
-    account, follower_days = save_account_insights(account_id, today, now_iso)
+    account, follower_days = save_account_insights(account_id, today, now_iso, failures)
 
     save_backup(posts)
     print(f"Ferdig! {len(saved)} innlegg og {len(insight_rows)} innsiktsrader lagret i Supabase.")
@@ -404,6 +433,7 @@ def main():
           + f" Nye følgere oppdatert for {follower_days} dager.")
     print(f"Lokal backup: {DATA_DIR}/posts.json og posts.csv")
     print_summary(posts)
+    failures.finish(saved_anything=bool(saved), name="Instagram")
 
 
 if __name__ == "__main__":

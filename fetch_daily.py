@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 import db
 import fetch_instagram as ig
 import fetch_youtube as yt_mod
+from retry import Failures
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 RECENT_DAYS = 7
@@ -97,22 +98,18 @@ def run_instagram(backfill, dry_run):
     start = (pacific_today() - timedelta(days=IG_HISTORY_DAYS - 1)) if backfill else end - timedelta(days=RECENT_DAYS - 1)
     print(f"Instagram: henter {start} → {end} (Stillehavsdøgn)")
 
-    pending, saved, failed, in_a_row = [], 0, [], 0
+    failures = Failures(ig.MetaApiError)
+    pending, saved, in_a_row = [], 0, 0
     for day in days(start, end):
-        for attempt in (1, 2):
-            try:
-                pending += ig_day(account_id, day)
-                in_a_row = 0
-                break
-            except ig.MetaApiError as e:
-                if attempt == 2:
-                    failed.append(day)
-                    in_a_row += 1
-                    print(f"  {day}: feil fra Meta: {str(e)[:150]}")
-                else:
-                    time.sleep(5)
-        if in_a_row >= 5:
-            raise ig.MetaApiError("Fem døgn på rad feilet. Avbryter.")
+        # api_get prøver selv på nytt ved forbigående feil; feiler døgnet likevel, hoppes det over.
+        rows = failures.soft(f"Instagram-døgn {day}", lambda: ig_day(account_id, day))
+        if rows is None:
+            in_a_row += 1
+            if in_a_row >= 5:
+                raise ig.MetaApiError("Fem døgn på rad feilet. Avbryter.")
+        else:
+            pending += rows
+            in_a_row = 0
         if len(pending) >= SAVE_EVERY * 4 or day == end:
             saved += save(pending, dry_run, ig.assert_no_token)
             pending = []
@@ -120,8 +117,8 @@ def run_instagram(backfill, dry_run):
             print(f"  {day}", end="\r", flush=True)
             time.sleep(0.2)
     print(f"Instagram: {saved} rader {'(ikke lagret, --dry-run)' if dry_run else 'lagret'}"
-          f"{f', {len(failed)} døgn feilet' if failed else ''}.")
-    return not failed
+          f"{f', {len(failures.failed)} døgn feilet' if failures.failed else ''}.")
+    return failures.problems(saved_anything=saved > 0)
 
 
 # --- YouTube ------------------------------------------------------------------
@@ -135,8 +132,10 @@ def run_youtube(backfill, dry_run):
     print(f"YouTube: henter {start} → {end} (Stillehavsdøgn, Analytics ligger 2–3 døgn etter)")
 
     params = {"startDate": start.isoformat(), "endDate": end.isoformat(), "metrics": ",".join(YT_METRICS)}
-    by_type = yt.analytics(**params, dimensions="day,creatorContentType", sort="day")
-    totals = yt.analytics(**params, dimensions="day", sort="day")
+    failures = Failures(yt_mod.YouTubeApiError)
+    by_type = failures.soft("YouTube per døgn og format",
+                            lambda: yt.analytics(**params, dimensions="day,creatorContentType", sort="day"), [])
+    totals = failures.soft("YouTube per døgn (hele kanalen)", lambda: yt.analytics(**params, dimensions="day", sort="day"), [])
 
     grouped = defaultdict(lambda: (defaultdict(int), {}))  # (dag, format) → (summer, raw)
     for r in by_type:
@@ -153,7 +152,7 @@ def run_youtube(backfill, dry_run):
     saved = save(rows, dry_run, yt.assert_clean)
     through = max((r["activity_date"] for r in rows), default="ingen")
     print(f"YouTube: {saved} rader {'(ikke lagret, --dry-run)' if dry_run else 'lagret'}, tall til og med {through}.")
-    return True
+    return failures.problems(saved_anything=saved > 0)
 
 
 # --- Felles -------------------------------------------------------------------
@@ -176,18 +175,18 @@ def main():
                         help="Hent fra API-ene og vis antall, uten å lese fra eller skrive til Supabase")
     args = parser.parse_args()
 
-    ok = True
+    problems = []
     runners = {"instagram": (run_instagram, ig.MetaApiError), "youtube": (run_youtube, yt_mod.YouTubeApiError)}
     for platform, (run, api_error) in runners.items():
         if args.only and args.only != platform:
             continue
         try:   # en feil på én plattform stopper ikke den andre
-            ok = run(args.backfill, args.dry_run) and ok
+            problems += [f"{platform}: {p}" for p in run(args.backfill, args.dry_run)]
         except (api_error, db.SupabaseError) as e:
-            print(f"{platform}: {type(e).__name__}: {e}")
-            ok = False
-    if not ok:
-        sys.exit(1)
+            problems.append(f"{platform}: {type(e).__name__}: {e}")
+    if problems:
+        # Rød kjøring bare ved mer enn et fåtall feilede kall, eller når ingenting ble lagret.
+        sys.exit("Kjøringen regnes som feilet: " + "; ".join(problems))
 
 
 if __name__ == "__main__":

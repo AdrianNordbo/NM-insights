@@ -37,6 +37,7 @@ from google.oauth2.credentials import Credentials
 import db
 from concepts import VM_EVENT, apply_concepts
 from fetch_instagram import DATA_DIR, OSLO, snapshot_slot
+from retry import Failures, retry
 
 load_dotenv()
 
@@ -61,7 +62,20 @@ DURATION_RE = re.compile(r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?")
 
 
 class YouTubeApiError(RuntimeError):
-    pass
+    """transient = forbigående (nettverk, HTTP 5xx/429, backendError o.l.) og verdt å prøve igjen."""
+
+    def __init__(self, message, status=None, transient=False):
+        super().__init__(message)
+        self.status = status
+        self.transient = transient
+
+
+# Feilårsaker fra Google som går over av seg selv. quotaExceeded (dagskvoten) er ikke med.
+TRANSIENT_REASONS = {"backendError", "internalError", "rateLimitExceeded", "userRateLimitExceeded"}
+
+
+def is_transient(error):
+    return getattr(error, "transient", False)
 
 
 # --- Autentisering og API-kall -----------------------------------------------
@@ -89,22 +103,39 @@ class YouTube:
         except Exception as e:  # meldingen fra google-auth inneholder ikke tokens
             raise YouTubeApiError(f"Kunne ikke fornye tilgangen: {type(e).__name__}") from None
 
-    def _get(self, url, params):
+    def _get_once(self, url, params):
         if not self.creds.valid:
             self._refresh()
-        resp = requests.get(url, params=params, timeout=60,
-                            headers={"Authorization": f"Bearer {self.creds.token}"})
-        data = resp.json()
+        try:
+            resp = requests.get(url, params=params, timeout=60,
+                                headers={"Authorization": f"Bearer {self.creds.token}"})
+        except requests.RequestException as e:  # meldingen kan inneholde URL, så bare typen vises
+            raise YouTubeApiError(f"Nettverksfeil ({type(e).__name__})", transient=True) from None
+        try:
+            data = resp.json()
+        except ValueError:
+            status = resp.status_code
+            raise YouTubeApiError(f"Ugyldig svar fra YouTube (HTTP {status})", status,
+                                  transient=status >= 500 or status == 429) from None
         if "error" in data:
-            raise YouTubeApiError(data["error"].get("message", "Ukjent feil fra YouTube"))
+            err = data["error"]
+            status = resp.status_code
+            reasons = {e.get("reason") for e in err.get("errors", [])}
+            transient = status >= 500 or status == 429 or bool(reasons & TRANSIENT_REASONS)
+            raise YouTubeApiError(f"{err.get('message', 'Ukjent feil fra YouTube')} (HTTP {status})",
+                                  status, transient)
         return data
 
+    def _get(self, url, params, what):
+        return retry(lambda: self._get_once(url, params), what=what, is_transient=is_transient)
+
     def data(self, path, params):
-        return self._get(f"{DATA_URL}/{path}", params)
+        return self._get(f"{DATA_URL}/{path}", params, what=f"Data API {path}")
 
     def analytics(self, **params):
         """Returnerer liste av dict per rad."""
-        data = self._get(ANALYTICS_URL, {"ids": "channel==MINE", **params})
+        what = " ".join(x for x in ("Analytics", params.get("dimensions"), params.get("filters")) if x)
+        data = self._get(ANALYTICS_URL, {"ids": "channel==MINE", **params}, what=what)
         time.sleep(0.1)  # skånsomt mot kvoten
         cols = [h["name"] for h in data.get("columnHeaders", [])]
         return [dict(zip(cols, row)) for row in data.get("rows", [])]
@@ -295,7 +326,7 @@ def daily_rows(video_id, rows, now_iso):
     } for r in rows]
 
 
-def save_channel(yt, account_id, channel, today, now_iso, start):
+def save_channel(yt, account_id, channel, today, now_iso, start, failures):
     stats = channel.get("statistics", {})
     raw = {"id": channel["id"], "title": channel["snippet"].get("title"), "statistics": stats}
     yt.assert_clean(raw)
@@ -309,8 +340,9 @@ def save_channel(yt, account_id, channel, today, now_iso, start):
         "raw": raw,
     }], on_conflict="account_id,snapshot_date")
 
-    days = [r for r in channel_daily_subscribers(yt, start.isoformat(), today.isoformat())
-            if date.fromisoformat(r["day"]) < today]
+    subscribers = failures.soft("nye abonnenter per døgn",
+                                lambda: channel_daily_subscribers(yt, start.isoformat(), today.isoformat()), [])
+    days = [r for r in subscribers if date.fromisoformat(r["day"]) < today]
     if days:
         # Dager uten rad fra før: ny rad med rått svar (abonnenttotal finnes ikke bakover)
         db.upsert("account_insights", [{
@@ -347,7 +379,9 @@ def main(backfill=False):
     now = datetime.now(OSLO)
     now_iso, today, slot = now.isoformat(), now.date(), snapshot_slot(now)
     yt = YouTube()
+    failures = Failures(YouTubeApiError)
 
+    # Kanal og videoliste er nødvendige: feiler de etter retry, stopper kjøringen.
     channel = fetch_channel(yt)
     account_id = db.get_account("youtube", channel["id"])["id"]
     channel_start = date.fromisoformat(channel["snippet"]["publishedAt"][:10])
@@ -359,10 +393,11 @@ def main(backfill=False):
     apply_concepts(posts, platform="youtube")
 
     print("Henter Analytics ...")
-    end_date = analytics_end_date(yt, today)
+    # Analytics kan hoppes over: da lagres Data API-tallene, og formatet settes etter varighet.
+    end_date = failures.soft("siste døgn med Analytics", lambda: analytics_end_date(yt, today))
     start = channel_start.isoformat()
-    life = lifetime_by_video(yt, start, today.isoformat())
-    types = content_types(yt, start, today.isoformat())
+    life = failures.soft("Analytics per video", lambda: lifetime_by_video(yt, start, today.isoformat()), {})
+    types = failures.soft("format (creatorContentType)", lambda: content_types(yt, start, today.isoformat()), {})
 
     formats = {}
     for p in posts:
@@ -387,7 +422,9 @@ def main(backfill=False):
     per_video_targets = [p for p in to_snapshot if p["id"] in per_video_ids and p["id"] in life]
     per_video = {}
     for i, p in enumerate(per_video_targets, 1):
-        per_video[p["id"]] = per_video_totals(yt, p["id"], start, today.isoformat())
+        # null = ikke hentet i denne kjøringen
+        per_video[p["id"]] = failures.soft(f"per-video Analytics for {p['id']}",
+                                           lambda: per_video_totals(yt, p["id"], start, today.isoformat()))
         print(f"  per-video {i}/{len(per_video_targets)}", end="\r", flush=True)
 
     print("\nLagrer i Supabase ...")
@@ -406,7 +443,9 @@ def main(backfill=False):
     daily_count = 0
     for i, p in enumerate(daily_targets, 1):
         published_day = p["published"].date()  # UTC-dato; Analytics bruker Stillehavstid, som er samme eller dagen før
-        rows = daily_for_video(yt, p["id"], (published_day - timedelta(days=1)).isoformat(), today.isoformat())
+        rows = failures.soft(f"daglig Analytics for {p['id']}",
+                             lambda: daily_for_video(yt, p["id"], (published_day - timedelta(days=1)).isoformat(),
+                                                     today.isoformat()), [])
         rows = [r for r in rows if r.get("views") or r.get("estimatedMinutesWatched")
                 or date.fromisoformat(r["day"]) >= published_day]
         if rows:
@@ -416,7 +455,7 @@ def main(backfill=False):
         print(f"  daglig {i}/{len(daily_targets)}", end="\r", flush=True)
 
     sub_start = channel_start if backfill else today - timedelta(days=SUBSCRIBER_DAYS)
-    stats, sub_days = save_channel(yt, account_id, channel, today, now_iso, sub_start)
+    stats, sub_days = save_channel(yt, account_id, channel, today, now_iso, sub_start, failures)
     save_backup(posts, formats, life)
 
     print(f"\nFerdig! {len(saved)} videoer, {len(insights)} øyeblikksbilder ({slot}), "
@@ -424,6 +463,7 @@ def main(backfill=False):
     print(f"Kanalen: {stats.get('subscriberCount')} abonnenter, {stats.get('videoCount')} videoer. "
           f"Nye abonnenter oppdatert for {sub_days} døgn. Analytics dekker til og med {end_date}.")
     print(f"Lokal backup: {DATA_DIR}/youtube_videos.json")
+    failures.finish(saved_anything=bool(saved), name="YouTube")
 
 
 if __name__ == "__main__":
