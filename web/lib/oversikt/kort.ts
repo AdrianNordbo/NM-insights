@@ -41,7 +41,7 @@ export const seriesId = (s: Series) => `${s.platform}-${s.format}`;
 export const seriesName = (s: Series) => `${PLATFORM_NAME[s.platform]} · ${FORMAT_NAME[s.format]}`;
 
 /** «uke 38», eller «uke 38, 15.–17.09» når bare en del av forrige periode er med. */
-function prevLabel(c: Comparison): string {
+export function prevLabel(c: Comparison): string {
   const name = periodShortLabel(c.prevPeriod);
   if (!c.prevRange || (c.prevRange.start === c.prevPeriod.start && c.prevRange.end === c.prevPeriod.end)) return name;
   const { start, end } = c.prevRange;

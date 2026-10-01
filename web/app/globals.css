@@ -339,6 +339,33 @@ a {
   color: var(--band-ink-2);
 }
 
+.summary {
+  display: grid;
+  gap: 8px;
+  max-width: 900px;
+  margin-top: 24px;
+}
+
+.summary p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--band-ink);
+}
+
+.summary .who {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.summary .who.instagram {
+  color: var(--ig-on-dark);
+}
+
+.summary .who.youtube {
+  color: var(--yt-on-dark);
+}
+
 .band-meta {
   margin: 20px 0 0;
   font-size: 13px;
@@ -689,6 +716,10 @@ a {
 
   .band-controls h1 {
     font-size: 26px;
+  }
+
+  .summary p {
+    font-size: 15px;
   }
 
   .stepper-label {

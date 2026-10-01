@@ -51,6 +51,15 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
           title="Oversikt"
           controls={<Periodevelger nav={topp.data.nav} type={topp.data.state.period.type} label={topp.data.label} feed={feed} />}
         >
+          {topp.data.summaries.length > 0 && (
+            <div className="summary">
+              {topp.data.summaries.map((line) => (
+                <p key={line.id}>
+                  <span className={`who ${line.platform}`}>{line.name}</span> {line.text}
+                </p>
+              ))}
+            </div>
+          )}
           <p className="band-meta">
             {lastFetched && <>Sist oppdatert {formatFetched(lastFetched)} · </>}
             TikTok <span className="chip">kommer</span>

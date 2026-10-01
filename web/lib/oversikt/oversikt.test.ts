@@ -1,32 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { DailyActivityRow, Platform, PlatformSummaryRow } from "../data/types";
-import { addDays } from "../format";
+import type { PlatformSummaryRow } from "../data/types";
 import { buildSeries, comparePeriod, sumRange, trend } from "./aktivitet";
 import { hrefFor, navigation, readState, visibleSeries } from "./adresse";
 import { change, pillText } from "./endring";
 import { engagementRow, heroCard } from "./kort";
 import { defaultPeriod, parsePeriodKey, periodKey, periodLabel, periodOf, prevPeriod } from "./periode";
-
-/** Én rad per dag fra start til og med end, med samme verdier hver dag. */
-function days(
-  platform: Platform,
-  format: DailyActivityRow["format"],
-  start: string,
-  end: string,
-  views: number,
-  through: string,
-  extra: Partial<DailyActivityRow> = {},
-): DailyActivityRow[] {
-  const rows: DailyActivityRow[] = [];
-  for (let d = start; d <= end; d = addDays(d, 1)) {
-    rows.push({
-      platform, account_id: platform === "instagram" ? 1 : 2, activity_date: d, format,
-      views, likes: 1, comments: 0, shares: 2, saves: platform === "instagram" ? 1 : null,
-      interactions: 4, data_through: through, takeover_date: "2026-06-15", ...extra,
-    });
-  }
-  return rows;
-}
+import { days } from "./testdata";
 
 describe("perioder", () => {
   it("uke 39 2026 er 21.–27.09", () => {
