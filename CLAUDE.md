@@ -22,6 +22,7 @@ og en plassholder for TikTok («kommer»).
 |---|---|
 | fetch_instagram.py | Henter fra Meta Graph API, merker konsept, skriver til Supabase + lokal backup data/posts.json/.csv |
 | fetch_youtube.py | Henter fra YouTube Data API + Analytics API, merker konsept, skriver til Supabase + data/youtube_videos.json. `--backfill` = full daglig historikk |
+| fetch_daily.py | Daglig aktivitet per konto og format → account_daily (Instagram + YouTube). Siste 7 døgn hver kjøring; `--backfill` = Instagram 730 døgn, YouTube fra 04.06.2026; `--only instagram\|youtube`; `--dry-run` uten Supabase |
 | youtube_auth.py | Engangs OAuth-innlogging (kanaleier), lagrer secrets/youtube_token.json og skriver YOUTUBE_* til .env |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
 | concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube). `python concepts.py` merker data/posts.json på nytt lokalt |
@@ -117,6 +118,15 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     true; kjøres de på nytt, må owner_rights-migreringen kjøres etterpå.
   - YouTube-kanalen bruker `account_insights` (account_id 2): followers_count = abonnenter,
     media_count = videoer, new_followers = subscribersGained per Stillehavsdøgn.
+  - `accounts.takeover_date`: når Nordbø Marketing tok over (Veksthuset 2026-06-15), markering i grafene.
+  - `account_daily` (2026-10-01_account_daily.sql): én rad per konto per Stillehavsdøgn per format med
+    views, likes, comments, shares, saves (null for YouTube), interactions og raw. Hele kontoen, også eldre
+    innlegg. PK (account_id, activity_date, format).
+    - Instagram fra `/{ig}/insights?metric_type=total_value&breakdown=media_product_type`: ALL, REELS (REEL),
+      FEED (POST + CAROUSEL_CONTAINER + CAROUSEL_ITEM; karuseller er en egen type hos Meta), STORY, AD, OTHER.
+      interactions = Metas total_interactions (kan være litt høyere enn summen, Meta teller også f.eks. svar).
+    - YouTube fra Analytics `dimensions=day,creatorContentType` (+ `day` for ALL): ALL, SHORTS, VIDEO, LIVE,
+      OTHER. interactions = likes + comments + shares.
 - Oppdateringsstrategi: innlegg/videoer yngre enn 30 dager får nye tall hver kjøring; eldre bare hvis de ikke
   har fått tall de siste 7 dagene. Samme dag + slot oppdaterer raden (idempotent).
 - YouTube i tillegg: per-video Analytics (shares, abonnenter) for videoer yngre enn 30 dager hver kjøring og
@@ -137,6 +147,9 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     til i dag): published, mature_posts, median_views (modne), new_followers, days_with_follower_data,
     followers_end (hele kontoen, likt for alle formater), period_complete og prev_* for forrige periode.
     Per format fordi Reels og feed ikke skal blandes i en median.
+  - `dashboard.daily_activity`: account_daily per plattform + konto + døgn + format (ALL, REELS, FEED,
+    STORY, SHORTS, VIDEO; AD og OTHER holdes utenfor), med `data_through` (siste døgn med data for kontoen;
+    YouTube 2–3 døgn bak) og `takeover_date`.
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -146,21 +159,23 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Standardrettigheter for nye objekter i public er strammet inn for eierrollene (også global
     EXECUTE-til-PUBLIC på nye funksjoner for eierrollen). En ny funksjon som authenticated skal bruke,
     trenger derfor eksplisitt grant.
-  - `authenticated` har bare USAGE på schema dashboard og SELECT på de tre viewene. anon har ingenting.
+  - `authenticated` har bare USAGE på schema dashboard og SELECT på de fire viewene. anon har ingenting.
   - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
     advisor flagger dem som «security definer views»; det er forventet.
   - Alle innloggede brukere ser alle kunders data i dashboard-viewene. Åpen registrering i Supabase Auth
     er slått av (30.09.2026). Før neste kunde trengs filtrering per bruker/kunde i viewene.
-  - Verifisert 30.09.2026 med supabase/checks/dashboard_access.sql (blokk A–G).
+  - Verifisert 30.09.2026 med supabase/checks/dashboard_access.sql (blokk A–G), og 01.10.2026 etter
+    account_daily-migreringen (A, B, C, D2, G).
 - Skjemaendringer: skriv migrering i supabase/migrations/ og oppdater schema.sql. Kode som avhenger av
   endringen pushes først etter at Adrian har kjørt SQL-en, ellers feiler de planlagte kjøringene.
 
 ### GitHub
 - Privat repo AdrianNordbo/NM-insights, branch main. `gh` er ikke installert: Actions-logger kan ikke leses herfra.
 - Workflow: cron 05, 06, 18, 19 UTC. Jobben `gate` regner ut Oslo-timen for utløseren og slipper bare
-  gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid. Jobbene `instagram` og
-  `youtube` avhenger bare av gate, så en feil i den ene stopper ikke den andre.
+  gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid. Jobbene `instagram`,
+  `youtube` og `daily` (fetch_daily.py, Instagram og YouTube som egne steg) avhenger bare av gate, så en
+  feil i én stopper ikke de andre.
 - Instagram-kjøringene er verifisert (29.09 kl. 20:13 og 30.09 kl. 07:14), og YouTube-kjøringen fungerer i Actions.
 - Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL, SUPABASE_SECRET_KEY, YOUTUBE_CLIENT_ID,
   YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN.
@@ -280,7 +295,9 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - VM-innholdet (juni–juli 2026, 9 innlegg) har høyest rekkevidde av alle innlegg. is_vm/special_event
   markerer det på tvers av konsept. Rapporter Adrians periode med og uten VM, og mot samme periode i 2025
   (som bare har 3 feed-innlegg og derfor ikke gir sammenlignbare tall).
-- Ingen innlegg er boostet. All rekkevidde er organisk.
+- Ingen innlegg er boostet etter det vi vet. Men Meta rapporterer annonsevisninger (format AD i account_daily):
+  ca. 37 000 visninger mars–september 2026 (bl.a. ca. 12 000 i august). AD holdes utenfor dashboardet, så
+  tallene der er organiske. Bør avklares med Eika (kjører de annonser med Veksthusets innhold?).
 - Roller: Adrian planlegger og publiserer (tidspunkt, konseptmiks, frekvens). Innholdet produseres av en
   annen, så anbefalinger om innhold må formuleres slik at de kan sendes videre til produsenten.
 - Produksjonstid per konsept er ukjent og skal ikke brukes i analysen.
@@ -323,7 +340,13 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 2. Dashboard: datalaget (schema dashboard) er ferdig og eksponert, og åpen registrering er slått av.
    Skjelett og innlogging i web/ er bygget. Gjenstår: frontend etter frontend-reglene, og egen SMTP +
    token_hash-malene før Veksthuset inviteres (se «Innlogging i dashboardet»).
-3. Fase 2 (agenter med Claude API) når det finnes betalende kunder
+3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
+   konsept per dag og tidsrom.
+   - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
+   - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
+   - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,
+     og om Instagram fortsatt gir `online_followers`.
+4. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller

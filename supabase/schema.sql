@@ -6,6 +6,7 @@
 --   post_insights  én rad per innlegg per dag: innsiktstall (øyeblikksbilder over tid)
 --   account_insights  én rad per konto per dag: følgere og antall innlegg
 --   youtube_videos, youtube_video_insights, youtube_video_daily  YouTube (se egne seksjoner)
+--   account_daily  én rad per konto per døgn per format: aktivitet på hele kontoen
 --
 -- Tilgang: bare service_role (backend med SUPABASE_SECRET_KEY).
 -- RLS er på uten policies, så anon og authenticated får ingenting selv om de
@@ -47,6 +48,11 @@ begin
         raise exception 'Uventet antall platform-constraints på accounts. Avbryter.';
     end if;
 end $$;
+
+-- Lagt til etter første versjon: når Nordbø Marketing tok over kontoen (se supabase/migrations/)
+alter table public.accounts add column if not exists takeover_date date;
+comment on column public.accounts.takeover_date is
+    'Datoen Nordbø Marketing tok over kontoen. Vises som markering i dashboardets grafer.';
 
 -- ---------------------------------------------------------------------------
 -- Innlegg: metadata og konsept
@@ -302,6 +308,33 @@ left join lateral (
 order by v.id, i.snapshot_date desc, i.fetched_at desc;
 
 -- ---------------------------------------------------------------------------
+-- Daglig aktivitet per konto og format (hele kontoen, også eldre innlegg)
+-- Døgn i Stillehavstid (Meta og YouTube Analytics). Formatene og interactions er forklart i
+-- supabase/migrations/2026-10-01_account_daily.sql.
+-- ---------------------------------------------------------------------------
+create table if not exists public.account_daily (
+    account_id      bigint not null references public.accounts (id) on delete cascade,
+    activity_date   date not null,                 -- plattformens døgn (Stillehavstid)
+    format          text not null
+                    check (format in ('ALL', 'REELS', 'FEED', 'STORY', 'AD', 'SHORTS', 'VIDEO', 'LIVE', 'OTHER')),
+    views           bigint,
+    likes           bigint,
+    comments        bigint,
+    shares          bigint,
+    saves           bigint,                        -- null for YouTube
+    interactions    bigint,                        -- Instagram: total_interactions; YouTube: likes + comments + shares
+    raw             jsonb,                         -- API-verdiene raden er bygget av
+    fetched_at      timestamptz not null default now(),
+    primary key (account_id, activity_date, format)
+);
+
+create index if not exists account_daily_date_idx on public.account_daily (activity_date);
+
+comment on table public.account_daily is
+    'Én rad per konto per døgn (Stillehavstid) per format: aktivitet på hele kontoen, også eldre innlegg. '
+    'Instagram fra Meta (media_product_type), YouTube fra Analytics (creatorContentType).';
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security: på, uten policies
 -- ---------------------------------------------------------------------------
 alter table public.accounts      enable row level security;
@@ -311,6 +344,7 @@ alter table public.account_insights enable row level security;
 alter table public.youtube_videos         enable row level security;
 alter table public.youtube_video_insights enable row level security;
 alter table public.youtube_video_daily    enable row level security;
+alter table public.account_daily          enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Rettigheter: eksplisitt, og bare til service_role
@@ -318,13 +352,14 @@ alter table public.youtube_video_daily    enable row level security;
 revoke all on public.accounts, public.posts, public.post_insights, public.account_insights,
     public.posts_latest,
     public.youtube_videos, public.youtube_video_insights, public.youtube_video_daily,
-    public.youtube_videos_latest
+    public.youtube_videos_latest, public.account_daily
     from public, anon, authenticated;
 
 grant usage on schema public to service_role;
 grant select, insert, update, delete
     on public.accounts, public.posts, public.post_insights, public.account_insights,
-       public.youtube_videos, public.youtube_video_insights, public.youtube_video_daily
+       public.youtube_videos, public.youtube_video_insights, public.youtube_video_daily,
+       public.account_daily
     to service_role;
 grant select on public.posts_latest, public.youtube_videos_latest to service_role;
 -- Identity-kolonner bruker sekvenser; nødvendig for insert
@@ -338,6 +373,9 @@ insert into public.accounts (client_name, platform, platform_account_id, usernam
 values ('Veksthuset', 'instagram', '17841450044968553', 'veksthusene', '2026-06-15'),
        ('Veksthuset', 'youtube', 'UChv7DsnM326j78XEZBWyTPg', 'Veksthuset', '2026-06-15')
 on conflict (platform, platform_account_id) do nothing;
+
+update public.accounts set takeover_date = date '2026-06-15'
+where client_name = 'Veksthuset' and takeover_date is null;
 
 -- ---------------------------------------------------------------------------
 -- Dashboard (schema dashboard): sammenstilte views for frontend
@@ -496,6 +534,32 @@ comment on view dashboard.platform_summary is
     'new_followers/followers_end gjelder hele kontoen. prev_* = forrige periode.';
 
 -- ---------------------------------------------------------------------------
+-- 4. daily_activity: aktivitet per konto per døgn per format, med data_through og takeover_date
+-- ---------------------------------------------------------------------------
+create or replace view dashboard.daily_activity
+with (security_invoker = false) as
+select
+    a.platform,
+    d.account_id,
+    d.activity_date,
+    d.format,
+    d.views,
+    d.likes,
+    d.comments,
+    d.shares,
+    d.saves,
+    d.interactions,
+    max(d.activity_date) over (partition by d.account_id)   as data_through,
+    a.takeover_date
+from public.account_daily d
+join public.accounts a on a.id = d.account_id
+where d.format in ('ALL', 'REELS', 'FEED', 'STORY', 'SHORTS', 'VIDEO');
+
+comment on view dashboard.daily_activity is
+    'Aktivitet per konto per døgn (Stillehavstid) per format. data_through = siste døgn med data for kontoen. '
+    'takeover_date = når Nordbø Marketing tok over. Sammenlign aldri på tvers av plattformer eller formater.';
+
+-- ---------------------------------------------------------------------------
 -- Rettigheter
 -- ---------------------------------------------------------------------------
 -- Rådata: ingen tilgang for anon/authenticated (gjentas eksplisitt, ingen endring for service_role)
@@ -547,7 +611,8 @@ end $$;
 revoke all on schema dashboard from public, anon, authenticated;
 revoke all on all tables in schema dashboard from public, anon, authenticated;
 grant usage on schema dashboard to authenticated, service_role;
-grant select on dashboard.content_latest, dashboard.concept_summary, dashboard.platform_summary
+grant select on dashboard.content_latest, dashboard.concept_summary, dashboard.platform_summary,
+    dashboard.daily_activity
     to authenticated, service_role;
 
 commit;

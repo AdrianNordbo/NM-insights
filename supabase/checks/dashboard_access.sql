@@ -1,8 +1,8 @@
--- NM Insights - kontroll av tilgang etter 2026-09-30_dashboard.sql
+-- NM Insights - kontroll av tilgang etter 2026-09-30_dashboard.sql og 2026-10-01_account_daily.sql
 -- Kjør hver blokk for seg i Supabase SQL Editor. Ingen blokk endrer data.
 
 -- A. Hvem kan bruke hva (anon/authenticated). Forventet: allowed = true BARE for authenticated
---    på de tre dashboard-viewene (select); false for alle tabeller, views, sekvenser og
+--    på de fire dashboard-viewene (select); false for alle tabeller, views, sekvenser og
 --    funksjoner i public, og for alt for anon.
 select r.rolname as role, o.kind, o.obj,
        case o.kind
@@ -29,18 +29,26 @@ from pg_class
 where relnamespace = 'public'::regnamespace and relkind = 'r'
 order by relname;
 
--- C. Som authenticated: dashboard-viewene kan leses. Forventet: tre tall.
+-- C. Som authenticated: dashboard-viewene kan leses. Forventet: fire tall.
 begin;
 set local role authenticated;
 select (select count(*) from dashboard.content_latest)   as content_latest,
        (select count(*) from dashboard.concept_summary)  as concept_summary,
-       (select count(*) from dashboard.platform_summary) as platform_summary;
+       (select count(*) from dashboard.platform_summary) as platform_summary,
+       (select count(*) from dashboard.daily_activity)   as daily_activity;
 rollback;
 
 -- D. Som authenticated: rådata blokkeres. Forventet: ERROR permission denied for table posts.
 begin;
 set local role authenticated;
 select count(*) from public.posts;
+rollback;
+
+-- D2. Som authenticated: den nye rådatatabellen blokkeres også.
+--     Forventet: ERROR permission denied for table account_daily.
+begin;
+set local role authenticated;
+select count(*) from public.account_daily;
 rollback;
 
 -- E. Som anon: dashboard blokkeres. Forventet: ERROR permission denied for schema dashboard.
@@ -50,7 +58,7 @@ select count(*) from dashboard.content_latest;
 rollback;
 
 -- G. security_invoker per view. Forventet etter 2026-09-30_latest_views_owner_rights.sql:
---    false for alle fem (public.posts_latest, public.youtube_videos_latest og de tre dashboard-viewene).
+--    false for alle seks (public.posts_latest, public.youtube_videos_latest og de fire dashboard-viewene).
 select n.nspname as schema, c.relname as view,
        coalesce((select option_value from pg_options_to_table(c.reloptions)
                  where option_name = 'security_invoker'), 'false (standard)') as security_invoker

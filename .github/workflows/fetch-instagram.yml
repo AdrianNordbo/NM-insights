@@ -1,8 +1,8 @@
 name: Daglig henting (Instagram og YouTube)
 
-# Kjører fetch_instagram.py og fetch_youtube.py kl. 07 og kl. 20 norsk tid hver dag,
+# Kjører fetch_instagram.py, fetch_youtube.py og fetch_daily.py kl. 07 og kl. 20 norsk tid hver dag,
 # og kan startes manuelt (Actions -> Daglig henting (Instagram og YouTube) -> Run workflow).
-# Instagram og YouTube er egne jobber: feiler den ene, kjører den andre likevel.
+# Instagram, YouTube og daglig aktivitet er egne jobber: feiler én, kjører de andre likevel.
 # Kveldskjøringen gir målinger nærmere 24 og 48 timer etter publisering for
 # innlegg som publiseres på kvelden.
 #
@@ -98,3 +98,42 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           PYTHONIOENCODING: utf-8
         run: python fetch_youtube.py
+
+  # Daglig aktivitet per konto og format (account_daily): de siste 7 døgnene på nytt hver kjøring.
+  # Egen jobb, så en feil her ikke stopper innleggshentingen. Instagram og YouTube er egne steg;
+  # YouTube-steget kjører selv om Instagram-steget feiler.
+  daily:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Installer avhengigheter
+        run: pip install -r requirements.txt
+
+      - name: Daglig aktivitet fra Instagram
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python fetch_daily.py --only instagram
+
+      - name: Daglig aktivitet fra YouTube
+        if: ${{ !cancelled() }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python fetch_daily.py --only youtube
