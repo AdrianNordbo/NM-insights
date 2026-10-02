@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseEnv } from "./env";
 
 /** Sider som kan vises uten innlogging. */
-const PUBLIC_PATHS = ["/logg-inn", "/auth/confirm", "/auth/callback"];
+const PUBLIC_PATHS = ["/logg-inn", "/auth/confirm"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

@@ -191,11 +191,11 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   sjekk) og i server-layouten `web/app/(app)/layout.tsx` (`getUser()` mot Supabase Auth).
 - Egen SMTP og token_hash-malen for Magic Link er på plass (02.10.2026). `/logg-inn` sender
   `emailRedirectTo: siteUrl()`, og malen lager `{{ .RedirectTo }}/auth/confirm?token_hash=…&type=email`.
-  `/auth/callback` (PKCE fra standardmalen) står igjen til `/auth/confirm` er testet i produksjon, og
-  fjernes deretter. Testbrukere opprettes med «Create new user» + Auto Confirm.
+  Testet i produksjon 02.10.2026, også på tvers av enheter (lenke bedt om på PC, åpnet på mobil i Safari).
+  `/auth/callback` (PKCE) er fjernet. Testbrukere opprettes med «Create new user» + Auto Confirm.
 - `/auth/confirm` (token_hash) finnes allerede: GET viser bare en knapp, og `verifyOtp` skjer først
   ved POST, så skannere som Microsoft Safe Links ikke bruker opp engangskoden.
-- **Før Veksthuset inviteres må dette på plass:**
+- Oppsett for innlogging (punkt 1 og Magic Link-malen er på plass 02.10.2026):
   1. Egen SMTP i Supabase (standardavsenderen har lav grense og tillater ikke egne maler).
   2. E-postmalene i Supabase (Authentication → Emails → Templates):
      - Magic Link, emne «Din innloggingslenke til NM Insights»:
@@ -207,7 +207,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
        `<h2>Du er invitert til NM Insights</h2>`
        `<p>Klikk på lenken for å aktivere tilgangen og logge inn. Lenken kan brukes én gang.</p>`
        `<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite">Aktiver tilgang</a></p>`
-  3. Gjort 02.10.2026: `emailRedirectTo` er `siteUrl()` alene. Gjenstår: fjerne `/auth/callback` etter test.
+  3. Gjort 02.10.2026: `emailRedirectTo` er `siteUrl()` alene, og `/auth/callback` er fjernet.
   4. Email OTP Expiration = 3600 sekunder (samsvarer med «utløper etter en time» i malene).
 - Supabase URL-innstillinger: Site URL `https://nm-insights-seven.vercel.app`; Redirect URLs
   produksjonsadressen og `http://localhost:3000`, begge med og uten `/**`.
@@ -394,8 +394,8 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 
 ## Neste steg
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
-2. Før Veksthuset inviteres: egen SMTP i Supabase + token_hash-malene (se «Innlogging i dashboardet»).
-   Oversiktssiden er ferdig (se «Dashboard (web/)»).
+2. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
+   (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
 3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
    konsept per dag og tidsrom.
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).

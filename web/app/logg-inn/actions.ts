@@ -9,8 +9,8 @@ import { createClient } from "@/lib/supabase/server";
  * Svaret er det samme om adressen har tilgang eller ikke, så siden ikke avslører hvem som er bruker.
  *
  * emailRedirectTo er siteUrl() alene: Magic Link-malen i Supabase lager selv lenken
- * {{ .RedirectTo }}/auth/confirm?token_hash=…&type=email (se CLAUDE.md). /auth/callback (PKCE) står
- * igjen til /auth/confirm er testet i produksjon, og fjernes deretter.
+ * {{ .RedirectTo }}/auth/confirm?token_hash=…&type=email (se CLAUDE.md). Lenken virker på tvers av
+ * nettlesere og enheter.
  */
 export async function sendLoginLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();

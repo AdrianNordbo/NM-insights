@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Logg inn – NM Insights" };
 const MESSAGES: Record<string, string> = {
   epost: "Skriv inn en gyldig e-postadresse.",
   lenke:
-    "Lenken er ugyldig eller utløpt. Be om en ny, og åpne den i samme nettleser som du ba om den fra.",
+    "Lenken er ugyldig eller utløpt. Be om en ny.",
   grense: "For mange forsøk. Vent litt og prøv igjen.",
 };
 
