@@ -211,8 +211,9 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   4. Email OTP Expiration = 3600 sekunder (samsvarer med «utløper etter en time» i malene).
 - Adresse: https://insights.nordbomarketing.no (eget domene fra 02.10.2026, innlogging testet der).
   Den gamle adressen https://nm-insights-seven.vercel.app står som reserve.
-- Supabase URL-innstillinger: Site URL `https://insights.nordbomarketing.no`; Redirect URLs oppdatert
-  for det nye domenet, i tillegg til `http://localhost:3000`, med og uten `/**`.
+- Supabase URL-innstillinger: Site URL `https://insights.nordbomarketing.no`. Redirect URLs, hver med
+  og uten `/**`: `https://insights.nordbomarketing.no`, `https://nm-insights-seven.vercel.app` (reserve,
+  så innlogging virker der også) og `http://localhost:3000`.
   NEXT_PUBLIC_SITE_URL i Vercel = `https://insights.nordbomarketing.no` (styrer lenken i e-posten).
 - Vercel: prosjekt med Root Directory `web`, Node 24.x, funksjonsregion dub1 (samme sted som
   Supabase eu-west-1), Ignored Build Step og Deployment Protection på preview. Miljøvariabler:
