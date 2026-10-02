@@ -8,9 +8,9 @@ import { createClient } from "@/lib/supabase/server";
  * Sender innloggingslenke. Ingen nye brukere opprettes (shouldCreateUser: false).
  * Svaret er det samme om adressen har tilgang eller ikke, så siden ikke avslører hvem som er bruker.
  *
- * Så lenge Supabase sin standardmal brukes, går lenken til /auth/callback (PKCE, samme nettleser).
- * Når egen SMTP og token_hash-malene er på plass, skal emailRedirectTo være siteUrl() alene,
- * fordi malen legger til /auth/confirm selv (se CLAUDE.md).
+ * emailRedirectTo er siteUrl() alene: Magic Link-malen i Supabase lager selv lenken
+ * {{ .RedirectTo }}/auth/confirm?token_hash=…&type=email (se CLAUDE.md). /auth/callback (PKCE) står
+ * igjen til /auth/confirm er testet i produksjon, og fjernes deretter.
  */
 export async function sendLoginLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -19,7 +19,7 @@ export async function sendLoginLink(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: false, emailRedirectTo: `${siteUrl()}/auth/callback` },
+    options: { shouldCreateUser: false, emailRedirectTo: siteUrl() },
   });
 
   // For mange forespørsler er det eneste vi sier fra om; det avslører ikke hvem som har tilgang.

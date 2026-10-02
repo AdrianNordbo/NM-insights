@@ -189,11 +189,10 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
 - Supabase Auth med innloggingslenke på e-post. Åpen registrering er av; `signInWithOtp` bruker
   `shouldCreateUser: false`. Innloggingskravet ligger både i `web/proxy.ts` (fornyer sesjonen, rask
   sjekk) og i server-layouten `web/app/(app)/layout.tsx` (`getUser()` mot Supabase Auth).
-- Nå (uten egen SMTP): Supabase sin standardmal (`{{ .ConfirmationURL }}`) sender lenken via
-  Supabase til `/auth/callback?code=` (PKCE, `exchangeCodeForSession`). Lenken må åpnes i samme
-  nettleser som den ble bedt om fra, og e-postskannere kan bruke opp lenken. `/logg-inn` sender
-  `emailRedirectTo: ${NEXT_PUBLIC_SITE_URL}/auth/callback`. Testbrukere opprettes med «Create new
-  user» + Auto Confirm.
+- Egen SMTP og token_hash-malen for Magic Link er på plass (02.10.2026). `/logg-inn` sender
+  `emailRedirectTo: siteUrl()`, og malen lager `{{ .RedirectTo }}/auth/confirm?token_hash=…&type=email`.
+  `/auth/callback` (PKCE fra standardmalen) står igjen til `/auth/confirm` er testet i produksjon, og
+  fjernes deretter. Testbrukere opprettes med «Create new user» + Auto Confirm.
 - `/auth/confirm` (token_hash) finnes allerede: GET viser bare en knapp, og `verifyOtp` skjer først
   ved POST, så skannere som Microsoft Safe Links ikke bruker opp engangskoden.
 - **Før Veksthuset inviteres må dette på plass:**
@@ -208,8 +207,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
        `<h2>Du er invitert til NM Insights</h2>`
        `<p>Klikk på lenken for å aktivere tilgangen og logge inn. Lenken kan brukes én gang.</p>`
        `<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite">Aktiver tilgang</a></p>`
-  3. I `web/app/logg-inn/actions.ts`: `emailRedirectTo` endres til `siteUrl()` alene, fordi
-     Magic Link-malen legger til `/auth/confirm` selv. `/auth/callback` kan da fjernes.
+  3. Gjort 02.10.2026: `emailRedirectTo` er `siteUrl()` alene. Gjenstår: fjerne `/auth/callback` etter test.
   4. Email OTP Expiration = 3600 sekunder (samsvarer med «utløper etter en time» i malene).
 - Supabase URL-innstillinger: Site URL `https://nm-insights-seven.vercel.app`; Redirect URLs
   produksjonsadressen og `http://localhost:3000`, begge med og uten `/**`.
