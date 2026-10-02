@@ -231,10 +231,12 @@ def follower_growth(followers, start, end, today):
     days = int(part["new_followers"].notna().sum())
     counts = followers[(followers["day"] >= start) & (followers["day"] <= end)].dropna(
         subset=["followers_count"])
+    with_data = part.loc[part["new_followers"].notna(), "day"]
     return {
         "sum": part["new_followers"].sum() if days else None,
         "days": days,
         "expected": expected,
+        "last_data": with_data.max() if days else None,
         "first": counts.iloc[0] if len(counts) else None,
         "last": counts.iloc[-1] if len(counts) else None,
     }
@@ -254,6 +256,20 @@ def follower_text(g):
 
 def complete(g):
     return g["sum"] is not None and g["expected"] and g["days"] / g["expected"] >= FOLLOWER_COVERAGE
+
+
+def full_coverage(g):
+    """Data for alle døgn i perioden (brukes for YouTube-abonnenter, der ett døgn er en stor andel)."""
+    return g["sum"] is not None and g["expected"] and g["days"] >= g["expected"]
+
+
+def coverage_note(g):
+    """«29 av 30 døgn med data», eller «data til og med 29.09» når døgn mangler."""
+    if g["sum"] is None:
+        return "ingen data"
+    if g["days"] >= g["expected"]:
+        return f"{g['days']} av {g['expected']} døgn med data"
+    return f"data til og med {g['last_data']:%d.%m}"
 
 
 # --- Månedsrapport -----------------------------------------------------------
@@ -836,7 +852,9 @@ def youtube_month_section(yt, now, start, end, prev_start, prev_end, month_name,
     young = int((cur_shorts["time"] > cutoff).sum())
     fg = follower_growth(yt["followers"], start, end, today)
     pfg = follower_growth(yt["followers"], prev_start, prev_end, today)
-    fg_ok = complete(fg) and complete(pfg)
+    # Nye abonnenter sammenlignes bare når begge månedene har data for alle døgn: tallene er små,
+    # og ett manglende døgn (Analytics ligger 2–3 døgn etter) kan gi stor prosentvis endring.
+    fg_ok = full_coverage(fg) and full_coverage(pfg)
     flags = []
     if end >= today:
         flags.append(f"{month_name} er ikke avsluttet: antall Shorts og summer er ikke sammenlignbare med hele "
@@ -855,7 +873,7 @@ def youtube_month_section(yt, now, start, end, prev_start, prev_end, month_name,
                   f"{len(cur)} Shorts ≥ {MIN_AGE_DAYS} dager"),
         stat_tile("Nye abonnenter", num(fg["sum"]),
                   change_cell(change(fg["sum"], pfg["sum"])) if fg_ok else None,
-                  f"{fg['days']} av {fg['expected']} døgn med data"),
+                  coverage_note(fg)),
     ]
     out.append('<div class="tiles">' + "".join(tiles) + "</div>")
     ch = change(cur["views"].median(), prev["views"].median())
@@ -863,8 +881,9 @@ def youtube_month_section(yt, now, start, end, prev_start, prev_end, month_name,
         flags.append(f"Median visninger per Short {change_cell(ch)} fra {prev_name}"
                      + (" (foreløpig)" if min(len(cur), len(prev)) < MIN_POSTS else "") + ".")
     if not fg_ok:
-        flags.append(f"Nye abonnenter sammenlignes ikke med {prev_name}: for få døgn med data "
-                     f"({pfg['days']} av {pfg['expected']} og {fg['days']} av {fg['expected']}).")
+        flags.append(f"Nye abonnenter sammenlignes ikke med {prev_name}: sammenligning krever data for alle døgn "
+                     f"({month_name}: {coverage_note(fg)}, {fg['days']} av {fg['expected']} døgn; "
+                     f"{prev_name}: {pfg['days']} av {pfg['expected']} døgn).")
 
     # Totalt for måneden
     n, pn = len(cur_shorts), len(prev_shorts)
@@ -877,8 +896,12 @@ def youtube_month_section(yt, now, start, end, prev_start, prev_end, month_name,
     for label, col in [("Visninger", "views"), ("Likes", "likes"), ("Kommentarer", "comments")]:
         a, b = cur_shorts[col].sum(min_count=1), prev_shorts[col].sum(min_count=1)
         rows.append([label, num(a), num(b), change_cell(change(a, b)), pp(a, n), pp(b, pn)])
-    rows.append(["Nye abonnenter <span class='muted'>(hele kanalen)</span>", num(fg["sum"]), num(pfg["sum"]),
-                 change_cell(change(fg["sum"], pfg["sum"])) if fg_ok else "–", "–", "–"])
+    if fg_ok:
+        rows.append(["Nye abonnenter <span class='muted'>(hele kanalen)</span>", num(fg["sum"]), num(pfg["sum"]),
+                     change_cell(change(fg["sum"], pfg["sum"])), "–", "–"])
+    else:
+        rows.append(["Nye abonnenter <span class='muted'>(hele kanalen)</span>",
+                     f"{num(fg['sum'])} <span class='muted'>({coverage_note(fg)})</span>", "–", "–", "–", "–"])
     out.append("<h3>Totalt for måneden</h3>")
     out.append(table(["", month_name.capitalize(), prev_name.capitalize(), "Endring",
                       f"Per Short {month_abbr(month_name)}", f"Per Short {month_abbr(prev_name)}"], rows))
