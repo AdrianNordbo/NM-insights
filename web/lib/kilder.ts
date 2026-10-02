@@ -11,6 +11,8 @@ export const KILDER = {
     "Visninger per døgn. Etikettene ved de største toppene er en mulig årsak, ikke en fasit: innlegget med flest visninger publisert inntil 3 dager før toppen, på samme plattform og format.",
   interaksjoner:
     "Interaksjoner = likes + kommentarer + delinger, pluss lagringer for Instagram. Dette er ikke Metas total_interactions (som også teller f.eks. svar). Annonsevisninger (AD) er holdt utenfor.",
+  anbefalinger:
+    "Regelbaserte signaler per plattform og format, aldri på tvers. Gjelder nå, uavhengig av valgt periode. Bare aktive konsepter (innlegg de siste 21 dagene) med minst 6 innlegg som er minst 7 dager gamle; Bankinfo, Før konsepter, Ukjent og Annet/aktualitet er utelatt. Reglene i prioritert rekkefølge: svak trend (de tre siste under ⅔ av konseptets median), ferskt toppinnlegg (7–14 dager gammelt med minst 1,5 × konseptets median), og hvilket konsept som leder på visninger og engasjement (minst 10 % foran nummer to). Nye konsepter med for lite grunnlag rangeres ikke. Signalene er utgangspunkt for vurdering, ikke fasit.",
   ferske:
     "Innlegg publisert de siste 7 dagene. Tallene vokser fortsatt, så de er et tidlig signal og ikke endelige. De brukes ikke i sammenligningene av konsepter, som bare tar med innlegg som er minst 7 dager gamle. Sortert på dato, ikke på visninger.",
   sist: "Innlegg publisert for 7–14 dager siden. Det med flest visninger vises per plattform og format.",

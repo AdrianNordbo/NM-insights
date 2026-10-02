@@ -302,6 +302,14 @@ Oversikt (`/`), i rekkefølge:
    trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = siste periode der
    alle viste plattformer har `data_through` ≥ periodens siste dag; uferdige perioder merkes «hittil, t.o.m.»
    og sammenlignes med like mange dager i forrige periode.
+   Rett over plattformkortene: «Anbefalinger · gjelder nå» (web/lib/oversikt/anbefalinger.ts, tersklene i
+   anbefalinger-regler.ts). Én linje per plattform og format, uavhengig av valgt periode. Bare aktive, ikke
+   foreløpige konsepter uten spesiell hendelse; Før konsepter, Ukjent, Annet/aktualitet og Bankinfo er utelatt.
+   Prioritet: C (de 3 siste modne under ⅔ av median) → A (innlegg 7–14 dager med ≥ 1,5 × median) → B/B2
+   (samme/ulike ledere på median visninger og engasjement per visning, lederen ≥ 10 % foran). Maks 3.
+   Nye, foreløpige konsepter vises som tilleggslinje: «lovende, men for tidlig å si» når medianen er minst
+   like høy som beste godkjente konsept, ellers «nytt konsept, for tidlig å si». Konsepter med ≥ 14 dager
+   siden siste innlegg vises med «(siste innlegg dd.mm)». Hver linje har info-ikon med tallene.
 2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
 3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
 4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,
@@ -331,7 +339,8 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
   - CTF (Cut the fluff): relevante nyheter som feed-innlegg, inaktiv (siste innlegg 08.09.2026)
   - Bankinfo: Veksthusets egne informasjons- og reklameinnlegg (ikke et innholdskonsept)
   - Annet/aktualitet: alt utenfor konseptene, i praksis VM-Reels juni–juli 2026
-  - Før konsepter: alle innlegg før 15.06.2026. Ukjent: ingen regel traff (ingen per 30.09.2026)
+  - Før konsepter: alle innlegg før 15.06.2026. Ukjent: ingen regel traff. Per 02.10.2026 ett innlegg:
+    Instagram Feed 01.10.2026 «☕ Livet på Veksthuset» (ikke rettet i concept_overrides.csv ennå)
 - Aktiv/inaktiv bestemmes av publisering, ikke av en manuell liste: et konsept er inaktivt når det har gått
   21 dager eller mer siden siste innlegg, og blir aktivt igjen ved neste innlegg.
 - Konseptene har faste publiseringsdager, så ukedagseffekter for Reels er i praksis konsepteffekter.
@@ -389,14 +398,13 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 1. TikTok: fullføre API-søknaden (demo-video), deretter integrasjon mot /business/get/ og /business/video/list/
 2. Før Veksthuset inviteres: egen SMTP i Supabase + token_hash-malene (se «Innlogging i dashboardet»).
    Oversiktssiden er ferdig (se «Dashboard (web/)»).
-3. Anbefalingslinje på Oversikt: planlagt, ikke bygget. Innhold og regler avklares før bygging.
-4. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
+3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
    konsept per dag og tidsrom.
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
    - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,
      og om Instagram fortsatt gir `online_followers`.
-5. Fase 2 (agenter med Claude API) når det finnes betalende kunder
+4. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller

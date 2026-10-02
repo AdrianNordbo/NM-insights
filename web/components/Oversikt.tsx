@@ -1,4 +1,5 @@
 import { Utvikling } from "@/components/grafer/Utvikling";
+import { Anbefalinger } from "@/components/oversikt/Anbefalinger";
 import { Engasjement } from "@/components/oversikt/Engasjement";
 import { Ferske } from "@/components/oversikt/Ferske";
 import { HvaFunketSist } from "@/components/oversikt/HvaFunketSist";
@@ -8,6 +9,7 @@ import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
 import type { ConceptSummaryRow, ContentLatestRow, Result } from "@/lib/data/types";
 import { formatFetched } from "@/lib/format";
 import { hrefFor } from "@/lib/oversikt/adresse";
+import { buildRecommendations } from "@/lib/oversikt/anbefalinger";
 import { buildConceptBlocks } from "@/lib/oversikt/konsepter";
 import type { OversiktTopp } from "@/lib/oversikt/side";
 import { buildRecent } from "@/lib/oversikt/sist";
@@ -59,6 +61,9 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
             {lastFetched && <>Sist oppdatert {formatFetched(lastFetched)} · </>}
             TikTok <span className="chip">kommer</span>
           </p>
+          {content.ok && concepts.ok && (
+            <Anbefalinger line={buildRecommendations(concepts.data, content.data, today, feed)} />
+          )}
           <div className="heroes">
             {topp.data.heroes.map((card) => (
               <Plattformkort key={card.id} card={card} trendLabel={topp.data.trendLabel} />

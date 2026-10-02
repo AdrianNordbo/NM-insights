@@ -383,6 +383,88 @@ a {
   color: var(--band-ink-2);
 }
 
+/* --- Anbefalinger i toppfeltet (gjelder nå, ikke valgt periode) ------------- */
+
+.recs {
+  margin-top: 18px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--band-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recs-title {
+  margin: 0 0 8px;
+  color: var(--band-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recs-title span {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.recs-empty {
+  margin: 0;
+  color: var(--band-ink-2);
+  font-size: 14px;
+}
+
+.recs-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rec {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 4px 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.rec.instagram {
+  --accent: var(--ig-on-dark);
+}
+
+.rec.youtube {
+  --accent: var(--yt-on-dark);
+}
+
+.rec-plat {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rec-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rec-text {
+  color: var(--band-ink);
+}
+
+.rec-none,
+.rec-promising {
+  color: var(--band-ink-2);
+}
+
+.rec-promising {
+  font-size: 13px;
+}
+
 /* --- Plattformkort i toppfeltet ---------------------------------------------- */
 
 .heroes {
@@ -1015,6 +1097,10 @@ a.fresh-title:hover {
 
   .summary p {
     font-size: 15px;
+  }
+
+  .rec {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stepper-label {

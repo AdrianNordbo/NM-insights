@@ -52,13 +52,29 @@ export const daysSince = (lastPublished: string, today: string) => daysInclusive
 /** Aktiv = færre enn INACTIVE_AFTER_DAYS dager siden siste innlegg. Publiseres det igjen, blir konseptet aktivt igjen. */
 export const isActive = (lastPublished: string, today: string) => daysSince(lastPublished, today) < INACTIVE_AFTER_DAYS;
 
+/** Siste publiseringstidspunkt (Oslo-tid) for konseptet på plattformen og formatet, uten spesielle hendelser. */
+export function lastPublished(content: ContentLatestRow[], platform: Platform, format: Format, concept: string | null): string | null {
+  return (
+    content
+      .filter((p) => p.platform === platform && p.format === format && p.concept === concept && !p.special_event)
+      .map((p) => p.published_at)
+      .sort()
+      .at(-1) ?? null
+  );
+}
+
+/** Modne innlegg (minst 7 dager) i konseptet, eldst først, uten spesielle hendelser. */
+export function maturePosts(content: ContentLatestRow[], platform: Platform, format: Format, concept: string | null): ContentLatestRow[] {
+  return content
+    .filter((p) => p.platform === platform && p.format === format && p.concept === concept && !p.special_event && p.is_mature)
+    .sort((a, b) => a.published_at.localeCompare(b.published_at));
+}
+
 const byViews = (a: ConceptLine, b: ConceptLine) => (b.medianViews ?? -1) - (a.medianViews ?? -1);
 
 /** Siste 10 modne innlegg i konseptet (uten spesielle hendelser), eldst først. */
 export function sparkFor(content: ContentLatestRow[], platform: Platform, format: Format, concept: string | null): SparkPoint[] {
-  return content
-    .filter((p) => p.platform === platform && p.format === format && p.concept === concept && !p.special_event && p.is_mature)
-    .sort((a, b) => a.published_at.localeCompare(b.published_at))
+  return maturePosts(content, platform, format, concept)
     .slice(-SPARK_POSTS)
     .map((p) => ({
       key: p.content_id,
@@ -90,12 +106,7 @@ export function buildConceptBlocks(
     const visible = regular.filter((c) => showBeforeConcepts || c.concept !== BEFORE_CONCEPTS);
 
     const lines: ConceptLine[] = visible.map((c) => {
-      const last =
-        content
-          .filter((p) => p.platform === platform && p.format === format && p.concept === c.concept && !p.special_event)
-          .map((p) => p.published_at)
-          .sort()
-          .at(-1) ?? null;
+      const last = lastPublished(content, platform, format, c.concept);
       const status: ConceptStatus = c.preliminary ? "forelopig" : last && isActive(last, today) ? "aktiv" : "inaktiv";
       return {
         concept: c.concept ?? "Uten konsept",
