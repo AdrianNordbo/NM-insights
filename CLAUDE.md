@@ -209,8 +209,11 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
        `<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite">Aktiver tilgang</a></p>`
   3. Gjort 02.10.2026: `emailRedirectTo` er `siteUrl()` alene, og `/auth/callback` er fjernet.
   4. Email OTP Expiration = 3600 sekunder (samsvarer med «utløper etter en time» i malene).
-- Supabase URL-innstillinger: Site URL `https://nm-insights-seven.vercel.app`; Redirect URLs
-  produksjonsadressen og `http://localhost:3000`, begge med og uten `/**`.
+- Adresse: https://insights.nordbomarketing.no (eget domene fra 02.10.2026, innlogging testet der).
+  Den gamle adressen https://nm-insights-seven.vercel.app står som reserve.
+- Supabase URL-innstillinger: Site URL `https://insights.nordbomarketing.no`; Redirect URLs oppdatert
+  for det nye domenet, i tillegg til `http://localhost:3000`, med og uten `/**`.
+  NEXT_PUBLIC_SITE_URL i Vercel = `https://insights.nordbomarketing.no` (styrer lenken i e-posten).
 - Vercel: prosjekt med Root Directory `web`, Node 24.x, funksjonsregion dub1 (samme sted som
   Supabase eu-west-1), Ignored Build Step og Deployment Protection på preview. Miljøvariabler:
   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SITE_URL.
@@ -289,6 +292,7 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 - Etiketter ved topper i grafene er «Mulig årsak: …», aldri en fasit.
 
 ## Dashboard (web/)
+Adresse: https://insights.nordbomarketing.no (reserve: https://nm-insights-seven.vercel.app).
 Next.js 16 (App Router) på Vercel, Recharts for grafer, Vitest for tester (`npm test` i web/). Design etter
 v5-forhåndsvisningen (data/forhandsvisning/, lokal og gitignored). Siden er alltid lys når den åpnes;
 sol/måne-knappen øverst til høyre slår mørk modus av og på mens siden er åpen (ingen lagring).
