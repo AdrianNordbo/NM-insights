@@ -28,22 +28,25 @@ export function buildTopp(
   summary: PlatformSummaryRow[],
   content: ContentLatestRow[],
   params: SearchParams,
+  /** Dagens dato i Oslo: bestemmer inneværende periode. */
   today: string,
+  /** Siste ferdige døgn hos plattformene (Stillehavstid, i går): plattformer bak dette merkes. */
+  expectedThrough: string,
 ): OversiktTopp {
   const series = buildSeries(daily);
-  const state = readState(params, series);
+  const state = readState(params, today);
   const shown = visibleSeries(series, state.feed);
   return {
     state,
-    nav: navigation(state, series),
+    nav: navigation(state, series, today),
     label: periodLabel(state.period),
     trendLabel: trendLabel(state.period.type, 12),
     summaries: shown.flatMap((s) => {
       const text = summarySentence(s, state.period, content);
       return text ? [{ id: seriesId(s), platform: s.platform, name: seriesName(s), text }] : [];
     }),
-    heroes: shown.map((s) => heroCard(s, state.period, content, summary, today)),
-    engagement: shown.map((s) => engagementRow(s, state.period)).filter((r): r is EngagementRow => r !== null),
+    heroes: shown.map((s) => heroCard(s, state.period, content, summary, today, expectedThrough)),
+    engagement: shown.map((s) => engagementRow(s, state.period, expectedThrough)).filter((r): r is EngagementRow => r !== null),
     fresh: freshGroups(content, state.feed),
     utvikling: {
       series: shown.map((s) => ({ id: seriesId(s), name: seriesName(s), platform: s.platform, plain: toPlain(s) })),

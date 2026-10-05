@@ -302,9 +302,13 @@ Oversikt (`/`), i rekkefølge:
 1. Mørkeblått toppfelt: Uke/Måned og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
    Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
    så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
-   trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = siste periode der
-   alle viste plattformer har `data_through` ≥ periodens siste dag; uferdige perioder merkes «hittil, t.o.m.»
-   og sammenlignes med like mange dager i forrige periode.
+   trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = alltid inneværende
+   uke/måned etter Oslo-kalenderen (osloToday), uten unntak; pilene stopper ved inneværende periode.
+   Plattformenes døgn følger Stillehavstid: siste ferdige døgn = i går i Stillehavstid (pacificToday − 1).
+   Uferdige perioder merkes «hittil, t.o.m. dd.mm» og sammenlignes med like mange dager i forrige periode.
+   En plattform som ligger etter siste ferdige døgn (YouTube Analytics), eller som ennå ikke har data i
+   perioden (f.eks. mandag morgen), merkes «data til og med dd.mm»; tallene vises da som «–», og det
+   lages ingen sammendragssetning for den. Ingen andre tekster for tynne perioder.
    Rett over plattformkortene: «Anbefalinger · gjelder nå» (web/lib/oversikt/anbefalinger.ts, tersklene i
    anbefalinger-regler.ts). Én linje per plattform og format, uavhengig av valgt periode. Bare aktive, ikke
    foreløpige konsepter uten spesiell hendelse; Før konsepter, Ukjent, Annet/aktualitet og Bankinfo er utelatt.

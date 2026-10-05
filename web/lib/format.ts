@@ -45,9 +45,14 @@ export function formatFetched(timestamp: string): string {
   return `${get("day")}.${get("month")} kl. ${get("hour")}:${get("minute")}`;
 }
 
-/** Dagens dato i Oslo, «YYYY-MM-DD». */
+/** Dagens dato i Oslo, «YYYY-MM-DD». Bestemmer hvilken uke/måned som er inneværende. */
 export function osloToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(now);
+}
+
+/** Dagens dato i Stillehavstid, «YYYY-MM-DD». Plattformenes døgn (Meta og YouTube Analytics) følger denne. */
+export function pacificToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
 }
 
 function toUtc(date: string): Date {

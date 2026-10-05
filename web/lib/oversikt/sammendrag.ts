@@ -52,6 +52,7 @@ function eventNote(prev: string[], cur: string[], prevName: string, curName: str
 export function summarySentence(s: Series, p: Period, content: ContentLatestRow[]): string | null {
   if (p.end < s.firstActive) return null;
   const c = comparePeriod(s, p);
+  if (c.current.days === 0) return null; // ingen døgn med data i perioden ennå: ingen setning
   if (!c.prev || !c.prevRange) return `Ingen sammenligning: plattformen har ikke data for ${periodShortLabel(c.prevPeriod)}.`;
 
   const cur = c.current.metrics.views;

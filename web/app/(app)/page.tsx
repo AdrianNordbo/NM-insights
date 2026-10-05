@@ -6,12 +6,14 @@ import {
   getPlatformSummary,
 } from "@/lib/data/dashboard";
 import type { Result } from "@/lib/data/types";
-import { osloToday } from "@/lib/format";
+import { addDays, osloToday, pacificToday } from "@/lib/format";
 import { buildTopp, type OversiktTopp } from "@/lib/oversikt/side";
 
 export default async function OversiktSide(props: PageProps<"/">) {
   const params = await props.searchParams;
-  const today = osloToday();
+  const now = new Date();
+  const today = osloToday(now); // inneværende periode følger Oslo-kalenderen
+  const expectedThrough = addDays(pacificToday(now), -1); // siste ferdige døgn hos Meta og YouTube
   const [daily, platformRows, content, concepts] = await Promise.all([
     getDailyActivity(),
     getPlatformSummary(),
@@ -24,7 +26,7 @@ export default async function OversiktSide(props: PageProps<"/">) {
     failed && !failed.ok
       ? failed
       : daily.ok && platformRows.ok && content.ok
-        ? { ok: true, data: buildTopp(daily.data, platformRows.data, content.data, params, today) }
+        ? { ok: true, data: buildTopp(daily.data, platformRows.data, content.data, params, today, expectedThrough) }
         : { ok: false, error: "Klarte ikke å hente tallene akkurat nå. Prøv igjen om litt." };
 
   return (

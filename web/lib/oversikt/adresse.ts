@@ -3,7 +3,7 @@
 
 import type { PeriodType } from "../data/types";
 import type { Series } from "./aktivitet";
-import { defaultPeriod, nextPeriod, parsePeriodKey, parsePeriodType, type Period, periodKey, prevPeriod } from "./periode";
+import { currentPeriod, nextPeriod, parsePeriodKey, parsePeriodType, type Period, periodKey, prevPeriod } from "./periode";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -19,14 +19,11 @@ export function visibleSeries(series: Series[], feed: boolean): Series[] {
   return series.filter((s) => formatVisible(s.format, feed));
 }
 
-/** Leser adressen. Mangler eller ugyldig periode gir standardperioden. */
-export function readState(params: SearchParams, series: Series[]): OversiktState {
+/** Leser adressen. Mangler eller ugyldig periode gir inneværende periode (Oslo-kalenderen). */
+export function readState(params: SearchParams, osloToday: string): OversiktState {
   const feed = first(params.feed) === "1";
   const type: PeriodType = parsePeriodType(first(params.periode));
-  const shown = visibleSeries(series, feed);
-  const period =
-    parsePeriodKey(type, first(params.p)) ??
-    defaultPeriod(type, shown.length ? shown.map((s) => s.through) : [new Date().toISOString().slice(0, 10)]);
+  const period = parsePeriodKey(type, first(params.p)) ?? currentPeriod(type, osloToday);
   return { period, feed };
 }
 
@@ -47,21 +44,20 @@ export type Navigation = {
 };
 
 /**
- * Lenkene i toppfeltet. Bakover stopper ved første periode med data, fremover ved perioden
- * som inneholder siste døgn med data.
+ * Lenkene i toppfeltet. Bakover stopper ved første periode med data, fremover ved inneværende
+ * periode. Uke/Måned går alltid til inneværende periode.
  */
-export function navigation(state: OversiktState, series: Series[]): Navigation {
+export function navigation(state: OversiktState, series: Series[], osloToday: string): Navigation {
   const shown = visibleSeries(series, state.feed);
   const firstActive = shown.map((s) => s.firstActive).sort()[0];
-  const lastThrough = shown.map((s) => s.through).sort().at(-1);
   const prev = prevPeriod(state.period);
   const next = nextPeriod(state.period);
-  const through = (feed: boolean) => visibleSeries(series, feed).map((s) => s.through);
+  const current = currentPeriod(state.period.type, osloToday);
   return {
     prev: firstActive && prev.end >= firstActive ? hrefFor({ ...state, period: prev }) : null,
-    next: lastThrough && next.start <= lastThrough ? hrefFor({ ...state, period: next }) : null,
-    week: hrefFor({ ...state, period: defaultPeriod("uke", through(state.feed)) }),
-    month: hrefFor({ ...state, period: defaultPeriod("måned", through(state.feed)) }),
+    next: next.start <= current.start ? hrefFor({ ...state, period: next }) : null,
+    week: hrefFor({ ...state, period: currentPeriod("uke", osloToday) }),
+    month: hrefFor({ ...state, period: currentPeriod("måned", osloToday) }),
     feedToggle: hrefFor({ ...state, feed: !state.feed }),
   };
 }

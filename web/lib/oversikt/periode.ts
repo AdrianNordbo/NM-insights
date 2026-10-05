@@ -69,13 +69,11 @@ export function parsePeriodType(value: string | undefined): PeriodType {
 }
 
 /**
- * Standardperiode: den siste perioden der alle viste plattformer har data til og med periodens
- * siste dag (data_through ≥ slutt).
+ * Inneværende periode: uken eller måneden dagens dato (Oslo-kalenderen) ligger i. Dette er
+ * standardperioden på Oversikt, uansett hvor langt plattformenes data rekker.
  */
-export function defaultPeriod(type: PeriodType, dataThrough: string[]): Period {
-  const through = [...dataThrough].sort()[0];
-  const p = periodOf(type, through);
-  return p.end <= through ? p : prevPeriod(p);
+export function currentPeriod(type: PeriodType, osloToday: string): Period {
+  return periodOf(type, osloToday);
 }
 
 /** «Uke 39 · 21.09–27.09» eller «September 2026». */

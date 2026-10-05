@@ -15,18 +15,19 @@ export type HeroCard = {
   id: string;
   platform: Series["platform"];
   name: string;
-  /** «hittil, t.o.m. 28.09» når perioden ikke er ferdig for plattformen. */
+  /** «hittil, t.o.m. 04.10» når perioden ikke er ferdig, «data til og med 02.10» når plattformen ligger etter. */
   partialNote: string | null;
   /** Plattformen har ikke data så langt tilbake. */
   noDataNote: string | null;
-  views: number;
+  /** Null når plattformen ennå ikke har data for noen døgn i perioden. */
+  views: number | null;
   delta: Delta;
   trend: TrendPoint[];
   posts: number;
   followers: { label: string; total: number | null; newLabel: string; newInPeriod: number | null } | null;
 };
 
-export type EngagementTile = { key: MetricKey; label: string; value: number; delta: Delta; trend: TrendPoint[] };
+export type EngagementTile = { key: MetricKey; label: string; value: number | null; delta: Delta; trend: TrendPoint[] };
 export type EngagementRow = { id: string; platform: Series["platform"]; name: string; partialNote: string | null; tiles: EngagementTile[] };
 
 const METRIC_LABEL: Record<MetricKey, string> = {
@@ -52,7 +53,16 @@ function delta(c: Comparison, metric: MetricKey): Delta {
   return { change: change(c.current.metrics[metric], c.prev ? c.prev.metrics[metric] : null), prevLabel: prevLabel(c) };
 }
 
-const partialNote = (c: Comparison, s: Series) => (c.partial ? `hittil, t.o.m. ${formatDayMonth(s.through)}` : null);
+/**
+ * Merknad når perioden ikke er dekket helt. «hittil, t.o.m. dd.mm» når plattformen har data til og med
+ * siste ferdige døgn (expectedThrough, Stillehavstid); «data til og med dd.mm» når den ligger etter
+ * (YouTube Analytics 2–3 døgn) eller ennå ikke har noen døgn i perioden.
+ */
+function partialNote(c: Comparison, s: Series, expectedThrough: string): string | null {
+  if (!c.partial) return null;
+  if (c.current.days === 0 || s.through < expectedThrough) return `data til og med ${formatDayMonth(s.through)}`;
+  return `hittil, t.o.m. ${formatDayMonth(s.through)}`;
+}
 
 function followers(s: Series, p: Period, rows: PlatformSummaryRow[], today: string): HeroCard["followers"] {
   const own = rows.filter((r) => r.platform === s.platform && r.format === s.format);
@@ -75,6 +85,7 @@ export function heroCard(
   content: ContentLatestRow[],
   summary: PlatformSummaryRow[],
   today: string,
+  expectedThrough: string,
 ): HeroCard {
   const c = comparePeriod(s, p);
   const noData = p.end < s.firstActive;
@@ -82,9 +93,9 @@ export function heroCard(
     id: seriesId(s),
     platform: s.platform,
     name: seriesName(s),
-    partialNote: noData ? null : partialNote(c, s),
+    partialNote: noData ? null : partialNote(c, s, expectedThrough),
     noDataNote: noData ? `Ingen data før ${formatDayMonth(s.firstActive)}.${s.firstActive.slice(0, 4)}.` : null,
-    views: c.current.metrics.views,
+    views: c.current.days > 0 ? c.current.metrics.views : null,
     delta: delta(c, "views"),
     trend: trend(s, p, "views"),
     posts: content.filter(
@@ -95,7 +106,7 @@ export function heroCard(
   };
 }
 
-export function engagementRow(s: Series, p: Period): EngagementRow | null {
+export function engagementRow(s: Series, p: Period, expectedThrough: string): EngagementRow | null {
   if (p.end < s.firstActive) return null;
   const c = comparePeriod(s, p);
   const keys: MetricKey[] = s.hasSaves ? ["likes", "comments", "shares", "saves"] : ["likes", "comments", "shares"];
@@ -103,11 +114,11 @@ export function engagementRow(s: Series, p: Period): EngagementRow | null {
     id: seriesId(s),
     platform: s.platform,
     name: seriesName(s),
-    partialNote: partialNote(c, s),
+    partialNote: partialNote(c, s, expectedThrough),
     tiles: keys.map((key) => ({
       key,
       label: METRIC_LABEL[key],
-      value: c.current.metrics[key],
+      value: c.current.days > 0 ? c.current.metrics[key] : null,
       delta: delta(c, key),
       trend: trend(s, p, key),
     })),
