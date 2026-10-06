@@ -5,6 +5,8 @@ import { INACTIVE_AFTER_DAYS } from "./oversikt/konsepter";
 export const KILDER = {
   aktivitet:
     "Aktivitet på hele kontoen per døgn, også på eldre innlegg. Døgnene følger Stillehavstid (plattformenes egne døgn), så en uke er mandag–søndag i Stillehavstid. Annonsevisninger (AD) er holdt utenfor; tallene er organiske. YouTube ligger 2–3 døgn bak. Prosent vises når forrige verdi er minst 1 000. En uferdig periode sammenlignes med like mange dager i forrige periode.",
+  instagramKort:
+    "Visninger på hele Instagram-kontoen per døgn (Stillehavstid), også på eldre innlegg. Annonsevisninger (AD) er holdt utenfor, så Metas egne tall i Instagram Innsikt kan være ca. 1 % høyere fordi de inkluderer annonsevisninger.",
   utvikling:
     "Hele kontoen per døgn, også eldre innlegg. Døgnene følger Stillehavstid. Grafen er uavhengig av Uke/Måned-velgeren: intervallet slutter alltid på siste døgn med data (YouTube ligger 2–3 døgn bak). Forrige periode er like mange dager rett før. Annonsevisninger (AD) er holdt utenfor.",
   utviklingVisninger:

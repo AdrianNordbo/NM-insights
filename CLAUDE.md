@@ -129,6 +129,13 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     - Instagram fra `/{ig}/insights?metric_type=total_value&breakdown=media_product_type`: ALL, REELS (REEL),
       FEED (POST + CAROUSEL_CONTAINER + CAROUSEL_ITEM; karuseller er en egen type hos Meta), STORY, AD, OTHER.
       interactions = Metas total_interactions (kan være litt høyere enn summen, Meta teller også f.eks. svar).
+      **Regel for since/until:** Meta tar med hvert døgn der midnatt (Stillehavstid) ligger i [since, until],
+      grensen inkludert. Ett døgn hentes derfor med since = døgnets midnatt og until = since + 86399
+      (23:59:59), ikke neste midnatt. Med until = neste midnatt fikk hvert kall to døgn (dette døgnet + neste),
+      så account_daily for Instagram var ca. 1,9 × for høy fra backfillen 01.10 til rettelsen 05.10.2026.
+      Rettet og backfillet 05.10.2026; kontrollert mot eksport fra Meta Insikt (se «Kjente problemer»).
+      Mangler et format i svaret, lagres 0, så en ny henting alltid overskriver hele døgnet.
+      Metas egne tall i Insikt tar med annonsevisninger (AD) og er derfor ca. 1 % høyere enn dashboardet.
     - YouTube fra Analytics `dimensions=day,creatorContentType` (+ `day` for ALL): ALL, SHORTS, VIDEO, LIVE,
       OTHER. interactions = likes + comments + shares.
 - Oppdateringsstrategi: innlegg/videoer yngre enn 30 dager får nye tall hver kjøring; eldre bare hvis de ikke

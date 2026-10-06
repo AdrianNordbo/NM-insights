@@ -33,6 +33,9 @@ SAVE_EVERY = 30                        # backfill: lagre underveis
 IG_METRICS = ["views", "likes", "comments", "shares", "saves", "total_interactions"]
 IG_FORMATS = {"REEL": "REELS", "POST": "FEED", "CAROUSEL_CONTAINER": "FEED", "CAROUSEL_ITEM": "FEED",
               "STORY": "STORY", "AD": "AD"}            # alt annet → OTHER
+# Alle formatene som lagres for Instagram. Mangler et format i Metas svar, lagres 0, så en ny henting
+# alltid overskriver hele døgnet (gamle rader for et format kan ellers bli stående med feil tall).
+IG_ALL_FORMATS = ["ALL", "REELS", "FEED", "STORY", "AD", "OTHER"]
 YT_METRICS = ["views", "likes", "comments", "shares"]
 YT_FORMATS = {"shorts": "SHORTS", "videoOnDemand": "VIDEO", "liveStream": "LIVE"}  # alt annet → OTHER
 
@@ -52,6 +55,16 @@ def ts(d):
     return int(datetime(d.year, d.month, d.day, tzinfo=PACIFIC).timestamp())
 
 
+def ig_day_window(day):
+    """since/until for ett Stillehavsdøgn hos Meta.
+
+    Meta tar med hvert døgn der midnatt (Stillehavstid) ligger i [since, until], grensen inkludert.
+    until = neste midnatt ga derfor to døgn per kall (rettet 05.10.2026). until = 23:59:59 gir bare
+    dette døgnet."""
+    since = ts(day)
+    return since, since + 86399
+
+
 def row(account_id, day, fmt, values, interactions, raw, saves=True):
     return {
         "account_id": account_id, "activity_date": day.isoformat(), "format": fmt,
@@ -67,9 +80,10 @@ def row(account_id, day, fmt, values, interactions, raw, saves=True):
 
 def ig_day(account_id, day):
     """Rader for ett Stillehavsdøgn: ALL + ett per format (FEED slår sammen bilder og karuseller)."""
+    since, until = ig_day_window(day)
     data = ig.api_get(f"{ig.IG_USER_ID}/insights", {
         "metric": ",".join(IG_METRICS), "period": "day", "metric_type": "total_value",
-        "breakdown": "media_product_type", "since": ts(day), "until": ts(day + timedelta(days=1)),
+        "breakdown": "media_product_type", "since": since, "until": until,
     })
     total, parts = {}, defaultdict(dict)   # parts: Metas type → {metric: verdi}
     for m in data.get("data", []):
@@ -87,7 +101,8 @@ def ig_day(account_id, day):
         raw[meta_type] = values
 
     rows = [row(account_id, day, "ALL", total, total.get("total_interactions", 0), {"ALL": total})]
-    for fmt, (sums, raw) in grouped.items():
+    for fmt in IG_ALL_FORMATS[1:]:
+        sums, raw = grouped[fmt] if fmt in grouped else ({}, {})  # 0-rad når formatet mangler i svaret
         rows.append(row(account_id, day, fmt, sums, sums.get("total_interactions", 0), raw))
     return rows
 
