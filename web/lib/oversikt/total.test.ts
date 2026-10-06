@@ -35,10 +35,10 @@ describe("Total", () => {
     expect(ig.views).toBeGreaterThan(92300); // inkluderer innlegget som er en halv dag gammelt
   });
 
-  it("VM-andelen summeres fra special_event", () => {
-    expect(ig.vmViews).toBe(90000);
-    expect(total.vmViews).toBe(90000);
+  it("totalen er summen av plattformene, og VM-innhold telles med som alt annet", () => {
     expect(total.views).toBe(ig.views + yt.views);
+    expect(ig.views).toBe(2000 + 90000 + 300 + 700); // VM-innlegget på 90 000 er med
+    expect(Object.keys(ig)).not.toContain("vmViews");
   });
 
   it("delinger summeres bare der tallet finnes, og antallet med tall vises", () => {

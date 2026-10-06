@@ -6,7 +6,7 @@ export const KILDER = {
   aktivitet:
     "Aktivitet på hele kontoen per døgn, også på eldre innlegg. Døgnene følger Stillehavstid (plattformenes egne døgn), så en uke er mandag–søndag i Stillehavstid. Annonsevisninger (AD) er holdt utenfor; tallene er organiske. YouTube ligger 2–3 døgn bak. Prosent vises når forrige verdi er minst 1 000. En uferdig periode sammenlignes med like mange dager i forrige periode.",
   total:
-    "Summen av visninger per innlegg publisert siden start (takeover-datoen), med siste måling for hvert innlegg. Det er visninger, ikke unike personer. Annonsevisninger er holdt utenfor. Tallet vokser også når eldre innlegg får nye visninger. Instagram Feed er alltid med, uansett Feed-bryteren. TikTok er ikke med før API-tilgangen er godkjent. Plattformene teller visninger ulikt og sammenlignes ikke med hverandre.",
+    "Summen av visninger per innlegg publisert siden start (takeover-datoen), med siste måling for hvert innlegg. Det er visninger, ikke unike personer. Annonsevisninger er holdt utenfor. Tallet vokser også når eldre innlegg får nye visninger. Instagram Feed er alltid med, uansett Feed-bryteren. TikTok er ikke med før API-tilgangen er godkjent. Metas egne Instagram-tall (Instagram Innsikt) er høyere fordi de også tar med historier, annonser og innlegg publisert før startdatoen. Plattformene teller visninger ulikt og sammenlignes ikke med hverandre.",
   totalInstagram:
     "Instagram (Reels og Feed): visninger per innlegg fra Meta, siste måling, summert for innlegg publisert siden start. Annonsevisninger er holdt utenfor, så Metas egne tall i Instagram Innsikt kan være ca. 1 % høyere. Delinger summeres bare for innlegg der tallet finnes. Kurven viser summen per publiseringsuke med dagens tall.",
   totalYoutube:

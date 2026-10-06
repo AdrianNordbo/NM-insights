@@ -1,5 +1,6 @@
 // «Total»: summen siden Nordbø Marketing tok over (takeover_date), fra innleggene i dashboard.content_latest.
-// Visninger per innlegg (siste måling), alle aldre, uten annonsevisninger. Feed er alltid med, uansett
+// Visninger per innlegg (siste måling), alle aldre, uten annonsevisninger, uavhengig av special_event (VM o.l.
+// skilles bare ut i konsepttabellen og anbefalingene). Feed er alltid med, uansett
 // Feed-bryteren. Plattformene vises hver for seg og sammenlignes aldri (ingen andeler mellom dem).
 
 import type { ContentLatestRow, Platform } from "../data/types";
@@ -14,7 +15,6 @@ export type TotalPlatform = {
   since: string;
   posts: number;
   views: number;
-  vmViews: number;
   likes: number;
   comments: number;
   /** Sum av delinger der tallet finnes. */
@@ -29,7 +29,6 @@ export type TotalModel = {
   /** Tidligste startdato blant plattformene (vanligvis lik for alle). */
   since: string;
   views: number;
-  vmViews: number;
   platforms: TotalPlatform[];
 };
 
@@ -74,7 +73,6 @@ export function buildTotal(
       since,
       posts: rows.length,
       views: sum((r) => r.views),
-      vmViews: sum((r) => (r.special_event ? r.views : 0)),
       likes: sum((r) => r.likes),
       comments: sum((r) => r.comments),
       shares: withShares.reduce((s, r) => s + (r.shares ?? 0), 0),
@@ -86,7 +84,6 @@ export function buildTotal(
   return {
     since: platforms.map((p) => p.since).sort()[0],
     views: platforms.reduce((s, p) => s + p.views, 0),
-    vmViews: platforms.reduce((s, p) => s + p.vmViews, 0),
     platforms,
   };
 }

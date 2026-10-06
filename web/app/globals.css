@@ -495,13 +495,6 @@ a {
   font-size: 14px;
 }
 
-.total-vm {
-  margin-top: 6px;
-  color: var(--band-ink-2);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
 .total-note {
   color: var(--band-ink-2);
   font-weight: 400;

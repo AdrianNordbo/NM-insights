@@ -328,13 +328,14 @@ Oversikt (`/`), i rekkefølge:
    siden siste innlegg vises med «(siste innlegg dd.mm)». Hver linje har info-ikon med tallene.
    «Total» (`?periode=total`, web/lib/oversikt/total.ts): ett stort tall «Totalt siden start (dd.mm)» =
    summen av visninger per innlegg i content_latest publisert fra og med `takeover_date` (Oslo-dato), alle
-   aldre, siste måling, uten annonsevisninger, med «hvorav VM-innhold» (special_event). Instagram (Reels og
+   aldre, siste måling, uten annonsevisninger, uavhengig av special_event (VM skilles bare ut i konsepttabellen
+   og anbefalingene). Instagram (Reels og
    Feed, alltid med uansett Feed-bryteren) og YouTube (Shorts); TikTok som plassholder. Ett kort per plattform
    med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
    noe mangler) og kumulativ kurve per publiseringsuke med dagens tall. Ingen piler, endringspiller,
    sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
    plattformene. Standardvalget er fortsatt inneværende uke. Per 06.10.2026: 583 185 visninger (Instagram
-   491 542, YouTube 91 643), hvorav VM 391 498.
+   491 542, YouTube 91 643).
 2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
 3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
 4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,

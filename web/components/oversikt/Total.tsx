@@ -18,7 +18,6 @@ function Plattform({ p }: { p: TotalPlatform }) {
         <div>
           <div className="hero-label">Visninger</div>
           <div className="hero-num">{formatNumber(p.views)}</div>
-          <div className="total-vm">hvorav VM-innhold {formatNumber(p.vmViews)}</div>
         </div>
         <div className="hero-spark">
           <Trendlinje points={p.cumulative} height={72} fill ariaLabel={`Visninger for ${p.name} samlet per uke siden ${sinceLabel(p.since)}`} />
@@ -53,9 +52,7 @@ export function Total({ total }: { total: TotalModel }) {
           Totalt siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
         </h2>
         <div className="total-num">{formatNumber(total.views)}</div>
-        <p className="total-sub">
-          visninger · hvorav VM-innhold {formatNumber(total.vmViews)}
-        </p>
+        <p className="total-sub">visninger</p>
         <p className="total-sub">Instagram og YouTube. TikTok kommer når API-tilgangen er godkjent.</p>
       </section>
       <div className="heroes total-cards">
