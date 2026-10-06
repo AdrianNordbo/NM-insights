@@ -27,6 +27,11 @@ export type ContentLatestRow = {
   permalink: string | null;
   /** timestamptz, f.eks. "2026-09-30T09:55:16.239042+00:00". */
   fetched_at: string | null;
+  /**
+   * Delinger (2026-10-06_content_latest_shares.sql). Instagram fra posts_latest, YouTube fra
+   * per-video-Analytics; null der tallet mangler. Valgfri til migreringen er kjørt.
+   */
+  shares?: number | null;
 };
 
 /** dashboard.concept_summary: median per plattform + konto + format + konsept + special_event. */

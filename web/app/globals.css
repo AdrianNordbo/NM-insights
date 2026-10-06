@@ -465,6 +465,62 @@ a {
   font-size: 13px;
 }
 
+/* --- Total i toppfeltet ---------------------------------------------------- */
+
+.total-hero {
+  margin-top: 22px;
+}
+
+.total-title {
+  margin: 0;
+  color: var(--band-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.total-num {
+  margin-top: 4px;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-sub {
+  margin: 6px 0 0;
+  color: var(--band-ink-2);
+  font-size: 14px;
+}
+
+.total-vm {
+  margin-top: 6px;
+  color: var(--band-ink-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-note {
+  color: var(--band-ink-2);
+  font-weight: 400;
+}
+
+.hero.tiktok-coming {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.hero.tiktok-coming::before {
+  display: none;
+}
+
+.hero.tiktok-coming h2 {
+  color: var(--band-ink-2);
+}
+
 /* --- Plattformkort i toppfeltet ---------------------------------------------- */
 
 .heroes {
@@ -1118,6 +1174,10 @@ a.fresh-title:hover {
 
   .hero-num {
     font-size: 40px;
+  }
+
+  .total-num {
+    font-size: 46px;
   }
 
   .eng-row {

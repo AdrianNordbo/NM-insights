@@ -8,6 +8,7 @@ import { type EngagementRow, engagementRow, type HeroCard, heroCard, seriesId, s
 import type { ChartPost, UtviklingSerie } from "./graf";
 import { periodLabel, trendLabel } from "./periode";
 import { summarySentence } from "./sammendrag";
+import { buildTotal, takeoverDates, type TotalModel } from "./total";
 
 export type Summary = { id: string; platform: "instagram" | "youtube"; name: string; text: string };
 
@@ -21,6 +22,8 @@ export type OversiktTopp = {
   engagement: EngagementRow[];
   utvikling: { series: UtviklingSerie[]; posts: ChartPost[] };
   fresh: FreshGroup[];
+  /** Bare når Total er valgt. */
+  total: TotalModel | null;
 };
 
 export function buildTopp(
@@ -48,6 +51,7 @@ export function buildTopp(
     heroes: shown.map((s) => heroCard(s, state.period, content, summary, today, expectedThrough)),
     engagement: shown.map((s) => engagementRow(s, state.period, expectedThrough)).filter((r): r is EngagementRow => r !== null),
     fresh: freshGroups(content, state.feed),
+    total: state.total ? buildTotal(content, takeoverDates(daily), today) : null,
     utvikling: {
       series: shown.map((s) => ({ id: seriesId(s), name: seriesName(s), platform: s.platform, plain: toPlain(s) })),
       posts: content

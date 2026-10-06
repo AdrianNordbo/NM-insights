@@ -5,6 +5,7 @@ import { Ferske } from "@/components/oversikt/Ferske";
 import { HvaFunketSist } from "@/components/oversikt/HvaFunketSist";
 import { Konsepter } from "@/components/oversikt/Konsepter";
 import { Plattformkort } from "@/components/oversikt/Plattformkort";
+import { Total } from "@/components/oversikt/Total";
 import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
 import type { ConceptSummaryRow, ContentLatestRow, Result } from "@/lib/data/types";
 import { formatFetched } from "@/lib/format";
@@ -46,9 +47,17 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
       {topp.ok ? (
         <Toppfelt
           title="Oversikt"
-          controls={<Periodevelger nav={topp.data.nav} type={topp.data.state.period.type} label={topp.data.label} feed={feed} />}
+          controls={
+            <Periodevelger
+              nav={topp.data.nav}
+              type={topp.data.state.period.type}
+              label={topp.data.label}
+              feed={feed}
+              total={topp.data.state.total}
+            />
+          }
         >
-          {topp.data.summaries.length > 0 && (
+          {!topp.data.state.total && topp.data.summaries.length > 0 && (
             <div className="summary">
               {topp.data.summaries.map((line) => (
                 <p key={line.id}>
@@ -64,11 +73,19 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
           {content.ok && concepts.ok && (
             <Anbefalinger line={buildRecommendations(concepts.data, content.data, today, feed)} />
           )}
-          <div className="heroes">
-            {topp.data.heroes.map((card) => (
-              <Plattformkort key={card.id} card={card} trendLabel={topp.data.trendLabel} />
-            ))}
-          </div>
+          {topp.data.state.total ? (
+            topp.data.total ? (
+              <Total total={topp.data.total} />
+            ) : (
+              <Notice>Ingen innlegg siden start ennå.</Notice>
+            )
+          ) : (
+            <div className="heroes">
+              {topp.data.heroes.map((card) => (
+                <Plattformkort key={card.id} card={card} trendLabel={topp.data.trendLabel} />
+              ))}
+            </div>
+          )}
         </Toppfelt>
       ) : (
         <Toppfelt title="Oversikt">
@@ -77,7 +94,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
       )}
 
       <main className={topp.ok ? "page under-heroes" : "page"}>
-        {topp.ok && <Engasjement rows={topp.data.engagement} trendLabel={topp.data.trendLabel} />}
+        {topp.ok && !topp.data.state.total && <Engasjement rows={topp.data.engagement} trendLabel={topp.data.trendLabel} />}
         {topp.ok && <Ferske groups={topp.data.fresh} />}
         {topp.ok && <Utvikling series={topp.data.utvikling.series} posts={topp.data.utvikling.posts} />}
 

@@ -24,35 +24,42 @@ export function Periodevelger({
   type,
   label,
   feed,
+  total,
 }: {
   nav: Navigation;
   type: "uke" | "måned";
   label: string;
   feed: boolean;
+  total: boolean;
 }) {
   return (
     <div className="control-row">
       <nav className="seg" aria-label="Periodetype">
-        <Link href={nav.week} aria-current={type === "uke" ? "true" : undefined} scroll={false}>
+        <Link href={nav.week} aria-current={!total && type === "uke" ? "true" : undefined} scroll={false}>
           Uke
         </Link>
-        <Link href={nav.month} aria-current={type === "måned" ? "true" : undefined} scroll={false}>
+        <Link href={nav.month} aria-current={!total && type === "måned" ? "true" : undefined} scroll={false}>
           Måned
         </Link>
+        <Link href={nav.total} aria-current={total ? "true" : undefined} scroll={false}>
+          Total
+        </Link>
       </nav>
-      <div className="stepper">
-        {nav.prev ? (
-          <Link href={nav.prev} aria-label="Forrige periode" scroll={false}>‹</Link>
-        ) : (
-          <span aria-hidden="true" className="disabled">‹</span>
-        )}
-        <span className="stepper-label">{label}</span>
-        {nav.next ? (
-          <Link href={nav.next} aria-label="Neste periode" scroll={false}>›</Link>
-        ) : (
-          <span aria-hidden="true" className="disabled">›</span>
-        )}
-      </div>
+      {!total && (
+        <div className="stepper">
+          {nav.prev ? (
+            <Link href={nav.prev} aria-label="Forrige periode" scroll={false}>‹</Link>
+          ) : (
+            <span aria-hidden="true" className="disabled">‹</span>
+          )}
+          <span className="stepper-label">{label}</span>
+          {nav.next ? (
+            <Link href={nav.next} aria-label="Neste periode" scroll={false}>›</Link>
+          ) : (
+            <span aria-hidden="true" className="disabled">›</span>
+          )}
+        </div>
+      )}
       <Link href={nav.feedToggle} className="feed-toggle" role="switch" aria-checked={feed} scroll={false}>
         <span className={feed ? "switch on" : "switch"} aria-hidden="true" />
         Ta med Instagram Feed (bilder og karuseller)

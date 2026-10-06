@@ -147,8 +147,10 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
 - Schema `dashboard` (datalag for dashboardet, 2026-09-30_dashboard.sql):
   - `dashboard.content_latest`: én rad per innlegg/video på tvers av plattformer (platform, account_id,
     content_id, published_at i Oslo-tid, format, concept, special_event, views, likes, comments, age_days,
-    is_mature ≥ 7 dager). Instagram fra posts_latest (REELS/FEED); YouTube fra youtube_videos_latest med
-    Data API-tall, bare SHORTS. Ikke youtube_video_daily.
+    is_mature ≥ 7 dager), title, permalink, fetched_at og `shares` (2026-10-06_content_latest_shares.sql,
+    bakerst): Instagram fra posts_latest, YouTube fra per-video-Analytics, null der tallet mangler.
+    Instagram fra posts_latest (REELS/FEED); YouTube fra youtube_videos_latest med Data API-tall, bare SHORTS.
+    Ikke youtube_video_daily.
   - `dashboard.concept_summary`: median views/likes/comments per plattform + konto + format + konsept +
     special_event, bare modne innlegg, med posts og preliminary (< 6). VM får egne rader.
     `median_engagement_per_view` = median av (likes + comments) / views per innlegg
@@ -306,7 +308,7 @@ v5-forhåndsvisningen (data/forhandsvisning/, lokal og gitignored). Siden er all
 sol/måne-knappen øverst til høyre slår mørk modus av og på mens siden er åpen (ingen lagring).
 
 Oversikt (`/`), i rekkefølge:
-1. Mørkeblått toppfelt: Uke/Måned og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
+1. Mørkeblått toppfelt: Uke | Måned | Total og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
    Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
    så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
    trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = alltid inneværende
@@ -324,6 +326,15 @@ Oversikt (`/`), i rekkefølge:
    Nye, foreløpige konsepter vises som tilleggslinje: «lovende, men for tidlig å si» når medianen er minst
    like høy som beste godkjente konsept, ellers «nytt konsept, for tidlig å si». Konsepter med ≥ 14 dager
    siden siste innlegg vises med «(siste innlegg dd.mm)». Hver linje har info-ikon med tallene.
+   «Total» (`?periode=total`, web/lib/oversikt/total.ts): ett stort tall «Totalt siden start (dd.mm)» =
+   summen av visninger per innlegg i content_latest publisert fra og med `takeover_date` (Oslo-dato), alle
+   aldre, siste måling, uten annonsevisninger, med «hvorav VM-innhold» (special_event). Instagram (Reels og
+   Feed, alltid med uansett Feed-bryteren) og YouTube (Shorts); TikTok som plassholder. Ett kort per plattform
+   med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
+   noe mangler) og kumulativ kurve per publiseringsuke med dagens tall. Ingen piler, endringspiller,
+   sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
+   plattformene. Standardvalget er fortsatt inneværende uke. Per 06.10.2026: 583 185 visninger (Instagram
+   491 542, YouTube 91 643), hvorav VM 391 498.
 2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
 3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
 4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,

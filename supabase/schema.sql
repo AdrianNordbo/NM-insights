@@ -404,7 +404,8 @@ select
     (p.published_at <= now() - interval '7 days')                as is_mature,
     left(nullif(btrim(split_part(coalesce(p.caption, ''), E'\n', 1)), ''), 200) as title,
     p.permalink,
-    p.fetched_at
+    p.fetched_at,
+    p.shares::bigint                                             as shares          -- delinger (2026-10-06)
 from public.posts_latest p
 union all
 select
@@ -422,13 +423,15 @@ select
     (y.published_at <= now() - interval '7 days'),
     y.title,
     y.permalink,
-    y.fetched_at
+    y.fetched_at,
+    y.shares::bigint                                                                  -- per-video-Analytics, null der det mangler
 from public.youtube_videos_latest y
 where y.format = 'SHORTS';                                                            -- VIDEO holdes utenfor
 
 comment on view dashboard.content_latest is
     'Én rad per innlegg/video (siste måling). YouTube: Data API-tall, bare SHORTS. published_at i Europe/Oslo. '
-    'title = første linje av captionen (Instagram) eller videotittelen (YouTube). fetched_at er timestamptz.';
+    'title = første linje av captionen (Instagram) eller videotittelen (YouTube). fetched_at er timestamptz. '
+    'shares: Instagram fra posts_latest, YouTube fra per-video-Analytics; null der tallet mangler.';
 
 -- ---------------------------------------------------------------------------
 -- 2. concept_summary: median per plattform + format + konsept, bare modne innlegg
