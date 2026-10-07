@@ -465,10 +465,43 @@ a {
   font-size: 13px;
 }
 
+/* Anbefalinger som eget kort på den lyse bakgrunnen (Total). Samme innhold, lyse fargetokens. */
+.recs.recs-light {
+  margin-top: 36px;
+  padding: 16px 20px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+
+.recs-light .recs-title,
+.recs-light .recs-empty,
+.recs-light .rec-none,
+.recs-light .rec-promising {
+  color: var(--ink-2);
+}
+
+.recs-light .rec-text {
+  color: var(--ink);
+}
+
+.recs-light .rec.instagram {
+  --accent: var(--ig);
+}
+
+.recs-light .rec.youtube {
+  --accent: var(--yt);
+}
+
+.recs-light .info {
+  border-color: var(--axis);
+  color: var(--muted);
+}
+
 /* --- Total i toppfeltet ---------------------------------------------------- */
 
 .total-hero {
-  margin-top: 22px;
+  margin-top: 26px;
   text-align: center;
 }
 
@@ -494,6 +527,12 @@ a {
   margin: 6px 0 0;
   color: var(--band-ink-2);
   font-size: 14px;
+}
+
+.total-updated {
+  margin: 4px 0 0;
+  color: var(--band-ink-2);
+  font-size: 12px;
 }
 
 /* Plattformkortene i Total: like høye (rader av lik høyde, også når de står under hverandre),

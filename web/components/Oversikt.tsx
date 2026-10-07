@@ -38,6 +38,10 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
   const lastFetched = content.ok
     ? content.data.map((p) => p.fetched_at).filter((t): t is string => Boolean(t)).sort().at(-1)
     : undefined;
+  const isTotal = topp.ok && topp.data.state.total;
+  const recommendations =
+    content.ok && concepts.ok ? buildRecommendations(concepts.data, content.data, today, feed) : null;
+  const updated = lastFetched ? `Sist oppdatert ${formatFetched(lastFetched)}` : null;
   const beforeConceptsHref = topp.ok
     ? hrefFor(topp.data.state, showBeforeConcepts ? {} : { vis: "alle" })
     : showBeforeConcepts ? "/" : "/?vis=alle";
@@ -57,34 +61,35 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
             />
           }
         >
-          {!topp.data.state.total && topp.data.summaries.length > 0 && (
-            <div className="summary">
-              {topp.data.summaries.map((line) => (
-                <p key={line.id}>
-                  <span className={`who ${line.platform}`}>{line.name}</span> {line.text}
-                </p>
-              ))}
-            </div>
-          )}
-          <p className="band-meta">
-            {lastFetched && <>Sist oppdatert {formatFetched(lastFetched)} · </>}
-            TikTok <span className="chip">kommer</span>
-          </p>
-          {content.ok && concepts.ok && (
-            <Anbefalinger line={buildRecommendations(concepts.data, content.data, today, feed)} />
-          )}
-          {topp.data.state.total ? (
+          {isTotal ? (
+            // Total: det store tallet rett under periodevelgeren, så kortene. Anbefalingene står under, på lys bakgrunn.
             topp.data.total ? (
-              <Total total={topp.data.total} />
+              <Total total={topp.data.total} updated={updated} />
             ) : (
               <Notice>Ingen innlegg siden start ennå.</Notice>
             )
           ) : (
-            <div className="heroes">
-              {topp.data.heroes.map((card) => (
-                <Plattformkort key={card.id} card={card} trendLabel={topp.data.trendLabel} />
-              ))}
-            </div>
+            <>
+              {topp.data.summaries.length > 0 && (
+                <div className="summary">
+                  {topp.data.summaries.map((line) => (
+                    <p key={line.id}>
+                      <span className={`who ${line.platform}`}>{line.name}</span> {line.text}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <p className="band-meta">
+                {updated && <>{updated} · </>}
+                TikTok <span className="chip">kommer</span>
+              </p>
+              {recommendations && <Anbefalinger line={recommendations} />}
+              <div className="heroes">
+                {topp.data.heroes.map((card) => (
+                  <Plattformkort key={card.id} card={card} trendLabel={topp.data.trendLabel} />
+                ))}
+              </div>
+            </>
           )}
         </Toppfelt>
       ) : (
@@ -94,6 +99,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
       )}
 
       <main className={topp.ok ? "page under-heroes" : "page"}>
+        {isTotal && recommendations && <Anbefalinger line={recommendations} light />}
         {topp.ok && !topp.data.state.total && <Engasjement rows={topp.data.engagement} trendLabel={topp.data.trendLabel} />}
         {topp.ok && <Ferske groups={topp.data.fresh} />}
         {topp.ok && <Utvikling series={topp.data.utvikling.series} posts={topp.data.utvikling.posts} />}

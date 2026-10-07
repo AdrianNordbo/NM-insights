@@ -47,7 +47,7 @@ function Plattform({ p }: { p: TotalPlatform }) {
 }
 
 /** «Total» i toppfeltet: ett stort tall siden start, og ett kort per plattform. Ingen sammenligning mellom plattformene. */
-export function Total({ total }: { total: TotalModel }) {
+export function Total({ total, updated }: { total: TotalModel; updated: string | null }) {
   return (
     <>
       <section className="total-hero" aria-labelledby="total-tittel">
@@ -56,6 +56,7 @@ export function Total({ total }: { total: TotalModel }) {
         </h2>
         <div className="total-num">{formatNumber(total.views)}</div>
         <p className="total-sub">Instagram og YouTube. TikTok kommer når API-tilgangen er godkjent.</p>
+        {updated && <p className="total-updated">{updated}</p>}
       </section>
       <div className="heroes total-cards">
         {total.platforms.map((p) => (

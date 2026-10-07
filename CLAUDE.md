@@ -334,7 +334,8 @@ Oversikt (`/`), i rekkefølge:
    med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
    noe mangler) og kumulativ kurve per publiseringsuke med dagens tall. Ingen piler, endringspiller,
    sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
-   plattformene. Standardvalget er fortsatt inneværende uke. Per 06.10.2026: 583 185 visninger (Instagram
+   plattformene. Rekkefølge i Total: periodevelger → det store tallet (sentrert) → kortene → «Anbefalinger ·
+   gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 06.10.2026: 583 185 visninger (Instagram
    491 542, YouTube 91 643).
 2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
 3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
