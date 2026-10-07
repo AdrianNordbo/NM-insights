@@ -4,41 +4,44 @@ import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
+/** Info-teksten for kortet, med antall innlegg som har delingstall når noen mangler. */
+function infoText(p: TotalPlatform): string {
+  const base = p.platform === "instagram" ? KILDER.totalInstagram : KILDER.totalYoutube;
+  const missing = p.posts - p.postsWithShares;
+  return missing > 0 ? `${base} Delinger finnes for ${p.postsWithShares} av ${p.posts} innlegg.` : base;
+}
+
 function Plattform({ p }: { p: TotalPlatform }) {
-  const missingShares = p.posts - p.postsWithShares;
+  const stats: [string, number][] = [
+    ["Likes", p.likes],
+    ["Kommentarer", p.comments],
+    ["Delinger", p.shares],
+    ["Innlegg", p.posts],
+  ];
   return (
-    <article className={`hero ${p.platform}`}>
+    <article className={`hero total-card ${p.platform}`}>
       <header className="hero-head">
         <h2>
-          {p.name} <InfoIkon id={`total-${p.platform}`} text={p.platform === "instagram" ? KILDER.totalInstagram : KILDER.totalYoutube} />
+          {p.name} <InfoIkon id={`total-${p.platform}`} text={infoText(p)} />
         </h2>
         <span className="chip">siden {sinceLabel(p.since)}</span>
       </header>
-      <div className="hero-body">
-        <div>
-          <div className="hero-label">Visninger</div>
-          <div className="hero-num">{formatNumber(p.views)}</div>
-        </div>
-        <div className="hero-spark">
-          <Trendlinje points={p.cumulative} height={72} fill ariaLabel={`Visninger for ${p.name} samlet per uke siden ${sinceLabel(p.since)}`} />
-          <div className="hero-spark-cap">Samlet per uke siden start</div>
+      <div className="total-card-body">
+        <div className="hero-label">Visninger</div>
+        <div className="hero-num">{formatNumber(p.views)}</div>
+        <div className="total-card-spark">
+          <Trendlinje points={p.cumulative} height={64} fill ariaLabel={`Visninger for ${p.name} samlet per uke siden ${sinceLabel(p.since)}`} />
+          <div className="hero-spark-cap">Per uke siden start</div>
         </div>
       </div>
-      <footer className="hero-foot">
-        <span>
-          Likes <b>{formatNumber(p.likes)}</b>
-        </span>
-        <span>
-          Kommentarer <b>{formatNumber(p.comments)}</b>
-        </span>
-        <span>
-          Delinger <b>{formatNumber(p.shares)}</b>
-          {missingShares > 0 && <span className="total-note"> ({p.postsWithShares} av {p.posts} innlegg)</span>}
-        </span>
-        <span>
-          Innlegg <b>{formatNumber(p.posts)}</b>
-        </span>
-      </footer>
+      <dl className="total-stats">
+        {stats.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{formatNumber(value)}</dd>
+          </div>
+        ))}
+      </dl>
     </article>
   );
 }
@@ -49,17 +52,16 @@ export function Total({ total }: { total: TotalModel }) {
     <>
       <section className="total-hero" aria-labelledby="total-tittel">
         <h2 id="total-tittel" className="total-title">
-          Totalt siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
+          Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
         </h2>
         <div className="total-num">{formatNumber(total.views)}</div>
-        <p className="total-sub">visninger</p>
         <p className="total-sub">Instagram og YouTube. TikTok kommer når API-tilgangen er godkjent.</p>
       </section>
       <div className="heroes total-cards">
         {total.platforms.map((p) => (
           <Plattform key={p.platform} p={p} />
         ))}
-        <article className="hero tiktok-coming">
+        <article className="hero total-card tiktok-coming">
           <header className="hero-head">
             <h2>TikTok</h2>
           </header>

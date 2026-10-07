@@ -469,6 +469,7 @@ a {
 
 .total-hero {
   margin-top: 22px;
+  text-align: center;
 }
 
 .total-title {
@@ -495,9 +496,59 @@ a {
   font-size: 14px;
 }
 
-.total-note {
+/* Plattformkortene i Total: like høye (rader av lik høyde, også når de står under hverandre),
+   visningstallet på samme høyde og statistikken i fire like felt. */
+.total-cards {
+  grid-auto-rows: 1fr;
+}
+
+.total-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.total-card-body {
+  margin-top: 10px;
+}
+
+.total-card-spark {
+  margin-top: 10px;
+  color: var(--accent);
+}
+
+.total-card .hero-spark-cap {
+  white-space: nowrap;
+}
+
+.total-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--band-border);
+}
+
+.total-card .total-stats {
+  margin-top: 16px;
+}
+
+.total-stats div {
+  min-width: 0;
+}
+
+.total-stats dt {
   color: var(--band-ink-2);
-  font-weight: 400;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.total-stats dd {
+  margin: 2px 0 0;
+  color: var(--band-ink);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .hero.tiktok-coming {
@@ -1171,6 +1222,12 @@ a.fresh-title:hover {
 
   .total-num {
     font-size: 46px;
+  }
+
+  /* Smal skjerm: fortsatt fire like felt i samme rekkefølge, som 2 × 2. */
+  .total-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 10px;
   }
 
   .eng-row {
