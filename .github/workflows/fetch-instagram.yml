@@ -1,8 +1,8 @@
-name: Daglig henting (Instagram og YouTube)
+name: Daglig henting (Instagram, YouTube og TikTok)
 
-# Kjører fetch_instagram.py, fetch_youtube.py og fetch_daily.py kl. 07 og kl. 20 norsk tid hver dag,
-# og kan startes manuelt (Actions -> Daglig henting (Instagram og YouTube) -> Run workflow).
-# Instagram, YouTube og daglig aktivitet er egne jobber: feiler én, kjører de andre likevel.
+# Kjører fetch_instagram.py, fetch_youtube.py, fetch_tiktok.py og fetch_daily.py kl. 07 og kl. 20 norsk tid hver dag,
+# og kan startes manuelt (Actions -> Daglig henting (Instagram, YouTube og TikTok) -> Run workflow).
+# Instagram, YouTube, TikTok og daglig aktivitet er egne jobber: feiler én, kjører de andre likevel.
 # Kveldskjøringen gir målinger nærmere 24 og 48 timer etter publisering for
 # innlegg som publiseres på kvelden.
 #
@@ -137,3 +137,42 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           PYTHONIOENCODING: utf-8
         run: python fetch_daily.py --only youtube
+
+  # TikTok: innlegg og daglig aktivitet i samme jobb, etter hverandre. Begge steg fornyer tilgangen med
+  # refresh-tokenet; i samme jobb kan de ikke gjøre det samtidig (TikTok kan gi et nytt refresh-token).
+  tiktok:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Installer avhengigheter
+        run: pip install -r requirements.txt
+
+      - name: Hent fra TikTok og lagre i Supabase
+        env:
+          TIKTOK_CLIENT_ID: ${{ secrets.TIKTOK_CLIENT_ID }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_TOKEN_PRIVATE_KEY: ${{ secrets.TIKTOK_TOKEN_PRIVATE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python fetch_tiktok.py
+
+      - name: Daglig aktivitet fra TikTok
+        if: ${{ !cancelled() }}
+        env:
+          TIKTOK_CLIENT_ID: ${{ secrets.TIKTOK_CLIENT_ID }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_TOKEN_PRIVATE_KEY: ${{ secrets.TIKTOK_TOKEN_PRIVATE_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python fetch_daily.py --only tiktok

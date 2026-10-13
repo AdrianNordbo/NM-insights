@@ -117,7 +117,9 @@ def classify(post, platform="instagram"):
     """Returnerer (konsept, begrunnelse) for ett innlegg.
 
     På YouTube (platform="youtube") er alt video: regler som bare gjelder feed
-    (CTF) hoppes over, og regler som på Instagram bare gjelder Reels, gjelder alle."""
+    (CTF) hoppes over, og regler som på Instagram bare gjelder Reels, gjelder alle.
+    På TikTok setter fetch_tiktok.py media_product_type til REELS for VIDEO og FEED for PHOTO,
+    så reglene gjelder som på Instagram."""
     if post["timestamp_oslo"][:10] < CONCEPTS_START:
         return FOR_KONSEPTER, f"publisert før {CONCEPTS_START}"
 
@@ -161,15 +163,22 @@ def load_overrides(path=OVERRIDES_FILE):
     return overrides
 
 
+def override_key(post_id, platform):
+    """Nøkkelen i concept_overrides.csv. TikTok-ID-er skrives med prefiks («tiktok:<item_id>») så de
+    ikke kan forveksles med Instagram-ID-er; Instagram og YouTube bruker ID-en alene som før."""
+    return f"tiktok:{post_id}" if platform == "tiktok" else post_id
+
+
 def apply_concepts(posts, overrides=None, platform="instagram"):
     """Setter concept, concept_source, concept_reason og is_vm på hvert innlegg.
-    concept_overrides.csv gjelder alle plattformer (ID-ene overlapper ikke)."""
+    concept_overrides.csv gjelder alle plattformer (TikTok med prefikset «tiktok:»)."""
     if overrides is None:
         overrides = load_overrides()
     for post in posts:
         post["is_vm"] = is_vm(post)
-        if post["id"] in overrides:
-            post["concept"] = overrides[post["id"]]
+        key = override_key(post["id"], platform)
+        if key in overrides:
+            post["concept"] = overrides[key]
             post["concept_source"] = "manuell"
             post["concept_reason"] = str(OVERRIDES_FILE)
         else:

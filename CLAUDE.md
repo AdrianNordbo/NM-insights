@@ -22,16 +22,18 @@ og en plassholder for TikTok («kommer»).
 |---|---|
 | fetch_instagram.py | Henter fra Meta Graph API, merker konsept, skriver til Supabase + lokal backup data/posts.json/.csv |
 | fetch_youtube.py | Henter fra YouTube Data API + Analytics API, merker konsept, skriver til Supabase + data/youtube_videos.json. `--backfill` = full daglig historikk |
-| fetch_daily.py | Daglig aktivitet per konto og format → account_daily (Instagram + YouTube). Siste 7 døgn hver kjøring; `--backfill` = Instagram 730 døgn, YouTube fra 04.06.2026; `--only instagram\|youtube`; `--dry-run` uten Supabase |
+| fetch_tiktok.py | Henter alle TikTok-innlegg (levetidstall) → tiktok_videos, tiktok_video_insights, account_insights. Samme oppdateringsstrategi som Instagram/YouTube; `--backfill` = måling for alle innlegg; `--dry-run` henter og viser feltene uten å lagre (data/tiktok_videos.json) |
+| tiktok_api.py | Felles TikTok-klient: fornyer tilgangen fra det krypterte refresh-tokenet, lagrer nytt refresh-token kryptert hvis TikTok sender et (også ved dry-run), retry, feltrapport, assert_clean |
+| fetch_daily.py | Daglig aktivitet per konto og format → account_daily (Instagram, YouTube, TikTok). Siste 7 døgn hver kjøring; `--backfill` = Instagram 730 døgn, YouTube fra 04.06.2026, TikTok 60 døgn; `--only instagram\|youtube\|tiktok`; `--dry-run` uten å skrive data |
 | youtube_auth.py | Engangs OAuth-innlogging (kanaleier), lagrer secrets/youtube_token.json og skriver YOUTUBE_* til .env |
 | tiktok_keys.py | Lager nøkkelparet for TikTok-tokenet og skriver TIKTOK_TOKEN_PRIVATE_KEY/PUBLIC_KEY rett til .env (skriver aldri ut verdiene; stopper hvis de finnes) |
 | tiktok_link.py | Engangslenke for TikTok-kobling: portallenken (TIKTOK_AUTH_URL) + tilfeldig state + disable_auto_auth=1. Lagrer bare hashen i tiktok_oauth_states (30 min, én gang) |
 | tiktok_crypto.py | Kryptering av refresh-tokenet (X25519 + HKDF-SHA256 + AES-256-GCM, format «v1.…»). Samme format som web/lib/tiktok/crypto.ts |
 | retry.py | Felles retry (2, 5 og 10 s ved forbigående feil) og `Failures` (enkeltkall hoppes over og logges; rød kjøring bare ved > 3 feilede kall eller ingenting lagret). Brukes av fetch_instagram/youtube/daily |
-| tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken). Uten nettverk |
+| tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken; test_tiktok_fetch.py: TikTok-henting, null for Business-felt, døgn som ikke er klare). Uten nettverk |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
 | concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube). `python concepts.py` merker data/posts.json på nytt lokalt |
-| concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Gjelder begge plattformer (ID-ene overlapper ikke) |
+| concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Instagram og YouTube med ID alene; TikTok som `tiktok:<item_id>` |
 | analyze.py | Oppsummering av Adrians periode → data/analysis.md. `load_posts()` leser posts_latest og brukes av report.py |
 | report.py | Uke- og månedsrapport som én selvstendig HTML-fil med inline SVG-grafer |
 | time_tests.csv | Register for tidspunkt-tester (`navn;konsept;format;fra;til;tidsrom`, f.eks. `19-21`), tomt foreløpig |
@@ -47,7 +49,10 @@ Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i termin
 ```
 .venv/Scripts/python fetch_instagram.py
 .venv/Scripts/python fetch_youtube.py [--backfill]
-.venv/Scripts/python -m unittest -v                              # Python-tester (retry)
+.venv/Scripts/python fetch_tiktok.py [--backfill] [--dry-run]
+.venv/Scripts/python fetch_daily.py --only tiktok [--backfill] [--dry-run]
+.venv/Scripts/python tiktok_link.py --account-id 3                # ny TikTok-kobling (engangslenke)
+.venv/Scripts/python -m unittest -v                              # Python-tester
 .venv/Scripts/python analyze.py
 .venv/Scripts/python report.py --periode måned [--måned 2026-09]   # standard: forrige måned
 .venv/Scripts/python report.py --periode uke [--uke 2026-W39]      # standard: forrige uke, på søndager inneværende
@@ -195,11 +200,13 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
 - Privat repo AdrianNordbo/NM-insights, branch main. `gh` er ikke installert: Actions-logger kan ikke leses herfra.
 - Workflow: cron 05, 06, 18, 19 UTC. Jobben `gate` regner ut Oslo-timen for utløseren og slipper bare
   gjennom 07 og 20 (håndterer sommer-/vintertid). workflow_dispatch kjører alltid. Jobbene `instagram`,
-  `youtube` og `daily` (fetch_daily.py, Instagram og YouTube som egne steg) avhenger bare av gate, så en
-  feil i én stopper ikke de andre.
+  `youtube`, `daily` (fetch_daily.py, Instagram og YouTube som egne steg) og `tiktok` (fetch_tiktok.py og
+  fetch_daily.py --only tiktok etter hverandre i samme jobb, så tilgangen aldri fornyes to steder samtidig)
+  avhenger bare av gate, så en feil i én stopper ikke de andre.
 - Instagram-kjøringene er verifisert (29.09 kl. 20:13 og 30.09 kl. 07:14), og YouTube-kjøringen fungerer i Actions.
 - Secrets: META_ACCESS_TOKEN, IG_USER_ID, SUPABASE_URL, SUPABASE_SECRET_KEY, YOUTUBE_CLIENT_ID,
-  YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN.
+  YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN, TIKTOK_CLIENT_ID, TIKTOK_CLIENT_SECRET,
+  TIKTOK_TOKEN_PRIVATE_KEY (TikTok lagt inn 13.10.2026).
 - data/posts.json og data/youtube_videos.json finnes ikke i Actions; der er Supabase eneste lager.
 
 ### Innlogging i dashboardet (web/)
@@ -240,36 +247,63 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   `web/scripts/check-no-secrets.mjs` stopper bygget hvis nøkkelen med full tilgang eller den private
   TikTok-nøkkelen finnes i web/.
 
-### TikTok (Accounts API v1.3, under arbeid på branchen `tiktok`)
+### TikTok (Accounts API v1.3)
 - App «NM Insights» i TikTok API for Business er godkjent med user.info.basic, user.info.username,
   user.info.stats, user.info.profile, user.account.type, user.insights, video.list og video.insights.
   Nye scopes krever «scope increase» og Accounts API Access Application Form.
-- Veksthusets TikTok er ikke Business/Advanced Access. Daglige nye/tapte følgere, unike visninger og
-  engasjert publikum (og profile_views per innlegg) kommer ikke; de lagres som null, ikke som feil.
-- `/business/get/`: sanntid username, followers_count, videos_count …; per UTC-døgn video_views, likes,
-  comments, shares, profile_views, followers_count. Maks 60 dager bakover, 24–48 t forsinkelse. video_views
-  inkluderer betalt visning. likes trekker ikke fra fjernede likes.
-- `/business/video/list/`: levetidstall per innlegg (ingen daglig historikk), 24–48 t forsinkelse, maks 20
-  per side, oppdateres ikke etter 365 dager. reach/seertid kan mangle når innlegget har vært uten aktivitet
-  i 7 dager. shares inkluderer «Send til venner». media_type VIDEO/PHOTO, is_ad.
-- Kobling (steg A):
-  - Redirect: `https://insights.nordbomarketing.no/tiktok/callback/` (må slutte på `/`; Next fjerner
-    skråstreken og beholder parameterne). Legges inn i portalen først når Adrian får beskjed.
-  - Flyt: `tiktok_link.py` → Adrian åpner lenken innlogget i dashboardet og godkjenner i TikTok →
-    `/tiktok/callback` (GET viser knapp) → server action (POST): `tilkobling.claim_tiktok_state` →
-    bytter koden hos TikTok (client secret, bare på serveren) → henter brukernavn/kontotype →
-    krypterer refresh-tokenet med den offentlige nøkkelen → `tilkobling.store_tiktok_token`.
+- Veksthuset: @veksthuset, accounts id 3, koblet 13.10.2026 (tilgangen utløper 13.10.2027, se under).
+  Ikke Business-konto; `has_advanced_access` mangler i svaret (ikke false).
+- `/business/get/`: sanntid username, followers_count, following_count, videos_count, total_likes;
+  per **UTC-døgn** video_views, likes, comments, shares, profile_views, followers_count. Maks 60 dager
+  bakover, 24–48 t forsinkelse. video_views inkluderer betalt visning. likes trekker ikke fra fjernede likes.
+- `/business/video/list/`: levetidstall per innlegg (ingen daglig historikk), maks 20 per side, oppdateres
+  ikke etter 365 dager. reach/seertid kan mangle når innlegget har vært uten aktivitet i 7 dager. shares
+  inkluderer «Send til venner». media_type VIDEO/PHOTO, is_ad. Veksthuset: bare VIDEO, ingen is_ad.
+- Kobling (steg A, i produksjon 13.10.2026):
+  - Redirect `https://insights.nordbomarketing.no/tiktok/callback/` (må slutte på `/`; Next fjerner
+    skråstreken og beholder parameterne). Aktiv i portalen.
+  - Flyt: `tiktok_link.py` → Adrian åpner lenken innlogget i dashboardet (ellers går koden tapt) og
+    godkjenner i TikTok → `/tiktok/callback` (GET viser knapp) → server action (POST):
+    `tilkobling.claim_tiktok_state` → bytter koden hos TikTok (client secret, bare på serveren) → henter
+    brukernavn/kontotype → krypterer refresh-tokenet med den offentlige nøkkelen →
+    `tilkobling.store_tiktok_token`.
   - Access-tokenet (1 døgn) lagres aldri. Refresh-tokenet (1 år) lagres kryptert i `tiktok_tokens`
     (bare service_role). Web har bare den offentlige nøkkelen; den private (TIKTOK_TOKEN_PRIVATE_KEY)
-    ligger bare i .env og GitHub Secrets. Etter ett år må kontoen kobles på nytt.
-  - Kontoraden (accounts id 3) har `platform_account_id = 'pending:veksthuset'` til første kobling; da
-    settes den til open_id. En koblet konto kan ikke byttes til en annen open_id.
+    ligger bare i .env og GitHub Secrets. tiktok_api.py varsler 30 dager før utløp; da kobles kontoen på
+    nytt med tiktok_link.py. TikTok har ikke sendt nytt refresh-token ved fornyelse så langt.
+  - Kontoraden hadde `platform_account_id = 'pending:veksthuset'` til første kobling; nå open_id. En koblet
+    konto kan ikke byttes til en annen open_id.
+- Henting (steg B, 13.10.2026): fetch_tiktok.py og fetch_daily.py --only tiktok, se Filer. Backfill kjørt
+  13.10.2026: 92 innlegg (15.06–13.10), account_daily 59 døgn (14.08–11.10, format ALL, saves null),
+  account_insights med følgertotal per døgn (148 → 253). Ved backfill: 530 942 visninger totalt fra 15.06.
+- Felt som krever Business/Advanced Access (daglige nye/tapte følgere, unike visninger, engasjert publikum,
+  profile_views per innlegg) bes ikke om og lagres som null. NB: en lesetest 13.10.2026 viste at TikTok
+  likevel gir tall for daily_new_followers, unique_video_views og engaged_audience for denne kontoen. Adrian
+  har valgt null inntil videre.
+- Funn fra dry-run og kontroll (13.10.2026):
+  - Døgnene er UTC, ikke Stillehavstid som Meta/YouTube. Studio-eksporten bruker samme døgn som API-et.
+  - `end_date` må være før dagens dato (ellers feil 40002); koden bruker i går.
+  - Døgn som ikke er ferdig behandlet kommer som nuller i alle felt, også followers_count = 0. Slike døgn
+    lagres ikke (tt_day_ready i fetch_daily.py) og hentes på nytt neste kjøring (siste 7 døgn).
+  - Ferske innlegg: reach = 0 med visninger > 0 betyr «ikke behandlet» og lagres som null; et innlegg
+    publisert like før hentingen har 0 i alt. tiktok_videos_latest viser dype mål (reach, seertid, nye
+    følgere) bare fra målinger der reach finnes. Dashboardet skal vise slike innlegg som «venter på TikTok»,
+    ikke som 0 (steg C).
+  - TikTok svarer ofte HTTP 200 med en feilkode. 40100 og alle 5xxxx (f.eks. 51010 «Internal Time out»)
+    prøves på nytt.
+  - Kontroll mot TikTok Studio (Overview-eksport 01.10.2025–30.09.2026 og innholdseksport 13.10.2026):
+    daglige tall 14.08–30.09 (48 døgn) helt like i visninger, likes, kommentarer, delinger og
+    profilvisninger (134 086 visninger). Per innlegg (15 innlegg): visninger −1, kommentarer +1, resten likt
+    (tidsforskjell mellom eksport og henting). Studios CSV har anførselstegn i captions som ikke er escapet;
+    les radene ut fra lenkene.
 - Tabeller (2026-10-13_tiktok.sql, kjørt 13.10.2026): tiktok_oauth_states, tiktok_tokens, tiktok_videos,
   tiktok_video_insights, view tiktok_videos_latest (security_invoker = false). Schema `tilkobling` er lagt
-  til under Exposed schemas. Dashboard-viewene har ikke TikTok ennå (steg C).
-- .env: TIKTOK_AUTH_URL (autoriseringslenken fra portalen), TIKTOK_REDIRECT_URI, TIKTOK_TOKEN_PRIVATE_KEY,
-  TIKTOK_TOKEN_PUBLIC_KEY, og senere TIKTOK_CLIENT_ID/TIKTOK_CLIENT_SECRET for hentingen.
-- Steg B (henting) og C (dashboard, Total, rapport) gjenstår. Døgnene er UTC, ikke Stillehavstid.
+  til under Exposed schemas. Dashboard-viewene har ikke TikTok ennå; rader i account_daily og
+  account_insights for TikTok ignoreres av dashboardet til steg C (buildSeries har en fast liste, og
+  platform_summary bygger på content_latest).
+- .env: TIKTOK_AUTH_URL (autoriseringslenken fra portalen), TIKTOK_CLIENT_ID, TIKTOK_CLIENT_SECRET,
+  TIKTOK_TOKEN_PRIVATE_KEY, TIKTOK_TOKEN_PUBLIC_KEY (TIKTOK_REDIRECT_URI valgfri, standard er callbacken).
+- Steg C (dashboard, Total, rapport) gjenstår.
 - Demoen (demo_report.py, record_demo.py) ble laget for søknaden og viser bare støttede felt.
 
 ## Rapporter
@@ -420,7 +454,11 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
   gjelder alle videoer. Testet mot de 83 videoene 30.09.2026: ingen avvik fra bekreftede Instagram-konsepter.
 - De 15 innleggene fra det svake signalet og de to ukjente (28.06 og 29.06) er bekreftet av Adrian og låst
   i concept_overrides.csv (17 rader, alle Folka Først).
-- Endringer i merkingen når Supabase ved neste kjøring av fetch_instagram.py / fetch_youtube.py.
+- TikTok (`platform="tiktok"`, på caption): VIDEO følger Reels-reglene og PHOTO feed-reglene (CTF).
+  Rettelser skrives som `tiktok:<item_id>` i concept_overrides.csv. De tre «Ukjent» ved backfill (28.06,
+  29.06, 08.07) er bekreftet som Folka Først av Adrian (13.10.2026).
+- Endringer i merkingen når Supabase ved neste kjøring av fetch_instagram.py / fetch_youtube.py /
+  fetch_tiktok.py.
 
 ## Arbeidsflyt
 - Ukentlig gjennomgang hver søndag (ukesrapport): justeringer av tidspunkt, rekkefølge og tester.
@@ -441,7 +479,9 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
   'morgen' selv om de ble hentet midt på dagen.
 - account_insights 30.08–28.09.2026 har bare new_followers (fra Metas historikk); followers_count lagres fra
   29.09.2026. August har følgerdata for bare 2 av 31 dager.
-- Metas døgn for følgere og unik rekkevidde følger Stillehavstid, ikke Oslo-tid.
+- Metas døgn for følgere og unik rekkevidde følger Stillehavstid, ikke Oslo-tid. TikToks døgn er UTC.
+- TikTok: account_daily og følgertotal per døgn finnes bare fra 14.08.2026 (60 døgn før første henting);
+  eldre kontotall er borte. Innleggstallene (levetid) er komplette.
 - Meta rapporterer media_count 237, men media-listen gir 241 innlegg (ikke undersøkt).
 - Unik rekkevidde per måned lagres ikke, og er bare tilgjengelig 2 år bakover.
 - YouTube: to videoer (02.07, begge «Kom han seg opp til slutt?», 211 s) er VIDEO, ikke Shorts. De to nyeste
@@ -452,8 +492,8 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 - Rapportene er på norsk; bare videoens tekster er på engelsk.
 
 ## Neste steg
-1. TikTok: steg A (kobling) er bygget på branchen `tiktok`; deretter B (fetch_tiktok.py, account_daily) og
-   C (dashboard, Total, rapport). Se «TikTok» under Integrasjoner
+1. TikTok steg C: TikTok inn i content_latest og daily_activity (day_tz), dashboard (kort, Total,
+   anbefalinger, «venter på TikTok» for ferske innlegg) og TikTok-seksjonen i report.py. A og B er i drift.
 2. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
 3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
