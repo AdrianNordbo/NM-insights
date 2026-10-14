@@ -3,7 +3,7 @@
 
 import type { ConceptSummaryRow, ContentLatestRow, Format, Platform } from "../data/types";
 import { formatDayMonth } from "../format";
-import { FORMAT_NAME, FORMAT_ORDER, PLATFORM_NAME } from "../navn";
+import { byPlatformFormat, FORMAT_NAME, PLATFORM_NAME } from "../navn";
 import { formatVisible } from "./adresse";
 
 export const RECENT_MIN_DAYS = 7;
@@ -43,7 +43,7 @@ export function buildRecent(content: ContentLatestRow[], concepts: ConceptSummar
   const combos = [...new Map(content.map((p) => [`${p.platform}|${p.format}`, p])).values()]
     .map((p) => ({ platform: p.platform, format: p.format }))
     .filter((c) => formatVisible(c.format, feed))
-    .sort((a, b) => a.platform.localeCompare(b.platform) || FORMAT_ORDER.indexOf(a.format) - FORMAT_ORDER.indexOf(b.format));
+    .sort(byPlatformFormat);
 
   return combos.map(({ platform, format }) => {
     const name = `${PLATFORM_NAME[platform]} · ${FORMAT_NAME[format]}`;

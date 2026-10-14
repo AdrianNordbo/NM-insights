@@ -55,6 +55,11 @@ export function pacificToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
 }
 
+/** Dagens dato i UTC, «YYYY-MM-DD». TikToks døgn følger denne. */
+export function utcToday(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
 function toUtc(date: string): Date {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d));

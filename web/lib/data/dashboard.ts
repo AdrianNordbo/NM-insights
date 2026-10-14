@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { onlyKnown, onlyKnownPlatforms } from "./kjente";
 import type {
   ConceptSummaryRow,
   ContentLatestRow,
@@ -41,18 +42,23 @@ async function selectAll<T>(view: DashboardView, columns: string, order: string)
   }
 }
 
-export function getContentLatest(): Promise<Result<ContentLatestRow[]>> {
-  return selectAll<ContentLatestRow>("content_latest", "*", "platform,content_id");
+/** Beholder bare rader dashboardet kjenner (se kjente.ts). */
+function keep<T>(result: Result<T[]>, filter: (rows: T[]) => T[]): Result<T[]> {
+  return result.ok ? { ok: true, data: filter(result.data) } : result;
 }
 
-export function getConceptSummary(): Promise<Result<ConceptSummaryRow[]>> {
-  return selectAll<ConceptSummaryRow>("concept_summary", "*", "platform,account_id,format,concept,special_event");
+export async function getContentLatest(): Promise<Result<ContentLatestRow[]>> {
+  return keep(await selectAll<ContentLatestRow>("content_latest", "*", "platform,content_id"), onlyKnown);
 }
 
-export function getPlatformSummary(): Promise<Result<PlatformSummaryRow[]>> {
-  return selectAll<PlatformSummaryRow>("platform_summary", "*", "account_id,format,period_type,period_start");
+export async function getConceptSummary(): Promise<Result<ConceptSummaryRow[]>> {
+  return keep(await selectAll<ConceptSummaryRow>("concept_summary", "*", "platform,account_id,format,concept,special_event"), onlyKnown);
 }
 
-export function getDailyActivity(): Promise<Result<DailyActivityRow[]>> {
-  return selectAll<DailyActivityRow>("daily_activity", "*", "account_id,activity_date,format");
+export async function getPlatformSummary(): Promise<Result<PlatformSummaryRow[]>> {
+  return keep(await selectAll<PlatformSummaryRow>("platform_summary", "*", "account_id,format,period_type,period_start"), onlyKnown);
+}
+
+export async function getDailyActivity(): Promise<Result<DailyActivityRow[]>> {
+  return keep(await selectAll<DailyActivityRow>("daily_activity", "*", "account_id,activity_date,format"), onlyKnownPlatforms);
 }

@@ -1,7 +1,7 @@
 // Setter sammen alt toppfeltet og «Engasjement i perioden» trenger, fra viewene og adressen.
 
-import type { ContentLatestRow, DailyActivityRow, PlatformSummaryRow } from "../data/types";
-import { buildSeries, toPlain } from "./aktivitet";
+import type { ContentLatestRow, DailyActivityRow, Platform, PlatformSummaryRow } from "../data/types";
+import { buildSeries, PACIFIC_TZ, type Series, toPlain } from "./aktivitet";
 import { type FreshGroup, freshGroups } from "./ferske";
 import { navigation, type Navigation, type OversiktState, readState, type SearchParams, visibleSeries } from "./adresse";
 import { type EngagementRow, engagementRow, type HeroCard, heroCard, seriesId, seriesName } from "./kort";
@@ -10,7 +10,15 @@ import { periodLabel, trendLabel } from "./periode";
 import { summarySentence } from "./sammendrag";
 import { buildTotal, takeoverDates, type TotalModel } from "./total";
 
-export type Summary = { id: string; platform: "instagram" | "youtube"; name: string; text: string };
+export type Summary = { id: string; platform: Platform; name: string; text: string };
+
+/**
+ * Siste ferdige døgn per tidssone («i går» i plattformens døgn): { "America/Los_Angeles": …, UTC: … }.
+ * En streng gjelder alle (Stillehavstid), som før TikTok.
+ */
+export type ExpectedThrough = string | Record<string, string>;
+
+export const expectedFor = (e: ExpectedThrough, s: Series) => (typeof e === "string" ? e : (e[s.dayTz] ?? e[PACIFIC_TZ]));
 
 export type OversiktTopp = {
   state: OversiktState;
@@ -33,8 +41,8 @@ export function buildTopp(
   params: SearchParams,
   /** Dagens dato i Oslo: bestemmer inneværende periode. */
   today: string,
-  /** Siste ferdige døgn hos plattformene (Stillehavstid, i går): plattformer bak dette merkes. */
-  expectedThrough: string,
+  /** Siste ferdige døgn hos plattformene (i går i plattformens døgn): plattformer bak dette merkes. */
+  expectedThrough: ExpectedThrough,
 ): OversiktTopp {
   const series = buildSeries(daily);
   const state = readState(params, today);
@@ -48,8 +56,10 @@ export function buildTopp(
       const text = summarySentence(s, state.period, content);
       return text ? [{ id: seriesId(s), platform: s.platform, name: seriesName(s), text }] : [];
     }),
-    heroes: shown.map((s) => heroCard(s, state.period, content, summary, today, expectedThrough)),
-    engagement: shown.map((s) => engagementRow(s, state.period, expectedThrough)).filter((r): r is EngagementRow => r !== null),
+    heroes: shown.map((s) => heroCard(s, state.period, content, summary, today, expectedFor(expectedThrough, s))),
+    engagement: shown
+      .map((s) => engagementRow(s, state.period, expectedFor(expectedThrough, s)))
+      .filter((r): r is EngagementRow => r !== null),
     fresh: freshGroups(content, state.feed),
     total: state.total ? buildTotal(content, takeoverDates(daily), today) : null,
     utvikling: {
@@ -58,7 +68,7 @@ export function buildTopp(
         .filter((x) => shown.some((s) => s.platform === x.platform && s.format === x.format))
         .map((x) => ({
           platform: x.platform,
-          format: x.format,
+          format: x.format as Series["format"], // filteret over sikrer at formatet har en serie
           day: x.published_at.slice(0, 10),
           title: x.title?.split("\n")[0].trim() || "(uten tittel)",
           views: x.views ?? 0,

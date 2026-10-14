@@ -3,7 +3,7 @@
 
 import type { ContentLatestRow, Format, Platform } from "../data/types";
 import { formatDayMonth } from "../format";
-import { FORMAT_NAME, FORMAT_ORDER, PLATFORM_NAME } from "../navn";
+import { FORMAT_NAME, FORMAT_ORDER, PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
 import { formatVisible } from "./adresse";
 
 export const FRESH_MAX_DAYS = 7;
@@ -17,6 +17,8 @@ export type FreshPost = {
   /** «i dag», «1 dag gammel», «6 dager gammel» */
   age: string;
   views: number | null;
+  /** TikTok har ikke behandlet tallene ennå: vises som «venter på TikTok», ikke som tall. */
+  pending: boolean;
   concept: string | null;
   specialEvent: string | null;
 };
@@ -31,7 +33,7 @@ export function ageText(ageDays: number): string {
 export function freshGroups(content: ContentLatestRow[], feed: boolean): FreshGroup[] {
   const fresh = content.filter((x) => x.age_days < FRESH_MAX_DAYS && formatVisible(x.format, feed));
   const groups: FreshGroup[] = [];
-  for (const platform of ["instagram", "youtube"] as Platform[]) {
+  for (const platform of PLATFORM_ORDER as Platform[]) {
     for (const format of FORMAT_ORDER) {
       const own = fresh
         .filter((x) => x.platform === platform && x.format === format)
@@ -48,7 +50,8 @@ export function freshGroups(content: ContentLatestRow[], feed: boolean): FreshGr
           permalink: x.permalink,
           published: formatDayMonth(x.published_at),
           age: ageText(x.age_days),
-          views: x.views,
+          views: x.pending ? null : x.views,
+          pending: x.pending === true,
           concept: x.concept,
           specialEvent: x.special_event,
         })),

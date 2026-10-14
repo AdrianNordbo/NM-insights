@@ -4,7 +4,7 @@
 
 import type { ConceptSummaryRow, ContentLatestRow, Format, Platform } from "../data/types";
 import { formatDayMonth, formatNumber, formatPercent, formatRatio } from "../format";
-import { FORMAT_NAME, FORMAT_ORDER, PLATFORM_NAME } from "../navn";
+import { byPlatformFormat, FORMAT_NAME, PLATFORM_NAME } from "../navn";
 import { formatVisible } from "./adresse";
 import {
   A_MAX_AGE_DAYS,
@@ -183,7 +183,7 @@ export function buildRecommendations(
   const combos = [...new Map(concepts.map((c) => [`${c.platform}|${c.format}`, c])).values()]
     .map((c) => ({ platform: c.platform, format: c.format }))
     .filter((c) => formatVisible(c.format, feed))
-    .sort((a, b) => a.platform.localeCompare(b.platform) || FORMAT_ORDER.indexOf(a.format) - FORMAT_ORDER.indexOf(b.format));
+    .sort(byPlatformFormat);
 
   const blocks: RecommendationBlock[] = combos.map(({ platform, format }) => {
     const name = `${PLATFORM_NAME[platform]} ${FORMAT_NAME[format]}`;

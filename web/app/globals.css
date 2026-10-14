@@ -25,6 +25,7 @@
   --ig: #c2307a;
   --ig-2: #7d3cc4;
   --yt: #d1221a;
+  --tt: #0b7a82;
   /* Mørkeblått toppfelt (likt i begge temaene) */
   --band: #121a2b;
   --band-surface: #1b2438;
@@ -36,6 +37,7 @@
   --ig-on-dark: #f472b0;
   --ig-2-on-dark: #b18cf5;
   --yt-on-dark: #ff6b63;
+  --tt-on-dark: #4fd8e0;
   --overlap: 70px;
 }
 
@@ -64,6 +66,7 @@
   --ig: #f472b0;
   --ig-2: #b18cf5;
   --yt: #ff6b63;
+  --tt: #4fd8e0;
 }
 
 * {
@@ -362,6 +365,10 @@ a {
   color: var(--yt-on-dark);
 }
 
+.summary .who.tiktok {
+  color: var(--tt-on-dark);
+}
+
 .band-meta {
   margin: 20px 0 0;
   font-size: 13px;
@@ -440,6 +447,10 @@ a {
   --accent: var(--yt-on-dark);
 }
 
+.rec.tiktok {
+  --accent: var(--tt-on-dark);
+}
+
 .rec-plat {
   color: var(--accent);
   font-size: 13px;
@@ -491,6 +502,10 @@ a {
 
 .recs-light .rec.youtube {
   --accent: var(--yt);
+}
+
+.recs-light .rec.tiktok {
+  --accent: var(--tt);
 }
 
 .recs-light .info {
@@ -649,6 +664,14 @@ a {
 
 .hero.youtube::before {
   background: var(--yt-on-dark);
+}
+
+.hero.tiktok {
+  --accent: var(--tt-on-dark);
+}
+
+.hero.tiktok::before {
+  background: var(--tt-on-dark);
 }
 
 .hero-head {
@@ -846,6 +869,10 @@ a {
   --accent: var(--yt);
 }
 
+.tiktok {
+  --accent: var(--tt);
+}
+
 .eng-rows {
   display: grid;
   gap: 16px;
@@ -993,6 +1020,15 @@ a.fresh-title:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* TikTok har ikke behandlet tallene ennå: tekst i stedet for et tall som ville sett ut som 0 */
+.fresh-views.fresh-pending {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+  padding: 7px 0 6px;
+}
+
 /* --- Utvikling per dag ------------------------------------------------------- */
 
 .range-chip {
@@ -1047,6 +1083,10 @@ a.fresh-title:hover {
 
 .lseg button.youtube[aria-pressed="true"] {
   color: var(--yt);
+}
+
+.lseg button.tiktok[aria-pressed="true"] {
+  color: var(--tt);
 }
 
 .lseg button:focus-visible {

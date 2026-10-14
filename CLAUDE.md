@@ -7,9 +7,9 @@ og andre kunder. Adrian (Nordbø Marketing) eier prosjektet.
 ## Arkitektur
 Fase 1 (nå): ingen Claude API og ingen agenter.
 
-fetch_instagram.py + fetch_youtube.py (GitHub Actions kl. 07 og 20) → Supabase
-→ analyze.py / report.py (pandas, regelbasert). Rapportene har egne seksjoner for Instagram og YouTube (Shorts),
-og en plassholder for TikTok («kommer»).
+fetch_instagram.py + fetch_youtube.py + fetch_tiktok.py (GitHub Actions kl. 07 og 20) → Supabase
+→ dashboardet (web/) og analyze.py / report.py (pandas, regelbasert). Rapportene har egne seksjoner for
+Instagram og YouTube (Shorts), og en plassholder for TikTok («kommer»); dashboardet viser alle tre.
 
 - Rapportene lager tall, grafer og automatiske flagg, men ingen tolkning.
 - Den kvalitative delen (hooks, tema, vurdering, anbefalinger til produsenten) gjør Adrian manuelt med
@@ -32,7 +32,7 @@ og en plassholder for TikTok («kommer»).
 | retry.py | Felles retry (2, 5 og 10 s ved forbigående feil) og `Failures` (enkeltkall hoppes over og logges; rød kjøring bare ved > 3 feilede kall eller ingenting lagret). Brukes av fetch_instagram/youtube/daily |
 | tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken; test_tiktok_fetch.py: TikTok-henting, null for Business-felt, døgn som ikke er klare). Uten nettverk |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
-| concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube). `python concepts.py` merker data/posts.json på nytt lokalt |
+| concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube/tiktok). `python concepts.py` merker data/posts.json på nytt lokalt |
 | concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Instagram og YouTube med ID alene; TikTok som `tiktok:<item_id>` |
 | analyze.py | Oppsummering av Adrians periode → data/analysis.md. `load_posts()` leser posts_latest og brukes av report.py |
 | report.py | Uke- og månedsrapport som én selvstendig HTML-fil med inline SVG-grafer |
@@ -41,7 +41,7 @@ og en plassholder for TikTok («kommer»).
 | record_demo.py | Playwright-videoopptak av demoen → data/demo_tiktok.mp4 (ikke committet ennå) |
 | supabase/schema.sql | Fullt skjema, idempotent. supabase/migrations/ har endringer for eksisterende database |
 | supabase/checks/ | Kontrollspørringer for SQL Editor: dashboard_access.sql (rettigheter, blokk A–G) og dashboard_data.sql (tall i viewene) |
-| .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram og YouTube (egne jobber) |
+| .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram, YouTube og TikTok (egne jobber) |
 | web/ | Dashboardet (Next.js på Vercel), se «Dashboard (web/)» |
 | secrets/ | youtube_client_secret.json (OAuth-klient) og youtube_token.json. Gitignored, skal aldri committes |
 
@@ -158,7 +158,10 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     is_mature ≥ 7 dager), title, permalink, fetched_at og `shares` (2026-10-06_content_latest_shares.sql,
     bakerst): Instagram fra posts_latest, YouTube fra per-video-Analytics, null der tallet mangler.
     Instagram fra posts_latest (REELS/FEED); YouTube fra youtube_videos_latest med Data API-tall, bare SHORTS.
-    Ikke youtube_video_daily.
+    Ikke youtube_video_daily. TikTok (2026-10-14_tiktok_dashboard.sql) fra tiktok_videos_latest: format
+    VIDEO/PHOTO, views = video_views (levetid, kan inneholde betalt visning), title = første linje av captionen
+    uten hashtags bakerst. Ny kolonne bakerst: `pending` (true når TikTok ikke har behandlet tallene ennå:
+    yngre enn 7 dager og 0 visninger eller ingen måling med reach; false for Instagram og YouTube).
   - `dashboard.concept_summary`: median views/likes/comments per plattform + konto + format + konsept +
     special_event, bare modne innlegg, med posts og preliminary (< 6). VM får egne rader.
     `median_engagement_per_view` = median av (likes + comments) / views per innlegg
@@ -170,7 +173,8 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Per format fordi Reels og feed ikke skal blandes i en median.
   - `dashboard.daily_activity`: account_daily per plattform + konto + døgn + format (ALL, REELS, FEED,
     STORY, SHORTS, VIDEO; AD og OTHER holdes utenfor), med `data_through` (siste døgn med data for kontoen;
-    YouTube 2–3 døgn bak) og `takeover_date`.
+    YouTube 2–3 døgn bak, TikTok 1–2), `takeover_date` og `day_tz` bakerst ('America/Los_Angeles' for
+    Instagram og YouTube, 'UTC' for TikTok). TikTok har bare format ALL.
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -298,12 +302,15 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     les radene ut fra lenkene.
 - Tabeller (2026-10-13_tiktok.sql, kjørt 13.10.2026): tiktok_oauth_states, tiktok_tokens, tiktok_videos,
   tiktok_video_insights, view tiktok_videos_latest (security_invoker = false). Schema `tilkobling` er lagt
-  til under Exposed schemas. Dashboard-viewene har ikke TikTok ennå; rader i account_daily og
-  account_insights for TikTok ignoreres av dashboardet til steg C (buildSeries har en fast liste, og
-  platform_summary bygger på content_latest).
+  til under Exposed schemas.
+- Dashboard (steg C, 14.10.2026): migrering 2026-10-14_tiktok_dashboard.sql (TikTok i content_latest,
+  `pending`, `day_tz`). Koden ble pushet før migreringen og tåler begge rekkefølger: web/lib/data/kjente.ts
+  forkaster rader med plattform/format dashboardet ikke kjenner, og `pending`/`day_tz` er valgfrie.
+  Kontrollert lokalt med fixture: Instagram- og YouTube-tallene uendret i alle seksjoner; Total
+  1 128 355 (Instagram 503 225, YouTube 93 241, TikTok 531 889) per 14.10.2026.
 - .env: TIKTOK_AUTH_URL (autoriseringslenken fra portalen), TIKTOK_CLIENT_ID, TIKTOK_CLIENT_SECRET,
   TIKTOK_TOKEN_PRIVATE_KEY, TIKTOK_TOKEN_PUBLIC_KEY (TIKTOK_REDIRECT_URI valgfri, standard er callbacken).
-- Steg C (dashboard, Total, rapport) gjenstår.
+- Gjenstår: TikTok-seksjonen i report.py (rapportene har fortsatt «TikTok kommer»).
 - Demoen (demo_report.py, record_demo.py) ble laget for søknaden og viser bare støttede felt.
 
 ## Rapporter
@@ -362,7 +369,14 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   web/lib/oversikt/konsepter.ts), og aktive igjen ved neste innlegg. Ingen manuell statusliste.
 - Instagram Feed er av som standard i alle seksjoner og slås på med `?feed=1`.
 - Endring mot forrige periode vises i prosent bare når forrige verdi er minst 1 000; ellers pil + forrige verdi.
-- Annonsevisninger (AD) holdes utenfor, og døgnene er Stillehavsdøgn (sagt i info-ikonene).
+- Annonsevisninger (AD) holdes utenfor for Instagram, og døgnene er Stillehavsdøgn for Instagram og
+  YouTube og UTC-døgn for TikTok (sagt i info-ikonene). TikTok-visninger kan inneholde betalt visning.
+- Dashboardet viser bare plattformer og formater i KNOWN_FORMATS (web/lib/navn.ts); andre rader ignoreres.
+- TikTok: kortet bygger på hele kontoen (daily_activity format ALL) og heter bare «TikTok»; innleggene er
+  «TikTok · Video». Siste ferdige døgn regnes per series.dayTz (i går i UTC for TikTok). Ferske innlegg med
+  `pending` vises som «venter på TikTok», aldri som 0. Nye følgere vises som «ikke nok data» (null fordi
+  kontoen ikke er Business).
+- Fast rekkefølge overalt: Instagram, YouTube, TikTok (PLATFORM_ORDER), så Reels, Feed, Shorts, Video, Foto.
 - Etiketter ved topper i grafene er «Mulig årsak: …», aldri en fasit.
 
 ## Dashboard (web/)
@@ -394,13 +408,14 @@ Oversikt (`/`), i rekkefølge:
    summen av visninger per innlegg i content_latest publisert fra og med `takeover_date` (Oslo-dato), alle
    aldre, siste måling, uten annonsevisninger, uavhengig av special_event (VM skilles bare ut i konsepttabellen
    og anbefalingene). Instagram (Reels og
-   Feed, alltid med uansett Feed-bryteren) og YouTube (Shorts); TikTok som plassholder. Ett kort per plattform
+   Feed, alltid med uansett Feed-bryteren), YouTube (Shorts) og TikTok (levetidstall per innlegg); en
+   TikTok-plassholder vises bare hvis TikTok mangler i viewene. Ett kort per plattform
    med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
    noe mangler) og kumulativ kurve per publiseringsuke med dagens tall. Ingen piler, endringspiller,
    sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
    plattformene. Rekkefølge i Total: periodevelger → det store tallet (sentrert) → kortene → «Anbefalinger ·
-   gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 06.10.2026: 583 185 visninger (Instagram
-   491 542, YouTube 91 643).
+   gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 14.10.2026 (lokal kontroll): 1 128 355 visninger
+   (Instagram 503 225, YouTube 93 241, TikTok 531 889).
 2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
 3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
 4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,
@@ -413,7 +428,8 @@ Oversikt (`/`), i rekkefølge:
    spesielle hendelser sammenfoldet, «Før konsepter» bak bryter `?vis=alle`).
 
 Struktur: all logikk i rene funksjoner i web/lib/oversikt/ (periode, aktivitet, endring, kort, sammendrag,
-graf, ferske, sist, konsepter, adresse, side) med tester ved siden av; komponentene i web/components/ bare
+graf, ferske, sist, konsepter, adresse, side, total) med tester ved siden av (tiktok.test.ts for TikTok og
+for at siden tåler manglende/ukjente rader); komponentene i web/components/ bare
 viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
 Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
 testet med en midlertidig, ikke-committet side som viser samme komponent med tall fra viewene.
@@ -492,8 +508,8 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 - Rapportene er på norsk; bare videoens tekster er på engelsk.
 
 ## Neste steg
-1. TikTok steg C: TikTok inn i content_latest og daily_activity (day_tz), dashboard (kort, Total,
-   anbefalinger, «venter på TikTok» for ferske innlegg) og TikTok-seksjonen i report.py. A og B er i drift.
+1. TikTok: kjør 2026-10-14_tiktok_dashboard.sql (etter at koden er i produksjon) og kontroller tallene i
+   produksjon; deretter TikTok-seksjonen i report.py. A, B og dashboard-koden for C er i drift.
 2. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
 3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med

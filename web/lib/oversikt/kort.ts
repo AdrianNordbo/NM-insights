@@ -39,7 +39,9 @@ const METRIC_LABEL: Record<MetricKey, string> = {
 };
 
 export const seriesId = (s: Series) => `${s.platform}-${s.format}`;
-export const seriesName = (s: Series) => `${PLATFORM_NAME[s.platform]} · ${FORMAT_NAME[s.format]}`;
+/** TikTok-serien er hele kontoen (TikTok deler ikke opp kontotallene per format), så bare «TikTok». */
+export const seriesName = (s: Series) =>
+  s.platform === "tiktok" ? PLATFORM_NAME.tiktok : `${PLATFORM_NAME[s.platform]} · ${FORMAT_NAME[s.format]}`;
 
 /** «uke 38», eller «uke 38, 15.–17.09» når bare en del av forrige periode er med. */
 export function prevLabel(c: Comparison): string {

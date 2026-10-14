@@ -2,11 +2,18 @@ import { Trendlinje } from "@/components/grafer/Trendlinje";
 import { InfoIkon } from "@/components/InfoIkon";
 import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
+import { joinNo } from "@/lib/oversikt/sammendrag";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
 /** Info-teksten for kortet, med antall innlegg som har delingstall når noen mangler. */
+const INFO: Record<TotalPlatform["platform"], string> = {
+  instagram: KILDER.totalInstagram,
+  youtube: KILDER.totalYoutube,
+  tiktok: KILDER.totalTiktok,
+};
+
 function infoText(p: TotalPlatform): string {
-  const base = p.platform === "instagram" ? KILDER.totalInstagram : KILDER.totalYoutube;
+  const base = INFO[p.platform];
   const missing = p.posts - p.postsWithShares;
   return missing > 0 ? `${base} Delinger finnes for ${p.postsWithShares} av ${p.posts} innlegg.` : base;
 }
@@ -55,19 +62,21 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
           Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
         </h2>
         <div className="total-num">{formatNumber(total.views)}</div>
-        <p className="total-sub">Instagram og YouTube. TikTok kommer når API-tilgangen er godkjent.</p>
+        <p className="total-sub">{joinNo(total.platforms.map((p) => p.name))}. Plattformene sammenlignes ikke med hverandre.</p>
         {updated && <p className="total-updated">{updated}</p>}
       </section>
       <div className="heroes total-cards">
         {total.platforms.map((p) => (
           <Plattform key={p.platform} p={p} />
         ))}
-        <article className="hero total-card tiktok-coming">
-          <header className="hero-head">
-            <h2>TikTok</h2>
-          </header>
-          <p className="hero-empty">Kommer når API-tilgangen er godkjent.</p>
-        </article>
+        {!total.platforms.some((p) => p.platform === "tiktok") && (
+          <article className="hero total-card tiktok-coming">
+            <header className="hero-head">
+              <h2>TikTok</h2>
+            </header>
+            <p className="hero-empty">Kommer i dashboardet snart.</p>
+          </article>
+        )}
       </div>
     </>
   );

@@ -2,9 +2,11 @@
 // Visninger per innlegg (siste måling), alle aldre, uten annonsevisninger, uavhengig av special_event (VM o.l.
 // skilles bare ut i konsepttabellen og anbefalingene). Feed er alltid med, uansett
 // Feed-bryteren. Plattformene vises hver for seg og sammenlignes aldri (ingen andeler mellom dem).
+// TikTok: levetidstall per innlegg (video_views), som kan inneholde betalt visning; ferske innlegg som TikTok
+// ikke har behandlet ennå, er med med de tallene som finnes.
 
 import type { ContentLatestRow, Platform } from "../data/types";
-import { PLATFORM_NAME } from "../navn";
+import { PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
 import { currentPeriod, nextPeriod, type Period, periodLabel, periodOf } from "./periode";
 
 export type TotalPoint = { key: string; label: string; value: number };
@@ -32,8 +34,6 @@ export type TotalModel = {
   platforms: TotalPlatform[];
 };
 
-const PLATFORMS: Platform[] = ["instagram", "youtube"];
-
 /** Innlegget er publisert på eller etter startdatoen (Oslo-dato). */
 export const publishedSince = (row: ContentLatestRow, since: string) => row.published_at.slice(0, 10) >= since;
 
@@ -55,7 +55,7 @@ export function buildTotal(
   osloToday: string,
 ): TotalModel | null {
   const platforms: TotalPlatform[] = [];
-  for (const platform of PLATFORMS) {
+  for (const platform of PLATFORM_ORDER) {
     const since = takeover[platform];
     if (!since) continue;
     const rows = content.filter((r) => r.platform === platform && publishedSince(r, since)); // alle formater, også Feed

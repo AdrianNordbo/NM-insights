@@ -3,6 +3,8 @@
 import type { ContentLatestRow, DailyActivityRow, Platform } from "../data/types";
 import { addDays } from "../format";
 
+const ACCOUNT: Record<Platform, number> = { instagram: 1, youtube: 2, tiktok: 3 };
+
 /** Én rad per dag fra start til og med end, med samme verdier hver dag (kan overstyres). */
 export function days(
   platform: Platform,
@@ -17,7 +19,7 @@ export function days(
   for (let d = start; d <= end; d = addDays(d, 1)) {
     rows.push({
       platform,
-      account_id: platform === "instagram" ? 1 : 2,
+      account_id: ACCOUNT[platform],
       activity_date: d,
       format,
       views,
@@ -43,7 +45,7 @@ export function post(
 ): ContentLatestRow {
   return {
     platform,
-    account_id: platform === "instagram" ? 1 : 2,
+    account_id: ACCOUNT[platform],
     content_id: `${platform}-${publishedAt}-${views}`,
     published_at: publishedAt,
     format,

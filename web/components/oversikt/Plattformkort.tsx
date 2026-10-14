@@ -13,6 +13,7 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
         <h2>
           {card.name}
           {card.platform === "instagram" && <InfoIkon id={`kort-${card.id}`} text={KILDER.instagramKort} />}
+          {card.platform === "tiktok" && <InfoIkon id={`kort-${card.id}`} text={KILDER.tiktokKort} />}
         </h2>
         {card.partialNote && <span className="chip">{card.partialNote}</span>}
       </header>

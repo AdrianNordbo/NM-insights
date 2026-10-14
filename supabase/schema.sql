@@ -554,7 +554,8 @@ select
     left(nullif(btrim(split_part(coalesce(p.caption, ''), E'\n', 1)), ''), 200) as title,
     p.permalink,
     p.fetched_at,
-    p.shares::bigint                                             as shares          -- delinger (2026-10-06)
+    p.shares::bigint                                             as shares,
+    false                                                        as pending         -- ny
 from public.posts_latest p
 union all
 select
@@ -573,14 +574,38 @@ select
     y.title,
     y.permalink,
     y.fetched_at,
-    y.shares::bigint                                                                  -- per-video-Analytics, null der det mangler
+    y.shares::bigint,                                                                 -- per-video-Analytics, null der det mangler
+    false
 from public.youtube_videos_latest y
-where y.format = 'SHORTS';                                                            -- VIDEO holdes utenfor
+where y.format = 'SHORTS'                                                             -- VIDEO holdes utenfor
+union all
+select
+    'tiktok'::text,
+    t.account_id,
+    t.platform_video_id,
+    (t.published_at at time zone 'Europe/Oslo'),
+    t.media_type,                                                                     -- VIDEO / PHOTO
+    t.concept,
+    t.special_event,
+    t.views,                                                                          -- video_views, levetid
+    t.likes::bigint,
+    t.comments::bigint,
+    round((extract(epoch from (now() - t.published_at)) / 86400)::numeric, 1),
+    (t.published_at <= now() - interval '7 days'),
+    left(nullif(btrim(regexp_replace(split_part(coalesce(t.caption, ''), E'\n', 1),
+                                     '(\s*#\S+)+\s*$', '')), ''), 200),             -- uten hashtags bakerst
+    t.permalink,
+    t.fetched_at,
+    t.shares::bigint,
+    (t.published_at > now() - interval '7 days'
+     and (coalesce(t.views, 0) = 0 or t.deep_snapshot_date is null))                  -- ikke behandlet ennå
+from public.tiktok_videos_latest t;
 
 comment on view dashboard.content_latest is
-    'Én rad per innlegg/video (siste måling). YouTube: Data API-tall, bare SHORTS. published_at i Europe/Oslo. '
-    'title = første linje av captionen (Instagram) eller videotittelen (YouTube). fetched_at er timestamptz. '
-    'shares: Instagram fra posts_latest, YouTube fra per-video-Analytics; null der tallet mangler.';
+    'Én rad per innlegg/video (siste måling). YouTube: Data API-tall, bare SHORTS. TikTok: levetidstall '
+    '(video_views, kan inneholde betalt visning), format VIDEO/PHOTO. published_at i Europe/Oslo. '
+    'title = første linje av captionen (Instagram, TikTok) eller videotittelen (YouTube). fetched_at er '
+    'timestamptz. shares: null der tallet mangler. pending = TikTok har ikke behandlet tallene ennå.';
 
 -- ---------------------------------------------------------------------------
 -- 2. concept_summary: median per plattform + format + konsept, bare modne innlegg
@@ -702,14 +727,16 @@ select
     d.saves,
     d.interactions,
     max(d.activity_date) over (partition by d.account_id)   as data_through,
-    a.takeover_date
+    a.takeover_date,
+    case a.platform when 'tiktok' then 'UTC' else 'America/Los_Angeles' end as day_tz   -- ny
 from public.account_daily d
 join public.accounts a on a.id = d.account_id
 where d.format in ('ALL', 'REELS', 'FEED', 'STORY', 'SHORTS', 'VIDEO');
 
 comment on view dashboard.daily_activity is
-    'Aktivitet per konto per døgn (Stillehavstid) per format. data_through = siste døgn med data for kontoen. '
-    'takeover_date = når Nordbø Marketing tok over. Sammenlign aldri på tvers av plattformer eller formater.';
+    'Aktivitet per konto per døgn per format. day_tz = døgnets tidssone (Stillehavstid for Instagram og '
+    'YouTube, UTC for TikTok). data_through = siste døgn med data for kontoen. takeover_date = når Nordbø '
+    'Marketing tok over. Sammenlign aldri på tvers av plattformer eller formater.';
 
 -- ---------------------------------------------------------------------------
 -- Rettigheter

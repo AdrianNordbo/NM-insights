@@ -1,11 +1,12 @@
 // Daglig aktivitet (dashboard.daily_activity) summert per periode, med sammenligning mot forrige periode.
-// Én serie per plattform + format; plattformer og formater blandes aldri.
+// Én serie per plattform + format; plattformer og formater blandes aldri. TikTok deler ikke opp kontotallene
+// per format, så TikTok-serien bygger på hele kontoen (ALL) og vises sammen med TikTok-videoene.
 
 import type { DailyActivityRow, Platform } from "../data/types";
 import { addDays, daysInclusive } from "../format";
 import { type Period, periodLabel, periodsBack, prevPeriod } from "./periode";
 
-export type SeriesFormat = "REELS" | "FEED" | "SHORTS";
+export type SeriesFormat = "REELS" | "FEED" | "SHORTS" | "VIDEO";
 export type MetricKey = "views" | "likes" | "comments" | "shares" | "saves";
 export type Metrics = Record<MetricKey, number>;
 
@@ -20,23 +21,31 @@ export type Series = {
   firstActive: string;
   takeover: string | null;
   hasSaves: boolean;
+  /** Døgnenes tidssone: «America/Los_Angeles» (Meta, YouTube) eller «UTC» (TikTok). */
+  dayTz: string;
   byDay: Map<string, Metrics>;
 };
 
-const SERIES_KEYS: { platform: Platform; format: SeriesFormat }[] = [
-  { platform: "instagram", format: "REELS" },
-  { platform: "instagram", format: "FEED" },
-  { platform: "youtube", format: "SHORTS" },
+/** source = formatet i daily_activity serien bygger på (TikTok: hele kontoen). */
+const SERIES_KEYS: { platform: Platform; format: SeriesFormat; source: string }[] = [
+  { platform: "instagram", format: "REELS", source: "REELS" },
+  { platform: "instagram", format: "FEED", source: "FEED" },
+  { platform: "youtube", format: "SHORTS", source: "SHORTS" },
+  { platform: "tiktok", format: "VIDEO", source: "ALL" },
 ];
+
+export const PACIFIC_TZ = "America/Los_Angeles";
+/** Tidssonen når viewet ikke har day_tz ennå (før 2026-10-14_tiktok_dashboard.sql). */
+const DEFAULT_TZ: Record<Platform, string> = { instagram: PACIFIC_TZ, youtube: PACIFIC_TZ, tiktok: "UTC" };
 
 const EMPTY: Metrics = { views: 0, likes: 0, comments: 0, shares: 0, saves: 0 };
 
 /** Lager seriene fra radene. Serier uten rader i det hele tatt utelates. */
 export function buildSeries(rows: DailyActivityRow[]): Series[] {
   const out: Series[] = [];
-  for (const key of SERIES_KEYS) {
+  for (const { source, ...key } of SERIES_KEYS) {
     const account = rows.filter((r) => r.platform === key.platform);
-    const own = account.filter((r) => r.format === key.format);
+    const own = account.filter((r) => r.format === source);
     if (!own.length) continue;
     const byDay = new Map<string, Metrics>();
     for (const r of own) {
@@ -57,6 +66,7 @@ export function buildSeries(rows: DailyActivityRow[]): Series[] {
       firstActive: active[0] ?? own[0].data_through,
       takeover: account[0].takeover_date,
       hasSaves: key.platform === "instagram",
+      dayTz: account[0].day_tz ?? DEFAULT_TZ[key.platform],
       byDay,
     });
   }

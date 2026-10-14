@@ -6,14 +6,18 @@ import {
   getPlatformSummary,
 } from "@/lib/data/dashboard";
 import type { Result } from "@/lib/data/types";
-import { addDays, osloToday, pacificToday } from "@/lib/format";
+import { addDays, osloToday, pacificToday, utcToday } from "@/lib/format";
 import { buildTopp, type OversiktTopp } from "@/lib/oversikt/side";
 
 export default async function OversiktSide(props: PageProps<"/">) {
   const params = await props.searchParams;
   const now = new Date();
   const today = osloToday(now); // inneværende periode følger Oslo-kalenderen
-  const expectedThrough = addDays(pacificToday(now), -1); // siste ferdige døgn hos Meta og YouTube
+  // Siste ferdige døgn per plattformdøgn: Meta og YouTube i Stillehavstid, TikTok i UTC
+  const expectedThrough = {
+    "America/Los_Angeles": addDays(pacificToday(now), -1),
+    UTC: addDays(utcToday(now), -1),
+  };
   const [daily, platformRows, content, concepts] = await Promise.all([
     getDailyActivity(),
     getPlatformSummary(),

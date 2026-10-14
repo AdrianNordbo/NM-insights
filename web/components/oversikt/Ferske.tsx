@@ -37,9 +37,14 @@ export function Ferske({ groups }: { groups: FreshGroup[] }) {
                     ) : (
                       <span className="fresh-title">{p.title}</span>
                     )}
-                    <div className="fresh-views">{formatNumber(p.views)}</div>
+                    {p.pending ? (
+                      <div className="fresh-views fresh-pending">venter på TikTok</div>
+                    ) : (
+                      <div className="fresh-views">{formatNumber(p.views)}</div>
+                    )}
                     <div className="fresh-meta">
-                      visninger hittil{p.concept ? ` · ${p.concept}` : ""}
+                      {p.pending ? "tallene er ikke behandlet ennå" : "visninger hittil"}
+                      {p.concept ? ` · ${p.concept}` : ""}
                       {p.specialEvent && <span className="tag">{p.specialEvent}</span>}
                     </div>
                   </li>

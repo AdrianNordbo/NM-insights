@@ -2,10 +2,13 @@
 // Tallkolonner fra percentile_cont (median_*) er double precision og kan være null.
 // Datoer og tidspunkter kommer som ISO-strenger fra PostgREST.
 
-export type Platform = "instagram" | "youtube";
+export type Platform = "instagram" | "youtube" | "tiktok";
 
-/** Instagram: REELS / FEED. YouTube: SHORTS (VIDEO er holdt utenfor i viewet). */
-export type Format = "REELS" | "FEED" | "SHORTS";
+/**
+ * Instagram: REELS / FEED. YouTube: SHORTS (YouTubes VIDEO er holdt utenfor i viewet).
+ * TikTok: VIDEO / PHOTO. Formatene sammenlignes aldri på tvers av plattformer.
+ */
+export type Format = "REELS" | "FEED" | "SHORTS" | "VIDEO" | "PHOTO";
 
 /** dashboard.content_latest: én rad per innlegg/video, siste måling. */
 export type ContentLatestRow = {
@@ -32,6 +35,11 @@ export type ContentLatestRow = {
    * per-video-Analytics; null der tallet mangler. Valgfri til migreringen er kjørt.
    */
   shares?: number | null;
+  /**
+   * TikTok har ikke behandlet tallene ennå (2026-10-14_tiktok_dashboard.sql): vises som «venter på TikTok».
+   * false for Instagram og YouTube. Valgfri til migreringen er kjørt.
+   */
+  pending?: boolean;
 };
 
 /** dashboard.concept_summary: median per plattform + konto + format + konsept + special_event. */
@@ -83,12 +91,12 @@ export type ActivityFormat = "ALL" | "REELS" | "FEED" | "STORY" | "SHORTS" | "VI
 
 /**
  * dashboard.daily_activity: aktivitet på hele kontoen per døgn og format, også på eldre innlegg.
- * Døgnene følger Stillehavstid (Metas og YouTube Analytics' egne døgn).
+ * Døgnene følger plattformens egne døgn: Stillehavstid for Meta og YouTube Analytics, UTC for TikTok.
  */
 export type DailyActivityRow = {
   platform: Platform;
   account_id: number;
-  /** Stillehavsdøgn, "YYYY-MM-DD". */
+  /** Plattformens døgn (se day_tz), "YYYY-MM-DD". */
   activity_date: string;
   format: ActivityFormat;
   views: number | null;
@@ -102,6 +110,8 @@ export type DailyActivityRow = {
   data_through: string;
   /** Når Nordbø Marketing tok over kontoen. */
   takeover_date: string | null;
+  /** Døgnets tidssone (2026-10-14_tiktok_dashboard.sql). Valgfri til migreringen er kjørt. */
+  day_tz?: string;
 };
 
 export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity";
