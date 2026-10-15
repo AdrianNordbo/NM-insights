@@ -496,6 +496,24 @@ left join lateral (
 order by v.id, i.snapshot_date desc, i.fetched_at desc;
 
 -- ---------------------------------------------------------------------------
+-- Kontrollpunkter for følgere (2026-10-15_follower_checkpoints.sql)
+-- ---------------------------------------------------------------------------
+create table if not exists public.follower_checkpoints (
+    account_id  bigint  not null references public.accounts (id) on delete cascade,
+    day         date    not null,           -- totalen gjelder ved SLUTTEN av denne dagen
+    followers   integer not null check (followers >= 0),
+    source      text    not null,           -- f.eks. 'Meta Insikt (beregnet)', 'TikTok Studio (beregnet)'
+    method      text,                       -- hvordan tallet er regnet fra de avleste månedstallene
+    read_at     date    not null,           -- når månedstallene ble lest av
+    created_at  timestamptz not null default now(),
+    primary key (account_id, day)
+);
+
+comment on table public.follower_checkpoints is
+    'Følgertall ved slutten av en dag, regnet fra avleste månedstall (Meta Insikt, TikTok Studio). Aldri målt '
+    'av API-et; vises som «beregnet fra …». Kan avvike med noen få følgere.';
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security: på, uten policies
 -- ---------------------------------------------------------------------------
 alter table public.accounts      enable row level security;
@@ -510,6 +528,7 @@ alter table public.tiktok_oauth_states    enable row level security;
 alter table public.tiktok_tokens          enable row level security;
 alter table public.tiktok_videos          enable row level security;
 alter table public.tiktok_video_insights  enable row level security;
+alter table public.follower_checkpoints   enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Rettigheter: eksplisitt, og bare til service_role
@@ -519,7 +538,7 @@ revoke all on public.accounts, public.posts, public.post_insights, public.accoun
     public.youtube_videos, public.youtube_video_insights, public.youtube_video_daily,
     public.youtube_videos_latest, public.account_daily,
     public.tiktok_oauth_states, public.tiktok_tokens, public.tiktok_videos, public.tiktok_video_insights,
-    public.tiktok_videos_latest
+    public.tiktok_videos_latest, public.follower_checkpoints
     from public, anon, authenticated;
 
 grant usage on schema public to service_role;
@@ -527,7 +546,8 @@ grant select, insert, update, delete
     on public.accounts, public.posts, public.post_insights, public.account_insights,
        public.youtube_videos, public.youtube_video_insights, public.youtube_video_daily,
        public.account_daily,
-       public.tiktok_oauth_states, public.tiktok_tokens, public.tiktok_videos, public.tiktok_video_insights
+       public.tiktok_oauth_states, public.tiktok_tokens, public.tiktok_videos, public.tiktok_video_insights,
+       public.follower_checkpoints
     to service_role;
 grant select on public.posts_latest, public.youtube_videos_latest, public.tiktok_videos_latest to service_role;
 -- Identity-kolonner bruker sekvenser; nødvendig for insert
@@ -844,12 +864,57 @@ comment on view dashboard.followers is
     'accounts. Netto = total ved periodens slutt minus total dagen før periodestart. Summer aldri netto på '
     'tvers av plattformer.';
 
+-- ---------------------------------------------------------------------------
+-- 6. follower_points: målt > kontrollpunkt > beregnet (YouTube Analytics før første måling)
+-- ---------------------------------------------------------------------------
+create or replace view dashboard.follower_points
+with (security_invoker = false) as
+with measured as (
+    select ai.account_id, ai.snapshot_date as day, ai.followers_count as total
+    from public.account_insights ai
+    where ai.followers_count is not null
+),
+first_measured as (
+    select account_id, min(day) as day from measured group by account_id
+),
+yt_derived as (
+    select ai.account_id,
+           ai.snapshot_date as day,
+           sum(coalesce((ai.raw->>'subscribers_gained')::int, 0) - coalesce((ai.raw->>'subscribers_lost')::int, 0))
+               over (partition by ai.account_id order by ai.snapshot_date) as total
+    from public.account_insights ai
+    join public.accounts a on a.id = ai.account_id and a.platform = 'youtube'
+    where ai.raw->>'source' = 'youtube_analytics_subscribers'
+)
+select a.platform, m.account_id, m.day, m.total::integer as total,
+       'målt'::text as kind, null::text as source, null::date as read_at
+from measured m
+join public.accounts a on a.id = m.account_id
+union all
+select a.platform, c.account_id, c.day, c.followers,
+       'kontrollpunkt', c.source, c.read_at
+from public.follower_checkpoints c
+join public.accounts a on a.id = c.account_id
+where not exists (select 1 from measured m where m.account_id = c.account_id and m.day = c.day)
+union all
+select a.platform, y.account_id, y.day, y.total::integer,
+       'beregnet', 'YouTube Analytics (beregnet)', null
+from yt_derived y
+join public.accounts a on a.id = y.account_id
+join first_measured f on f.account_id = y.account_id
+where y.day < f.day
+  and not exists (select 1 from public.follower_checkpoints c where c.account_id = y.account_id and c.day = y.day);
+
+comment on view dashboard.follower_points is
+    'Følgertall per konto per dag med type: målt (API) > kontrollpunkt (regnet fra Meta Insikt / TikTok Studio) '
+    '> beregnet (YouTube Analytics før første måling). Aldri vis kontrollpunkt eller beregnet som målt.';
+
 -- Dashboard: authenticated kan bare lese viewene; anon får ingenting
 revoke all on schema dashboard from public, anon, authenticated;
 revoke all on all tables in schema dashboard from public, anon, authenticated;
 grant usage on schema dashboard to authenticated, service_role;
 grant select on dashboard.content_latest, dashboard.concept_summary, dashboard.platform_summary,
-    dashboard.daily_activity, dashboard.followers
+    dashboard.daily_activity, dashboard.followers, dashboard.follower_points
     to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
