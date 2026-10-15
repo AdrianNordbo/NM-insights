@@ -48,6 +48,31 @@ function Plattform({ p }: { p: TotalPlatform }) {
           <div className="hero-spark-cap">Per uke siden start</div>
         </div>
       </div>
+      {p.followers && (
+        <section className="hero-follow total-card-follow" aria-label={FOLLOWER_NAME[p.platform]}>
+          <div className="hero-follow-cell">
+            <div className="hero-label">{FOLLOWER_NAME[p.platform]}</div>
+            <div className="hero-num">{formatNumber(p.followers.now)}</div>
+          </div>
+          <div className="hero-follow-cell">
+            <div className="hero-label">
+              Netto{" "}
+              <InfoIkon id={`total-folgere-${p.platform}`} text={FOLLOWER_INFO[p.platform]} />
+            </div>
+            <div className="hero-num-row">
+              <span className={p.followers.change ? "hero-num" : "hero-num-text"}>{p.followers.change ?? "ikke nok data"}</span>
+              {p.followers.sinceLabel && <span className="hero-num-note">{p.followers.sinceLabel}</span>}
+            </div>
+          </div>
+          {(p.followers.fromTo || p.followers.startLabel) && (
+            <p className="hero-follow-sub">
+              {p.followers.fromTo}
+              {p.followers.fromTo && p.followers.startLabel && " · "}
+              {p.followers.startLabel}
+            </p>
+          )}
+        </section>
+      )}
       <dl className="total-stats">
         {stats.map(([label, value]) => (
           <div key={label}>
@@ -56,15 +81,6 @@ function Plattform({ p }: { p: TotalPlatform }) {
           </div>
         ))}
       </dl>
-      {p.followers && (
-        <p className="total-card-followers">
-          {FOLLOWER_NAME[p.platform]} <b>{formatNumber(p.followers.now)}</b>
-          {p.followers.since && <> · {p.followers.since}</>}
-          {p.followers.fromTo && <> ({p.followers.fromTo})</>}{" "}
-          <InfoIkon id={`total-folgere-${p.platform}`} text={FOLLOWER_INFO[p.platform]} />
-          {p.followers.startLabel && <span className="total-card-start">{p.followers.startLabel}</span>}
-        </p>
-      )}
     </article>
   );
 }
@@ -74,16 +90,23 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
   return (
     <>
       <section className="total-hero" aria-labelledby="total-tittel">
-        <h2 id="total-tittel" className="total-title">
-          Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
-        </h2>
-        <div className="total-num">{formatNumber(total.views)}</div>
-        {total.followersNow != null && (
-          <p className="total-followers">
-            Følgere nå: <b>{formatNumber(total.followersNow)}</b> · sum av kontoer, ikke unike personer{" "}
-            <InfoIkon id="total-folgere" text={KILDER.folgereTotal} />
-          </p>
-        )}
+        <div className={total.followersNow != null ? "total-hero-grid" : undefined}>
+          <div>
+            <h2 id="total-tittel" className="total-title">
+              Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
+            </h2>
+            <div className="total-num">{formatNumber(total.views)}</div>
+          </div>
+          {total.followersNow != null && (
+            <div>
+              <h2 className="total-title">
+                Følgere nå <InfoIkon id="total-folgere" text={KILDER.folgereTotal} />
+              </h2>
+              <div className="total-num">{formatNumber(total.followersNow)}</div>
+              <p className="total-num-sub">sum av kontoer, ikke unike personer</p>
+            </div>
+          )}
+        </div>
         <p className="total-sub">{joinNo(total.platforms.map((p) => p.name))}. Plattformene sammenlignes ikke med hverandre.</p>
         {updated && <p className="total-updated">{updated}</p>}
       </section>

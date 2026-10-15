@@ -550,34 +550,22 @@ a {
   font-size: 12px;
 }
 
-.total-followers {
-  margin: 6px 0 0;
-  color: var(--band-ink-2);
-  font-size: 14px;
+/* Total visninger og følgere nå side om side, like store */
+.total-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, auto));
+  justify-content: center;
+  gap: 8px 72px;
 }
 
-.total-followers b {
-  color: var(--band-ink);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.total-card-followers {
-  margin: 10px 0 0;
+.total-num-sub {
+  margin: 4px 0 0;
   color: var(--band-ink-2);
   font-size: 13px;
 }
 
-.total-card-start {
-  display: block;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.total-card-followers b {
-  color: var(--band-ink);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+.total-card .total-card-follow {
+  margin-top: 16px;
 }
 
 /* Plattformkortene i Total: like høye (rader av lik høyde, også når de står under hverandre),
@@ -778,17 +766,52 @@ a {
   font-weight: 600;
 }
 
-/* «målt fra 29.09», «hittil»: står i selve tallraden, dempet */
-.follow-note {
-  color: var(--band-ink-2);
-  white-space: nowrap;
+/* Følgerfeltet i plattformkortene: samme vekt som visningene (to store tall side om side) */
+.hero-follow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--band-border);
 }
 
-/* Brutto nye og startverdi-etikett: egen dempet linje under følgertallene */
-.hero-foot-sub {
-  flex-basis: 100%;
+.hero-follow-cell {
+  min-width: 0;
+}
+
+.hero-follow .hero-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tallet og merknaden («hittil», «målt fra 29.09») står i samme rad */
+.hero-num-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.hero-num-note {
+  font-size: 13px;
+  color: var(--band-ink-2);
+}
+
+/* «ikke nok data» i stedet for et tall */
+.hero-num-text {
+  display: inline-block;
+  padding: 12px 0 9px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--band-ink-2);
+}
+
+/* Brutto nye og kildeetikett: dempet linje under følgertallene */
+.hero-follow-sub {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
   font-size: 12px;
-  opacity: 0.85;
+  color: var(--band-ink-2);
 }
 
 /* --- Endring (piller) --------------------------------------------------------- */
@@ -1753,4 +1776,12 @@ a.recent-title:hover {
   background: var(--series-1);
   color: #fff;
   cursor: pointer;
+}
+
+/* Mobil: visninger og følgere nå under hverandre i Total */
+@media (max-width: 760px) {
+  .total-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
 }

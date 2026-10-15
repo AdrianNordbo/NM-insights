@@ -7,7 +7,8 @@
 
 import type { ContentLatestRow, Platform } from "../data/types";
 import { PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
-import { type FollowerSeries, followersNow, followersNowSum, netto, sinceStartText, startLabel } from "./folgere";
+import { formatDayMonth } from "../format";
+import { type FollowerSeries, followersNow, followersNowSum, netto, signed, sinceStartText, startLabel } from "./folgere";
 import { currentPeriod, nextPeriod, type Period, periodLabel, periodOf } from "./periode";
 
 export type TotalPoint = { key: string; label: string; value: number };
@@ -33,6 +34,9 @@ export type TotalPlatform = {
   followers: {
     now: number | null;
     since: string | null;
+    /** Samme netto delt opp for visning: «+176» og «siden 15.06». */
+    change: string | null;
+    sinceLabel: string | null;
     /** «fra 432 til 515» og etiketten når startverdien er brukt; ellers null. */
     fromTo: string | null;
     startLabel: string | null;
@@ -116,6 +120,8 @@ function followerInfo(fs: FollowerSeries | undefined, since: string, osloToday: 
   return {
     now: followersNow(fs)?.value ?? null,
     since: sinceStartText(n),
+    change: n.kind === "value" ? signed(n.change) : null,
+    sinceLabel: n.kind === "value" ? `siden ${formatDayMonth(n.fromLabelDay)}` : null,
     fromTo: usedStart ? `fra ${fmt.format(n.from)} til ${fmt.format(n.to)}` : null,
     startLabel: usedStart && n.start ? startLabel(n.start) : null,
   };
