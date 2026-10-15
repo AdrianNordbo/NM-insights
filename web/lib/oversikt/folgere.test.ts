@@ -230,3 +230,24 @@ describe("kort og Total med og uten dashboard.followers", async () => {
     });
   });
 });
+
+describe("brutto skjules når netto bare dekker en del av perioden", async () => {
+  const { buildTopp } = await import("./side");
+  const { days } = await import("./testdata");
+  const daily = days("instagram", "REELS", "2026-08-01", "2026-10-14", 100, "2026-10-14");
+
+  it("september: «+N · målt fra 29.09» uten brutto-linje; oktober (hel periode): med brutto", () => {
+    const sep = buildTopp(daily, [], [], { periode: "måned", p: "2026-09" }, TODAY, "2026-10-14", instagram).heroes[0];
+    expect(sep.followers?.netto?.note).toBe("målt fra 29.09");
+    expect(sep.followers?.gross).toBeNull();
+    const oct = buildTopp(daily, [], [], { periode: "måned", p: "2026-10" }, TODAY, "2026-10-14", instagram).heroes[0];
+    expect(oct.followers?.netto?.note).toBe("hittil");
+    expect(oct.followers?.gross).toEqual({ label: "Nye følgere (Meta)", value: 14 });
+  });
+
+  it("«ikke nok data» for netto skjuler ikke brutto (ingen netto-verdi å blande med)", () => {
+    const aug = buildTopp(daily, [], [], { periode: "måned", p: "2026-08" }, TODAY, "2026-10-14", instagram).heroes[0];
+    expect(aug.followers?.netto?.value).toBe("ikke nok data");
+    expect(aug.followers?.gross?.label).toBe("Nye følgere (Meta)");
+  });
+});

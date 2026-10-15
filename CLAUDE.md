@@ -376,7 +376,9 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   - Summer bare «følgere nå» på tvers (Total: «Følgere nå: X · sum av kontoer, ikke unike personer»), aldri
     netto. Ingen prosent og ingen pil mot forrige periode for netto.
   - Brutto (Instagram «Nye følgere (Meta)», YouTube «Nye abonnenter»; TikTok ingen) er en dempet linje under
-    netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto.
+    netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto. Brutto skjules når
+    netto bare dekker en del av perioden («målt fra dd.mm»), så netto og brutto aldri står side om side for
+    ulike tidsrom (f.eks. Instagram september: «+2 · målt fra 29.09» uten brutto-linje).
   - Uten dashboard.followers (eller ved feil) vises kortene som før, uten melding.
 - Brutto følgertall (new_followers) vises som «ikke nok data» når antall dager med tall er
   lavere enn antall dager i perioden. For en periode som ikke er ferdig (`period_complete = false`)

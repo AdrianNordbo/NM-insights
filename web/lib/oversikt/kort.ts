@@ -98,12 +98,16 @@ function followers(s: Series, p: Period, rows: PlatformSummaryRow[], today: stri
     newInPeriod: row && hasEnoughFollowerData(row, today) ? row.new_followers : null,
   };
   if (!fs) return old; // uten dashboard.followers: som før
+  const n = netto(fs, p.start, p.end, today);
+  // Brutto dekker hele perioden. Dekker netto bare en del av den («målt fra dd.mm»), skjules brutto,
+  // så de to aldri står side om side for ulike tidsrom.
+  const partialNetto = n.kind === "value" && n.measuredFrom;
   const label = GROSS_LABEL[s.platform];
   return {
     ...old,
     total: followersNow(fs)?.value ?? old.total,
-    netto: nettoView(netto(fs, p.start, p.end, today)),
-    gross: label ? { label, value: grossInPeriod(fs, p.start, p.end, today) } : null,
+    netto: nettoView(n),
+    gross: label && !partialNetto ? { label, value: grossInPeriod(fs, p.start, p.end, today) } : null,
   };
 }
 
