@@ -375,8 +375,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
     «kontoen startet på 0», ellers «startverdi oppgitt manuelt dd.mm») (startverdi brukt), «t.o.m.
     dd.mm» (ferdig periode med hull på slutten). «ikke nok data» når første måling er etter periodens slutt
     eller det bare finnes én måling i perioden; «–» når det ikke finnes målinger.
-  - Summer bare «følgere nå» på tvers (Total: «Følgere nå: X · sum av kontoer, ikke unike personer»), aldri
-    netto. Ingen prosent og ingen pil mot forrige periode for netto.
+  - Summer bare «følgere nå» på tvers (Total: «Følgere nå», forklart som sum av kontoer i info-ikonet), aldri
+    netto. Uke/Måned-kortene viser bare netto nye i perioden, ikke totalen. Ingen prosent og ingen pil mot forrige periode for netto.
   - Brutto (Instagram «Nye følgere (Meta)», YouTube «Nye abonnenter»; TikTok ingen) er en dempet linje under
     netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto. Brutto skjules når
     netto bare dekker en del av perioden («målt fra dd.mm»), så netto og brutto aldri står side om side for
@@ -415,7 +415,9 @@ Oversikt (`/`), i rekkefølge:
 1. Mørkeblått toppfelt: Uke | Måned | Total og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
    Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
    så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
-   trend siste 12 perioder, følgere, netto i perioden med merknad, dempet brutto-linje, innlegg publisert). Standardperiode = alltid inneværende
+   trend siste 12 perioder, et eget følgerfelt med «Netto nye følgere» / «Netto nye abonnenter» som stort tall
+   med merknad i tallraden og dempet brutto-linje under, innlegg publisert). Totalen («følgere nå») vises
+   bare i Total. Standardperiode = alltid inneværende
    uke/måned etter Oslo-kalenderen (osloToday), uten unntak; pilene stopper ved inneværende periode.
    Plattformenes døgn følger Stillehavstid: siste ferdige døgn = i går i Stillehavstid (pacificToday − 1).
    Uferdige perioder merkes «hittil, t.o.m. dd.mm» og sammenlignes med like mange dager i forrige periode.
@@ -438,8 +440,9 @@ Oversikt (`/`), i rekkefølge:
    TikTok-plassholder vises bare hvis TikTok mangler i viewene. Ett kort per plattform
    med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
    noe mangler), kumulativ kurve per publiseringsuke med dagens tall, og «Følgere 515 · +10 siden 29.09»
-   (eller «siden 15.06» med startverdi). Under det store tallet: «Følgere nå: X · sum av kontoer, ikke unike
-   personer». Ingen piler, endringspiller,
+   (eller «siden 15.06» med startverdi), i to like brede kolonner (følgere | netto) med «fra X til Y» og
+   kildeetikett under. Ved siden av det store tallet: «Følgere nå» som like stort tall; «sum av kontoer, ikke
+   unike personer» står bare i info-ikonet. Ingen piler, endringspiller,
    sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
    plattformene. Rekkefølge i Total: periodevelger → det store tallet (sentrert) → kortene → «Anbefalinger ·
    gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 14.10.2026 (lokal kontroll): 1 128 355 visninger

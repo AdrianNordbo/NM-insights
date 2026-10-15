@@ -558,12 +558,6 @@ a {
   gap: 8px 72px;
 }
 
-.total-num-sub {
-  margin: 4px 0 0;
-  color: var(--band-ink-2);
-  font-size: 13px;
-}
-
 .total-card .total-card-follow {
   margin-top: 16px;
 }
@@ -769,11 +763,17 @@ a {
 /* Følgerfeltet i plattformkortene: samme vekt som visningene (to store tall side om side) */
 .hero-follow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px 20px;
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--band-border);
+}
+
+/* Total-kortene: følgere | netto i to like brede kolonner, så netto står likt i alle kort uansett antall
+   sifre */
+.hero-follow-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .hero-follow-cell {

@@ -11,6 +11,12 @@ const FOLLOWER_INFO: Record<HeroCard["platform"], string> = {
   tiktok: KILDER.folgereTiktok,
 };
 
+const NET_LABEL: Record<HeroCard["platform"], string> = {
+  instagram: "Netto nye følgere",
+  youtube: "Netto nye abonnenter",
+  tiktok: "Netto nye følgere",
+};
+
 /** «+8», «−2», «0» og «–» vises som tall; «ikke nok data» som tekst. */
 const isNumber = (value: string) => /^[+−\-–]?\d|^–$/.test(value);
 
@@ -43,16 +49,13 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
         </div>
       )}
 
-      {/* Følgere: eget felt med samme vekt som visningene (når dashboard.followers finnes) */}
+      {/* Netto nye følgere i perioden: eget felt med samme vekt som visningene (når dashboard.followers
+          finnes). Totalen («følgere nå») vises bare i Total. */}
       {card.followers?.netto && (
-        <section className="hero-follow" aria-label={card.followers.label}>
-          <div className="hero-follow-cell">
-            <div className="hero-label">{card.followers.label}</div>
-            <div className="hero-num">{formatNumber(card.followers.total)}</div>
-          </div>
+        <section className="hero-follow" aria-label={NET_LABEL[card.platform]}>
           <div className="hero-follow-cell">
             <div className="hero-label">
-              Netto i perioden <InfoIkon id={`folgere-${card.id}`} text={FOLLOWER_INFO[card.platform]} />
+              {NET_LABEL[card.platform]} <InfoIkon id={`folgere-${card.id}`} text={FOLLOWER_INFO[card.platform]} />
             </div>
             <div className="hero-num-row">
               <span className={isNumber(card.followers.netto.value) ? "hero-num" : "hero-num-text"}>

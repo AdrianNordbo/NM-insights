@@ -49,7 +49,7 @@ function Plattform({ p }: { p: TotalPlatform }) {
         </div>
       </div>
       {p.followers && (
-        <section className="hero-follow total-card-follow" aria-label={FOLLOWER_NAME[p.platform]}>
+        <section className="hero-follow hero-follow-pair total-card-follow" aria-label={FOLLOWER_NAME[p.platform]}>
           <div className="hero-follow-cell">
             <div className="hero-label">{FOLLOWER_NAME[p.platform]}</div>
             <div className="hero-num">{formatNumber(p.followers.now)}</div>
@@ -103,7 +103,6 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
                 Følgere nå <InfoIkon id="total-folgere" text={KILDER.folgereTotal} />
               </h2>
               <div className="total-num">{formatNumber(total.followersNow)}</div>
-              <p className="total-num-sub">sum av kontoer, ikke unike personer</p>
             </div>
           )}
         </div>
