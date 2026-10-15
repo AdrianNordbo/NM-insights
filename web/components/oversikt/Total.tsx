@@ -3,6 +3,7 @@ import { InfoIkon } from "@/components/InfoIkon";
 import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
 import { FOLLOWER_NAME } from "@/lib/navn";
+import { KildeLinje } from "./KildeLinje";
 import { joinNo } from "@/lib/oversikt/sammendrag";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
@@ -64,13 +65,7 @@ function Plattform({ p }: { p: TotalPlatform }) {
               {p.followers.sinceLabel && <span className="hero-num-note">{p.followers.sinceLabel}</span>}
             </div>
           </div>
-          {(p.followers.fromTo || p.followers.startLabel) && (
-            <p className="hero-follow-sub">
-              {p.followers.fromTo}
-              {p.followers.fromTo && p.followers.startLabel && " · "}
-              {p.followers.startLabel}
-            </p>
-          )}
+          <KildeLinje parts={[p.followers.fromTo, p.followers.sourceLabel]} />
         </section>
       )}
       <dl className="total-stats">

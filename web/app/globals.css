@@ -809,9 +809,17 @@ a {
 /* Brutto nye og kildeetikett: dempet linje under følgertallene */
 .hero-follow-sub {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
   margin: 2px 0 0;
   font-size: 12px;
   color: var(--band-ink-2);
+}
+
+/* Hver del (brutto, «fra X til Y», kilde) holdes samlet; trang linje bryter mellom delene */
+.src-part {
+  white-space: nowrap;
 }
 
 /* --- Endring (piller) --------------------------------------------------------- */

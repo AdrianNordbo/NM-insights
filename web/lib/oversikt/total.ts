@@ -37,9 +37,10 @@ export type TotalPlatform = {
     /** Samme netto delt opp for visning: «+176» og «siden 15.06». */
     change: string | null;
     sinceLabel: string | null;
-    /** «fra 432 til 515» og etiketten når startverdien er brukt; ellers null. */
+    /** «fra 339 til 515» når et endepunkt ikke er målt (startverdi, kontrollpunkt, beregnet); ellers null. */
     fromTo: string | null;
-    startLabel: string | null;
+    /** Kildeetikettene for endepunkter som ikke er målt («beregnet fra Meta Insikt» o.l.). */
+    sourceLabel: string | null;
   } | null;
 };
 
@@ -123,7 +124,7 @@ function followerInfo(fs: FollowerSeries | undefined, since: string, osloToday: 
     change: n.kind === "value" ? signed(n.change) : null,
     sinceLabel: n.kind === "value" ? `siden ${formatDayMonth(n.fromLabelDay)}` : null,
     fromTo: notMeasured && n.kind === "value" ? `fra ${fmt.format(n.from)} til ${fmt.format(n.to)}` : null,
-    startLabel: sourceLabels(n),
+    sourceLabel: sourceLabels(n),
   };
 }
 

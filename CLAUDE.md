@@ -183,6 +183,13 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Instagram og YouTube, 'UTC' for TikTok). TikTok har bare format ALL.
   - `dashboard.followers` (2026-10-15_followers.sql, kjørt 15.10.2026): én rad per konto per dag fra
     account_insights med followers_count (total) og new_followers (brutto), pluss startverdien fra accounts.
+  - `public.follower_checkpoints` (2026-10-15_follower_checkpoints.sql, kjørt 15.10.2026): følgertall ved
+    slutten av en dag, regnet fra avleste månedstall. source på formen «Meta Insikt (beregnet)» / «TikTok
+    Studio (beregnet)». Bare service_role. Fem rader: Instagram 374 (30.06), 427 (31.07), 464 (31.08);
+    TikTok 85 (30.06), 134 (31.07). Skrives manuelt, aldri av hentingen; account_insights røres ikke.
+  - `dashboard.follower_points` (samme migrering): ett punkt per konto per dag med kind målt
+    (account_insights) > kontrollpunkt (follower_checkpoints) > beregnet (YouTube: kumulativ sum av
+    subscribers_gained − subscribers_lost fra raw, fra 04.06, bare før første måling 30.09).
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -381,7 +388,15 @@ Ukesrapport (kort, ingen konseptbeslutninger):
     netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto. Brutto skjules når
     netto bare dekker en del av perioden («målt fra dd.mm»), så netto og brutto aldri står side om side for
     ulike tidsrom (f.eks. Instagram september: «+2 · målt fra 29.09» uten brutto-linje).
-  - Uten dashboard.followers (eller ved feil) vises kortene som før, uten melding.
+  - Uten dashboard.followers (eller ved feil) vises kortene som før, uten melding. Uten follower_points brukes
+    bare de målte totalene fra dashboard.followers.
+  - Punktene: målt > kontrollpunkt > beregnet samme dag. Kontrollpunkter og beregnede punkter skal aldri
+    presenteres som målt: tallraden sier «målt fra dd.mm» bare når første punkt er målt, ellers «fra dd.mm»,
+    og den dempede kildelinjen viser «beregnet fra Meta Insikt» / «beregnet fra TikTok Studio» / «beregnet fra
+    YouTube Analytics» / «kontoen startet på 0» for alle endepunkter som ikke er målt. «fra X til Y» står
+    bare på Total-kortene. Info-tekstene sier at månedstall før 29.09 (Instagram) og 14.08 (TikTok) kan
+    avvike med noen få følgere.
+  - Instagram-uker før 29.09 og TikTok-uker før 14.08 er «ikke nok data» (bare månedstall finnes).
 - Brutto følgertall (new_followers) vises som «ikke nok data» når antall dager med tall er
   lavere enn antall dager i perioden. For en periode som ikke er ferdig (`period_complete = false`)
   sammenlignes det med antall dager som har gått: fra period_start til og med i går (dagens døgn er
@@ -577,6 +592,9 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 - YouTube: utelat-regelen (yngre enn 7 dager) gjelder Data API-tallene. Dype mål (seertid, visningstid,
   andel sett) brukes bare når analytics_end_date dekker innlegget, så ulik alder ikke sammenlignes.
 - YouTube: kommentarer og likes fra Data API er hovedtall. Ikke bland Data API og Analytics i samme beregning.
+  Unntak (godkjent 15.10.2026): netto følgere/abonnenter for perioder som krysser 30.09 bruker en
+  Analytics-beregnet start (follower_points, kind beregnet) og en Data API-slutt. Overgangen er kontrollert:
+  28.09 = 29.09 (beregnet) = 30.09 (målt) = 39. Kildelinjen sier «beregnet fra YouTube Analytics».
 - youtube_video_daily (Analytics, Stillehavsdøgn) og youtube_video_insights (øyeblikksbilder) er ulike kilder
   og skal aldri blandes. «Samme alder» fra daily = publiseringsdøgn + neste døgn, ikke eksakte timer.
 - Ingen grants til anon/authenticated på noe i public. Frontend skal bare lese fra schema dashboard.

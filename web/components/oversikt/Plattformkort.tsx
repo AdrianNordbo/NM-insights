@@ -4,6 +4,7 @@ import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
 import type { HeroCard } from "@/lib/oversikt/kort";
 import { Endring } from "./Endring";
+import { KildeLinje } from "./KildeLinje";
 
 const FOLLOWER_INFO: Record<HeroCard["platform"], string> = {
   instagram: KILDER.folgereInstagram,
@@ -65,18 +66,13 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
             </div>
           </div>
           {/* Brutto (dempet) og kildeetikett: egen linje under netto */}
-          {(card.followers.gross || card.followers.netto.sourceLabel) && (
-            <p className="hero-follow-sub">
-              {card.followers.gross && (
-                <>
-                  {card.followers.gross.label}:{" "}
-                  {card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}
-                </>
-              )}
-              {card.followers.gross && card.followers.netto.sourceLabel && " · "}
-              {card.followers.netto.sourceLabel}
-            </p>
-          )}
+          <KildeLinje
+            parts={[
+              card.followers.gross &&
+                `${card.followers.gross.label}: ${card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}`,
+              card.followers.netto.sourceLabel,
+            ]}
+          />
         </section>
       )}
 
