@@ -54,6 +54,32 @@ alter table public.accounts add column if not exists takeover_date date;
 comment on column public.accounts.takeover_date is
     'Datoen Nordbø Marketing tok over kontoen. Vises som markering i dashboardets grafer.';
 
+-- Lagt til etter første versjon: startverdi for følgere (se supabase/migrations/2026-10-15_followers.sql)
+alter table public.accounts add column if not exists followers_start        integer;
+alter table public.accounts add column if not exists followers_start_date   date;
+alter table public.accounts add column if not exists followers_start_source text;
+
+comment on column public.accounts.followers_start is
+    'Følgere/abonnenter ved starten av followers_start_date (= utgangen av dagen før). null = ukjent.';
+comment on column public.accounts.followers_start_date is
+    'Datoen startverdien gjelder fra (vanligvis takeover_date).';
+comment on column public.accounts.followers_start_source is
+    'Hvor startverdien kommer fra, f.eks. «manuelt (Meta Insikt)» eller «YouTube Analytics».';
+
+do $$
+begin
+    if not exists (select 1 from pg_constraint
+                   where conname = 'accounts_followers_start_check'
+                     and conrelid = 'public.accounts'::regclass) then
+        alter table public.accounts add constraint accounts_followers_start_check check (
+            (followers_start is null) = (followers_start_date is null)
+            and (followers_start is null) = (followers_start_source is null)
+            and (followers_start is null or followers_start >= 0)
+        );
+    end if;
+end $$;
+
+
 -- ---------------------------------------------------------------------------
 -- Innlegg: metadata og konsept
 -- ---------------------------------------------------------------------------
@@ -519,6 +545,13 @@ on conflict (platform, platform_account_id) do nothing;
 update public.accounts set takeover_date = date '2026-06-15'
 where client_name = 'Veksthuset' and takeover_date is null;
 
+-- YouTube: 0 abonnenter ved starten av 15.06 (YouTube Analytics, nye − tapte 04.06–14.06).
+-- Instagram og TikTok mangler startverdi (legges inn manuelt, se 2026-10-15_followers.sql).
+update public.accounts
+   set followers_start = 0, followers_start_date = date '2026-06-15',
+       followers_start_source = 'YouTube Analytics (nye − tapte 04.06–14.06)'
+ where platform = 'youtube' and platform_account_id = 'UChv7DsnM326j78XEZBWyTPg' and followers_start is null;
+
 -- TikTok: platform_account_id er 'pending:veksthuset' til kontoen er koblet (da settes den til open_id)
 insert into public.accounts (client_name, platform, platform_account_id, concepts_start, takeover_date)
 select 'Veksthuset', 'tiktok', 'pending:veksthuset', date '2026-06-15', date '2026-06-15'
@@ -786,12 +819,37 @@ begin
     end loop;
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 5. followers: følgere per konto per dag (total og brutto nye) med startverdi
+-- ---------------------------------------------------------------------------
+create or replace view dashboard.followers
+with (security_invoker = false) as
+select
+    a.platform,
+    a.id                        as account_id,
+    ai.snapshot_date            as day,             -- Instagram/YouTube: Oslo-dato for siste måling;
+                                                    -- TikTok: UTC-døgn når ferdig, ellers Oslo-dato
+    ai.followers_count,                             -- total (null der den ikke ble målt)
+    ai.new_followers,                               -- brutto: Instagram (Meta), YouTube (Analytics), TikTok null
+    a.takeover_date,
+    a.followers_start,
+    a.followers_start_date,
+    a.followers_start_source
+from public.account_insights ai
+join public.accounts a on a.id = ai.account_id
+where ai.followers_count is not null or ai.new_followers is not null;
+
+comment on view dashboard.followers is
+    'Følgere per konto per dag: total (followers_count) og brutto nye (new_followers), med startverdi fra '
+    'accounts. Netto = total ved periodens slutt minus total dagen før periodestart. Summer aldri netto på '
+    'tvers av plattformer.';
+
 -- Dashboard: authenticated kan bare lese viewene; anon får ingenting
 revoke all on schema dashboard from public, anon, authenticated;
 revoke all on all tables in schema dashboard from public, anon, authenticated;
 grant usage on schema dashboard to authenticated, service_role;
 grant select on dashboard.content_latest, dashboard.concept_summary, dashboard.platform_summary,
-    dashboard.daily_activity
+    dashboard.daily_activity, dashboard.followers
     to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------

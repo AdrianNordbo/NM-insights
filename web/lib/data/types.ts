@@ -114,7 +114,26 @@ export type DailyActivityRow = {
   day_tz?: string;
 };
 
-export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity";
+/**
+ * dashboard.followers (2026-10-15_followers.sql): følgere per konto per dag. followers_count er totalen
+ * (Instagram/YouTube: siste måling den Oslo-datoen; TikTok: UTC-døgnet når det er ferdig). new_followers er
+ * brutto nye (Instagram fra Meta, YouTube fra Analytics, TikTok null). Startverdien gjelder ved starten av
+ * followers_start_date (= utgangen av dagen før). Viewet finnes ikke før migreringen er kjørt.
+ */
+export type FollowerRow = {
+  platform: Platform;
+  account_id: number;
+  /** "YYYY-MM-DD" */
+  day: string;
+  followers_count: number | null;
+  new_followers: number | null;
+  takeover_date: string | null;
+  followers_start: number | null;
+  followers_start_date: string | null;
+  followers_start_source: string | null;
+};
+
+export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity" | "followers";
 
 /** Resultat av en spørring: enten data, eller en feil som kan vises rolig til brukeren. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
