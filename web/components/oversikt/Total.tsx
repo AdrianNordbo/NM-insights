@@ -59,8 +59,10 @@ function Plattform({ p }: { p: TotalPlatform }) {
       {p.followers && (
         <p className="total-card-followers">
           {FOLLOWER_NAME[p.platform]} <b>{formatNumber(p.followers.now)}</b>
-          {p.followers.since && <> · {p.followers.since}</>}{" "}
+          {p.followers.since && <> · {p.followers.since}</>}
+          {p.followers.fromTo && <> ({p.followers.fromTo})</>}{" "}
           <InfoIkon id={`total-folgere-${p.platform}`} text={FOLLOWER_INFO[p.platform]} />
+          {p.followers.startLabel && <span className="total-card-start">{p.followers.startLabel}</span>}
         </p>
       )}
     </article>

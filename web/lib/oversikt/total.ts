@@ -7,7 +7,7 @@
 
 import type { ContentLatestRow, Platform } from "../data/types";
 import { PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
-import { type FollowerSeries, followersNow, followersNowSum, netto, sinceStartText } from "./folgere";
+import { type FollowerSeries, followersNow, followersNowSum, netto, sinceStartText, startLabel } from "./folgere";
 import { currentPeriod, nextPeriod, type Period, periodLabel, periodOf } from "./periode";
 
 export type TotalPoint = { key: string; label: string; value: number };
@@ -30,7 +30,13 @@ export type TotalPlatform = {
    * Følgere nå og netto siden start («+40 siden 15.06», eller «+10 siden 29.09» når målingene starter
    * senere og startverdi mangler). Null når dashboard.followers mangler.
    */
-  followers: { now: number | null; since: string | null } | null;
+  followers: {
+    now: number | null;
+    since: string | null;
+    /** «fra 432 til 515» og etiketten når startverdien er brukt; ellers null. */
+    fromTo: string | null;
+    startLabel: string | null;
+  } | null;
 };
 
 export type TotalModel = {
@@ -104,7 +110,15 @@ export function buildTotal(
 
 function followerInfo(fs: FollowerSeries | undefined, since: string, osloToday: string): TotalPlatform["followers"] {
   if (!fs) return null;
-  return { now: followersNow(fs)?.value ?? null, since: sinceStartText(netto(fs, since, osloToday, osloToday)) };
+  const n = netto(fs, since, osloToday, osloToday);
+  const fmt = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 });
+  const usedStart = n.kind === "value" && n.start;
+  return {
+    now: followersNow(fs)?.value ?? null,
+    since: sinceStartText(n),
+    fromTo: usedStart ? `fra ${fmt.format(n.from)} til ${fmt.format(n.to)}` : null,
+    startLabel: usedStart && n.start ? startLabel(n.start) : null,
+  };
 }
 
 /** Startdato per plattform fra daily_activity-radene (takeover_date). */

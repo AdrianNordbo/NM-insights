@@ -568,6 +568,12 @@ a {
   font-size: 13px;
 }
 
+.total-card-start {
+  display: block;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 .total-card-followers b {
   color: var(--band-ink);
   font-weight: 600;

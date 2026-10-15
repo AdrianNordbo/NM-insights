@@ -58,22 +58,24 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
                 <b>{card.followers.newInPeriod == null ? "ikke nok data" : formatNumber(card.followers.newInPeriod)}</b>
               </span>
             )}
+            {/* Brutto (dempet) og startverdi-etikett: egen linje rett under netto */}
+            {card.followers.netto && (card.followers.gross || card.followers.netto.startLabel) && (
+              <span className="hero-foot-sub">
+                {card.followers.gross && (
+                  <>
+                    {card.followers.gross.label}:{" "}
+                    {card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}
+                  </>
+                )}
+                {card.followers.gross && card.followers.netto.startLabel && " · "}
+                {card.followers.netto.startLabel}
+              </span>
+            )}
           </>
         )}
         <span>
           Innlegg publisert <b>{formatNumber(card.posts)}</b>
         </span>
-        {card.followers?.netto && (card.followers.gross || card.followers.netto.startLabel) && (
-          <span className="hero-foot-sub">
-            {card.followers.gross && (
-              <>
-                {card.followers.gross.label}: {card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}
-              </>
-            )}
-            {card.followers.gross && card.followers.netto.startLabel && " · "}
-            {card.followers.netto.startLabel}
-          </span>
-        )}
       </footer>
     </article>
   );

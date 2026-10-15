@@ -214,8 +214,19 @@ describe("kort og Total med og uten dashboard.followers", async () => {
     const total = buildTopp(daily, [], content, { periode: "total" }, TODAY, "2026-10-14", followerRows).total!;
     expect(total.followersNow).toBe(510 + 210);
     expect(total.platforms.map((p) => p.followers)).toEqual([
-      { now: 510, since: "+5 siden 29.09" },
-      { now: 210, since: "+62 siden 14.08" },
+      { now: 510, since: "+5 siden 29.09", fromTo: null, startLabel: null },
+      { now: 210, since: "+62 siden 14.08", fromTo: null, startLabel: null },
     ]);
+  });
+
+  it("Total med startverdi: «fra X til Y» og etikett", () => {
+    const rows = [...youtube];
+    const total = buildTopp(
+      [...daily, ...days("youtube", "SHORTS", "2026-09-01", "2026-10-12", 5, "2026-10-12")],
+      [], [...content, post("youtube", "SHORTS", "2026-09-10T19:00:00", 70)], { periode: "total" }, TODAY, "2026-10-14", rows,
+    ).total!;
+    expect(total.platforms.find((p) => p.platform === "youtube")?.followers).toEqual({
+      now: 40, since: "+40 siden 15.06", fromTo: "fra 0 til 40", startLabel: "beregnet fra YouTube Analytics",
+    });
   });
 });
