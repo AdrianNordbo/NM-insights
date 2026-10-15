@@ -1,8 +1,10 @@
--- NM Insights - kontroll av tilgang etter 2026-09-30_dashboard.sql, 2026-10-01_account_daily.sql og 2026-10-13_tiktok.sql
+-- NM Insights - kontroll av tilgang etter 2026-09-30_dashboard.sql, 2026-10-01_account_daily.sql,
+-- 2026-10-13_tiktok.sql, 2026-10-14_tiktok_dashboard.sql, 2026-10-15_followers.sql og
+-- 2026-10-15_follower_checkpoints.sql
 -- Kjør hver blokk for seg i Supabase SQL Editor. Ingen blokk endrer data.
 
 -- A. Hvem kan bruke hva (anon/authenticated). Forventet: allowed = true BARE for authenticated
---    på de fire dashboard-viewene (select); false for alle tabeller, views, sekvenser og
+--    på de seks dashboard-viewene (select); false for alle tabeller, views, sekvenser og
 --    funksjoner i public, og for alt for anon.
 select r.rolname as role, o.kind, o.obj,
        case o.kind
@@ -29,19 +31,28 @@ from pg_class
 where relnamespace = 'public'::regnamespace and relkind = 'r'
 order by relname;
 
--- C. Som authenticated: dashboard-viewene kan leses. Forventet: fire tall.
+-- C. Som authenticated: dashboard-viewene kan leses. Forventet: seks tall.
 begin;
 set local role authenticated;
 select (select count(*) from dashboard.content_latest)   as content_latest,
        (select count(*) from dashboard.concept_summary)  as concept_summary,
        (select count(*) from dashboard.platform_summary) as platform_summary,
-       (select count(*) from dashboard.daily_activity)   as daily_activity;
+       (select count(*) from dashboard.daily_activity)   as daily_activity,
+       (select count(*) from dashboard.followers)        as followers,
+       (select count(*) from dashboard.follower_points)  as follower_points;
 rollback;
 
 -- D. Som authenticated: rådata blokkeres. Forventet: ERROR permission denied for table posts.
 begin;
 set local role authenticated;
 select count(*) from public.posts;
+rollback;
+
+-- D3. Som authenticated: kontrollpunktene blokkeres. Forventet: ERROR permission denied for table
+--     follower_checkpoints.
+begin;
+set local role authenticated;
+select count(*) from public.follower_checkpoints;
 rollback;
 
 -- D2. Som authenticated: den nye rådatatabellen blokkeres også.
@@ -52,14 +63,15 @@ select count(*) from public.account_daily;
 rollback;
 
 -- E. Som anon: dashboard blokkeres. Forventet: ERROR permission denied for schema dashboard.
+--    (Gjelder også dashboard.followers; samme schema.)
 begin;
 set local role anon;
 select count(*) from dashboard.content_latest;
 rollback;
 
 -- G. security_invoker per view. Forventet etter 2026-09-30_latest_views_owner_rights.sql:
---    false for alle sju (public.posts_latest, public.youtube_videos_latest, public.tiktok_videos_latest
---    og de fire dashboard-viewene).
+--    false for alle ni (public.posts_latest, public.youtube_videos_latest, public.tiktok_videos_latest
+--    og de seks dashboard-viewene).
 select n.nspname as schema, c.relname as view,
        coalesce((select option_value from pg_options_to_table(c.reloptions)
                  where option_name = 'security_invoker'), 'false (standard)') as security_invoker

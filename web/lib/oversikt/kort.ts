@@ -7,6 +7,7 @@ import { FOLLOWER_NAME, FORMAT_NAME, NEW_FOLLOWER_NAME, PLATFORM_NAME } from "..
 import { hasEnoughFollowerData } from "../regler/folgertall";
 import { type Comparison, comparePeriod, type MetricKey, type Series, trend, type TrendPoint } from "./aktivitet";
 import { type Change, change } from "./endring";
+import { type FollowerSeries, followersNow, grossInPeriod, netto, type NettoView, nettoView } from "./folgere";
 import { type Period, periodShortLabel } from "./periode";
 
 export type Delta = { change: Change | null; prevLabel: string };
@@ -24,7 +25,24 @@ export type HeroCard = {
   delta: Delta;
   trend: TrendPoint[];
   posts: number;
-  followers: { label: string; total: number | null; newLabel: string; newInPeriod: number | null } | null;
+  followers: {
+    label: string;
+    total: number | null;
+    newLabel: string;
+    newInPeriod: number | null;
+    /**
+     * Fra dashboard.followers: netto i perioden (F(slutt) − F(dagen før start)) med merknad i tallraden, og
+     * brutto nye som dempet linje. Mangler når viewet ikke finnes; da vises newInPeriod som før.
+     */
+    netto?: NettoView;
+    gross?: { label: string; value: number | null } | null;
+  } | null;
+};
+
+/** Brutto nye i perioden: Instagram fra Meta, YouTube fra Analytics. TikTok har ingen. */
+const GROSS_LABEL: Partial<Record<Series["platform"], string>> = {
+  instagram: "Nye følgere (Meta)",
+  youtube: "Nye abonnenter",
 };
 
 export type EngagementTile = { key: MetricKey; label: string; value: number | null; delta: Delta; trend: TrendPoint[] };
@@ -66,18 +84,30 @@ function partialNote(c: Comparison, s: Series, expectedThrough: string): string 
   return `hittil, t.o.m. ${formatDayMonth(s.through)}`;
 }
 
-function followers(s: Series, p: Period, rows: PlatformSummaryRow[], today: string): HeroCard["followers"] {
+function followers(s: Series, p: Period, rows: PlatformSummaryRow[], today: string, fs?: FollowerSeries): HeroCard["followers"] {
   const own = rows.filter((r) => r.platform === s.platform && r.format === s.format);
   const latest = own
     .filter((r) => r.followers_end != null)
     .sort((a, b) => a.period_start.localeCompare(b.period_start))
     .at(-1);
   const row = own.find((r) => r.period_type === p.type && r.period_start === p.start);
-  return {
+  const old = {
     label: FOLLOWER_NAME[s.platform],
     total: latest?.followers_end ?? null,
     newLabel: `${NEW_FOLLOWER_NAME[s.platform]} i perioden`,
     newInPeriod: row && hasEnoughFollowerData(row, today) ? row.new_followers : null,
+  };
+  if (!fs) return old; // uten dashboard.followers: som før
+  const n = netto(fs, p.start, p.end, today);
+  // Brutto dekker hele perioden. Dekker netto bare en del av den («målt fra dd.mm»), skjules brutto,
+  // så de to aldri står side om side for ulike tidsrom.
+  const partialNetto = n.kind === "value" && n.measuredFrom;
+  const label = GROSS_LABEL[s.platform];
+  return {
+    ...old,
+    total: followersNow(fs)?.value ?? old.total,
+    netto: nettoView(n),
+    gross: label && !partialNetto ? { label, value: grossInPeriod(fs, p.start, p.end, today) } : null,
   };
 }
 
@@ -88,6 +118,8 @@ export function heroCard(
   summary: PlatformSummaryRow[],
   today: string,
   expectedThrough: string,
+  /** Følgerserien for plattformen fra dashboard.followers; uten den vises følgertallene som før. */
+  fs?: FollowerSeries,
 ): HeroCard {
   const c = comparePeriod(s, p);
   const noData = p.end < s.firstActive;
@@ -104,7 +136,7 @@ export function heroCard(
       (x) => x.platform === s.platform && x.format === s.format && x.published_at.slice(0, 10) >= p.start && x.published_at.slice(0, 10) <= p.end,
     ).length,
     // Følgere gjelder hele kontoen og vises ikke på Feed-kortet (de står allerede på Reels-kortet).
-    followers: s.format === "FEED" ? null : followers(s, p, summary, today),
+    followers: s.format === "FEED" ? null : followers(s, p, summary, today, fs),
   };
 }
 

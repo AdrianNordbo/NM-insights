@@ -2,10 +2,18 @@ import { Trendlinje } from "@/components/grafer/Trendlinje";
 import { InfoIkon } from "@/components/InfoIkon";
 import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
+import { FOLLOWER_NAME } from "@/lib/navn";
+import { KildeLinje } from "./KildeLinje";
 import { joinNo } from "@/lib/oversikt/sammendrag";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
 /** Info-teksten for kortet, med antall innlegg som har delingstall når noen mangler. */
+const FOLLOWER_INFO: Record<TotalPlatform["platform"], string> = {
+  instagram: KILDER.folgereInstagram,
+  youtube: KILDER.folgereYoutube,
+  tiktok: KILDER.folgereTiktok,
+};
+
 const INFO: Record<TotalPlatform["platform"], string> = {
   instagram: KILDER.totalInstagram,
   youtube: KILDER.totalYoutube,
@@ -41,6 +49,25 @@ function Plattform({ p }: { p: TotalPlatform }) {
           <div className="hero-spark-cap">Per uke siden start</div>
         </div>
       </div>
+      {p.followers && (
+        <section className="hero-follow hero-follow-pair total-card-follow" aria-label={FOLLOWER_NAME[p.platform]}>
+          <div className="hero-follow-cell">
+            <div className="hero-label">{FOLLOWER_NAME[p.platform]}</div>
+            <div className="hero-num">{formatNumber(p.followers.now)}</div>
+          </div>
+          <div className="hero-follow-cell">
+            <div className="hero-label">
+              Netto{" "}
+              <InfoIkon id={`total-folgere-${p.platform}`} text={FOLLOWER_INFO[p.platform]} />
+            </div>
+            <div className="hero-num-row">
+              <span className={p.followers.change ? "hero-num" : "hero-num-text"}>{p.followers.change ?? "ikke nok data"}</span>
+              {p.followers.sinceLabel && <span className="hero-num-note">{p.followers.sinceLabel}</span>}
+            </div>
+          </div>
+          <KildeLinje parts={[p.followers.fromTo, p.followers.sourceLabel]} />
+        </section>
+      )}
       <dl className="total-stats">
         {stats.map(([label, value]) => (
           <div key={label}>
@@ -58,10 +85,22 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
   return (
     <>
       <section className="total-hero" aria-labelledby="total-tittel">
-        <h2 id="total-tittel" className="total-title">
-          Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
-        </h2>
-        <div className="total-num">{formatNumber(total.views)}</div>
+        <div className={total.followersNow != null ? "total-hero-grid" : undefined}>
+          <div>
+            <h2 id="total-tittel" className="total-title">
+              Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
+            </h2>
+            <div className="total-num">{formatNumber(total.views)}</div>
+          </div>
+          {total.followersNow != null && (
+            <div>
+              <h2 className="total-title">
+                Følgere nå <InfoIkon id="total-folgere" text={KILDER.folgereTotal} />
+              </h2>
+              <div className="total-num">{formatNumber(total.followersNow)}</div>
+            </div>
+          )}
+        </div>
         <p className="total-sub">{joinNo(total.platforms.map((p) => p.name))}. Plattformene sammenlignes ikke med hverandre.</p>
         {updated && <p className="total-updated">{updated}</p>}
       </section>

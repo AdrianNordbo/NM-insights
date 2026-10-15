@@ -114,7 +114,51 @@ export type DailyActivityRow = {
   day_tz?: string;
 };
 
-export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity";
+/**
+ * dashboard.followers (2026-10-15_followers.sql): følgere per konto per dag. followers_count er totalen
+ * (Instagram/YouTube: siste måling den Oslo-datoen; TikTok: UTC-døgnet når det er ferdig). new_followers er
+ * brutto nye (Instagram fra Meta, YouTube fra Analytics, TikTok null). Startverdien gjelder ved starten av
+ * followers_start_date (= utgangen av dagen før). Viewet finnes ikke før migreringen er kjørt.
+ */
+export type FollowerRow = {
+  platform: Platform;
+  account_id: number;
+  /** "YYYY-MM-DD" */
+  day: string;
+  followers_count: number | null;
+  new_followers: number | null;
+  takeover_date: string | null;
+  followers_start: number | null;
+  followers_start_date: string | null;
+  followers_start_source: string | null;
+};
+
+/** Typen til et punkt i dashboard.follower_points. */
+export type FollowerPointKind = "målt" | "kontrollpunkt" | "beregnet";
+
+/**
+ * dashboard.follower_points (2026-10-15_follower_checkpoints.sql): ett punkt per konto per dag med totalen ved
+ * slutten av dagen. målt = API-et; kontrollpunkt = regnet fra avleste månedstall (Meta Insikt, TikTok Studio);
+ * beregnet = YouTube Analytics (nye − tapte) før første måling. source er null for målte punkter.
+ * Viewet finnes ikke før migreringen er kjørt.
+ */
+export type FollowerPointRow = {
+  platform: Platform;
+  account_id: number;
+  day: string;
+  total: number | null;
+  kind: FollowerPointKind;
+  source: string | null;
+  read_at: string | null;
+};
+
+export type DashboardView =
+  | "content_latest"
+  | "concept_summary"
+  | "platform_summary"
+  | "daily_activity"
+  | "followers"
+  | "follower_points";
 
 /** Resultat av en spørring: enten data, eller en feil som kan vises rolig til brukeren. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
