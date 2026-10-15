@@ -2,6 +2,7 @@ import { Trendlinje } from "@/components/grafer/Trendlinje";
 import { InfoIkon } from "@/components/InfoIkon";
 import { formatNumber } from "@/lib/format";
 import { KILDER } from "@/lib/kilder";
+import { FOLLOWER_NAME } from "@/lib/navn";
 import { joinNo } from "@/lib/oversikt/sammendrag";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
@@ -49,6 +50,12 @@ function Plattform({ p }: { p: TotalPlatform }) {
           </div>
         ))}
       </dl>
+      {p.followers && (
+        <p className="total-card-followers">
+          {FOLLOWER_NAME[p.platform]} <b>{formatNumber(p.followers.now)}</b>
+          {p.followers.since && <> · {p.followers.since}</>}
+        </p>
+      )}
     </article>
   );
 }
@@ -62,6 +69,11 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
           Total visninger siden start ({sinceLabel(total.since)}) <InfoIkon id="total" text={KILDER.total} />
         </h2>
         <div className="total-num">{formatNumber(total.views)}</div>
+        {total.followersNow != null && (
+          <p className="total-followers">
+            Følgere nå: <b>{formatNumber(total.followersNow)}</b> · sum av kontoer, ikke unike personer
+          </p>
+        )}
         <p className="total-sub">{joinNo(total.platforms.map((p) => p.name))}. Plattformene sammenlignes ikke med hverandre.</p>
         {updated && <p className="total-updated">{updated}</p>}
       </section>

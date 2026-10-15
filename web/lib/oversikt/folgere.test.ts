@@ -181,3 +181,41 @@ describe("brutto nye (tilleggsinfo, egen regel for nok data)", () => {
 it("tegn", () => {
   expect([signed(10), signed(-2), signed(0), signed(1234)]).toEqual(["+10", "−2", "0", "+1 234"]); // hardt mellomrom, som formatNumber
 });
+
+describe("kort og Total med og uten dashboard.followers", async () => {
+  const { buildTopp } = await import("./side");
+  const { days, post } = await import("./testdata");
+  const daily = [
+    ...days("instagram", "REELS", "2026-09-01", "2026-10-14", 100, "2026-10-14"),
+    ...days("tiktok", "ALL", "2026-09-01", "2026-10-13", 50, "2026-10-13"),
+  ];
+  const content = [post("instagram", "REELS", "2026-09-10T19:00:00", 900), post("tiktok", "VIDEO", "2026-09-10T19:00:00", 800)];
+  const followerRows = [...instagram, ...tiktok];
+
+  it("uten viewet: kortene som før (ingen netto), og Total uten følgere", () => {
+    const topp = buildTopp(daily, [], content, { periode: "uke", p: "2026-W42" }, TODAY, "2026-10-14");
+    expect(topp.heroes[0].followers).toEqual({ label: "Følgere", total: null, newLabel: "Nye følgere i perioden", newInPeriod: null });
+    const total = buildTopp(daily, [], content, { periode: "total" }, TODAY, "2026-10-14").total!;
+    expect(total.followersNow).toBeNull();
+    expect(total.platforms.every((p) => p.followers === null)).toBe(true);
+  });
+
+  it("med viewet: følgere nå, netto med merknad i raden og brutto (ikke for TikTok)", () => {
+    const topp = buildTopp(daily, [], content, { periode: "måned", p: "2026-10" }, TODAY, "2026-10-14", followerRows);
+    const [igCard, ttCard] = topp.heroes;
+    expect(igCard.followers?.total).toBe(510);
+    expect(igCard.followers?.netto).toEqual({ value: "+5", note: "hittil", startLabel: null });
+    expect(igCard.followers?.gross).toEqual({ label: "Nye følgere (Meta)", value: 14 });
+    expect(ttCard.followers?.netto?.value).toBe("+15");
+    expect(ttCard.followers?.gross).toBeNull();
+  });
+
+  it("Total: sum av følgere nå og «siden» per kort, aldri sum av netto", () => {
+    const total = buildTopp(daily, [], content, { periode: "total" }, TODAY, "2026-10-14", followerRows).total!;
+    expect(total.followersNow).toBe(510 + 210);
+    expect(total.platforms.map((p) => p.followers)).toEqual([
+      { now: 510, since: "+5 siden 29.09" },
+      { now: 210, since: "+62 siden 14.08" },
+    ]);
+  });
+});

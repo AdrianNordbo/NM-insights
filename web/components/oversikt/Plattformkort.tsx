@@ -40,15 +40,33 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
             <span>
               {card.followers.label} <b>{formatNumber(card.followers.total)}</b>
             </span>
-            <span>
-              {card.followers.newLabel}{" "}
-              <b>{card.followers.newInPeriod == null ? "ikke nok data" : formatNumber(card.followers.newInPeriod)}</b>
-            </span>
+            {card.followers.netto ? (
+              <span>
+                Netto i perioden <b>{card.followers.netto.value}</b>
+                {card.followers.netto.note && <span className="follow-note"> · {card.followers.netto.note}</span>}
+              </span>
+            ) : (
+              <span>
+                {card.followers.newLabel}{" "}
+                <b>{card.followers.newInPeriod == null ? "ikke nok data" : formatNumber(card.followers.newInPeriod)}</b>
+              </span>
+            )}
           </>
         )}
         <span>
           Innlegg publisert <b>{formatNumber(card.posts)}</b>
         </span>
+        {card.followers?.netto && (card.followers.gross || card.followers.netto.startLabel) && (
+          <span className="hero-foot-sub">
+            {card.followers.gross && (
+              <>
+                {card.followers.gross.label}: {card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}
+              </>
+            )}
+            {card.followers.gross && card.followers.netto.startLabel && " · "}
+            {card.followers.netto.startLabel}
+          </span>
+        )}
       </footer>
     </article>
   );

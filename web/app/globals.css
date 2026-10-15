@@ -550,6 +550,30 @@ a {
   font-size: 12px;
 }
 
+.total-followers {
+  margin: 6px 0 0;
+  color: var(--band-ink-2);
+  font-size: 14px;
+}
+
+.total-followers b {
+  color: var(--band-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-card-followers {
+  margin: 10px 0 0;
+  color: var(--band-ink-2);
+  font-size: 13px;
+}
+
+.total-card-followers b {
+  color: var(--band-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Plattformkortene i Total: like høye (rader av lik høyde, også når de står under hverandre),
    visningstallet på samme høyde og statistikken i fire like felt. */
 .total-cards {
@@ -746,6 +770,19 @@ a {
 .hero-foot b {
   color: var(--band-ink);
   font-weight: 600;
+}
+
+/* «målt fra 29.09», «hittil»: står i selve tallraden, dempet */
+.follow-note {
+  color: var(--band-ink-2);
+  white-space: nowrap;
+}
+
+/* Brutto nye og startverdi-etikett: egen dempet linje under følgertallene */
+.hero-foot-sub {
+  flex-basis: 100%;
+  font-size: 12px;
+  opacity: 0.85;
 }
 
 /* --- Endring (piller) --------------------------------------------------------- */

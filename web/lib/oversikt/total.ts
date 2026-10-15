@@ -7,6 +7,7 @@
 
 import type { ContentLatestRow, Platform } from "../data/types";
 import { PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
+import { type FollowerSeries, followersNow, followersNowSum, netto, sinceStartText } from "./folgere";
 import { currentPeriod, nextPeriod, type Period, periodLabel, periodOf } from "./periode";
 
 export type TotalPoint = { key: string; label: string; value: number };
@@ -25,6 +26,11 @@ export type TotalPlatform = {
   postsWithShares: number;
   /** Kumulative visninger per publiseringsuke siden start, med dagens tall per innlegg. */
   cumulative: TotalPoint[];
+  /**
+   * Følgere nå og netto siden start («+40 siden 15.06», eller «+10 siden 29.09» når målingene starter
+   * senere og startverdi mangler). Null når dashboard.followers mangler.
+   */
+  followers: { now: number | null; since: string | null } | null;
 };
 
 export type TotalModel = {
@@ -32,6 +38,8 @@ export type TotalModel = {
   since: string;
   views: number;
   platforms: TotalPlatform[];
+  /** Sum av «følgere nå» på kontoene (ikke unike personer). Null når dashboard.followers mangler. */
+  followersNow: number | null;
 };
 
 /** Innlegget er publisert på eller etter startdatoen (Oslo-dato). */
@@ -53,6 +61,8 @@ export function buildTotal(
   content: ContentLatestRow[],
   takeover: Partial<Record<Platform, string>>,
   osloToday: string,
+  /** Fra dashboard.followers; tom liste = viewet mangler, og Total vises uten følgere som før. */
+  followers: FollowerSeries[] = [],
 ): TotalModel | null {
   const platforms: TotalPlatform[] = [];
   for (const platform of PLATFORM_ORDER) {
@@ -78,14 +88,23 @@ export function buildTotal(
       shares: withShares.reduce((s, r) => s + (r.shares ?? 0), 0),
       postsWithShares: withShares.length,
       cumulative,
+      followers: followerInfo(followers.find((f) => f.platform === platform), since, osloToday),
     });
   }
   if (!platforms.length) return null;
+  // Bare totalene summeres, og bare for plattformene som vises i Total (aldri netto på tvers).
+  const shownFollowers = followers.filter((f) => platforms.some((p) => p.platform === f.platform));
   return {
     since: platforms.map((p) => p.since).sort()[0],
     views: platforms.reduce((s, p) => s + p.views, 0),
     platforms,
+    followersNow: followersNowSum(shownFollowers)?.total ?? null,
   };
+}
+
+function followerInfo(fs: FollowerSeries | undefined, since: string, osloToday: string): TotalPlatform["followers"] {
+  if (!fs) return null;
+  return { now: followersNow(fs)?.value ?? null, since: sinceStartText(netto(fs, since, osloToday, osloToday)) };
 }
 
 /** Startdato per plattform fra daily_activity-radene (takeover_date). */
