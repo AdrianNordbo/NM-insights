@@ -134,8 +134,9 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   - `accounts.followers_start`, `followers_start_date`, `followers_start_source` (2026-10-15_followers.sql,
     nullable, alle tre eller ingen): følgere ved STARTEN av followers_start_date (= utgangen av dagen før).
     YouTube (konto 2): 0 per 15.06, «YouTube Analytics (nye − tapte 04.06–14.06)» (satt 15.10.2026;
-    kontroll: summen t.o.m. 29.09 = 39 = Data API 30.09). Instagram og TikTok: ikke satt (tall mangler);
-    UPDATE-setningene står kommentert ut i migreringen.
+    kontroll: summen t.o.m. 29.09 = 39 = Data API 30.09). Instagram (konto 1): 339 per 15.06, «beregnet fra
+    Meta Insikt (515 − 197 nye + 21 sluttet, 15.06–15.10)». TikTok (konto 3): 0 per 15.06, «kontoen ble
+    opprettet med 0 følgere». Alle satt av Adrian 15.10.2026.
   - `account_daily` (2026-10-01_account_daily.sql): én rad per konto per Stillehavsdøgn per format med
     views, likes, comments, shares, saves (null for YouTube), interactions og raw. Hele kontoen, også eldre
     innlegg. PK (account_id, activity_date, format).
@@ -370,7 +371,8 @@ Ukesrapport (kort, ingen konseptbeslutninger):
     startverdien er aldri en slutt.
   - Merknaden står i selve tallraden, ikke bare i info-ikonet: «hittil» (uferdig periode), «målt fra dd.mm»
     (første måling ligger inne i perioden og startverdi mangler; aldri vist som hele perioden), «fra X til Y»
-    + «startverdi oppgitt manuelt dd.mm» / «beregnet fra YouTube Analytics» (startverdi brukt), «t.o.m.
+    + kildeetikett fra followers_start_source («beregnet fra Meta Insikt», «beregnet fra YouTube Analytics»,
+    «kontoen startet på 0», ellers «startverdi oppgitt manuelt dd.mm») (startverdi brukt), «t.o.m.
     dd.mm» (ferdig periode med hull på slutten). «ikke nok data» når første måling er etter periodens slutt
     eller det bare finnes én måling i perioden; «–» når det ikke finnes målinger.
   - Summer bare «følgere nå» på tvers (Total: «Følgere nå: X · sum av kontoer, ikke unike personer»), aldri

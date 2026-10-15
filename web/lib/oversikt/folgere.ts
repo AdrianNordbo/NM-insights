@@ -157,11 +157,18 @@ export function signed(n: number): string {
   return `${n > 0 ? "+" : "−"}${integer.format(Math.abs(n))}`;
 }
 
-/** Etiketten for startverdien: YouTube er beregnet, de andre er oppgitt manuelt. */
+/**
+ * Kort, forståelig etikett for startverdien, bygget fra followers_start_source:
+ * «beregnet fra YouTube Analytics», «beregnet fra Meta Insikt», «beregnet fra TikTok Studio»,
+ * «kontoen startet på 0» (kontoen ble opprettet med 0), ellers «startverdi oppgitt manuelt dd.mm».
+ */
 export function startLabel(start: StartValue): string {
-  return /youtube analytics/i.test(start.source)
-    ? "beregnet fra YouTube Analytics"
-    : `startverdi oppgitt manuelt ${formatDayMonth(start.date)}`;
+  const source = start.source.toLowerCase();
+  if (source.includes("youtube analytics")) return "beregnet fra YouTube Analytics";
+  if (source.includes("meta insikt") || source.includes("meta insights")) return "beregnet fra Meta Insikt";
+  if (source.includes("tiktok studio")) return "beregnet fra TikTok Studio";
+  if (start.value === 0 && /opprettet|startet/.test(source)) return "kontoen startet på 0";
+  return `startverdi oppgitt manuelt ${formatDayMonth(start.date)}`;
 }
 
 export type NettoView = {

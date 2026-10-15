@@ -142,7 +142,7 @@ describe("startverdi", () => {
     const s = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, manual))[0];
     const n = netto(s, "2026-09-01", "2026-09-30", TODAY);
     expect(n).toMatchObject({ kind: "value", from: 432, to: 506, measuredFrom: true, fromLabelDay: "2026-09-29" });
-    expect(nettoView(n)).toEqual({ value: "+74", note: "fra 432 til 506", startLabel: "startverdi oppgitt manuelt 29.09" });
+    expect(nettoView(n)).toEqual({ value: "+74", note: "fra 432 til 506", startLabel: "beregnet fra Meta Insikt" });
   });
 
   it("uten startverdi faller Total tilbake til «siden» første måling", () => {
@@ -154,11 +154,17 @@ describe("startverdi", () => {
     const manual = { followers_start: 432, followers_start_date: "2026-09-29", followers_start_source: "manuelt (Meta Insikt)" };
     const s = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, manual))[0];
     const n = netto(s, "2026-09-29", TODAY, TODAY);
-    expect(nettoView(n)).toEqual({ value: "+89", note: "fra 432 til 521, hittil", startLabel: "startverdi oppgitt manuelt 29.09" });
+    expect(nettoView(n)).toEqual({ value: "+89", note: "fra 432 til 521, hittil", startLabel: "beregnet fra Meta Insikt" });
     // Startdato 30.09: dagen før (29.09) er målt (505), så målingen brukes og ikke startverdien
     const s2 = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, { ...manual, followers_start_date: "2026-09-30" }))[0];
     expect(netto(s2, "2026-09-30", TODAY, TODAY)).toMatchObject({ from: 505, start: null });
-    expect(startLabel({ value: 1, date: "2026-06-15", source: "manuelt (TikTok Studio)" })).toBe("startverdi oppgitt manuelt 15.06");
+    // Etiketten bygges fra kilden (followers_start_source), med de faktiske kildene i databasen
+    const label = (value: number, source: string) => startLabel({ value, date: "2026-06-15", source });
+    expect(label(339, "beregnet fra Meta Insikt (515 − 197 nye + 21 sluttet, 15.06–15.10)")).toBe("beregnet fra Meta Insikt");
+    expect(label(0, "YouTube Analytics (nye − tapte 04.06–14.06)")).toBe("beregnet fra YouTube Analytics");
+    expect(label(0, "kontoen ble opprettet med 0 følgere")).toBe("kontoen startet på 0");
+    expect(label(120, "manuelt (TikTok Studio)")).toBe("beregnet fra TikTok Studio");
+    expect(label(50, "manuelt")).toBe("startverdi oppgitt manuelt 15.06");
   });
 });
 
