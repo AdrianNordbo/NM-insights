@@ -131,6 +131,11 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   - YouTube-kanalen bruker `account_insights` (account_id 2): followers_count = abonnenter,
     media_count = videoer, new_followers = subscribersGained per Stillehavsdøgn.
   - `accounts.takeover_date`: når Nordbø Marketing tok over (Veksthuset 2026-06-15), markering i grafene.
+  - `accounts.followers_start`, `followers_start_date`, `followers_start_source` (2026-10-15_followers.sql,
+    nullable, alle tre eller ingen): følgere ved STARTEN av followers_start_date (= utgangen av dagen før).
+    YouTube (konto 2): 0 per 15.06, «YouTube Analytics (nye − tapte 04.06–14.06)» (satt 15.10.2026;
+    kontroll: summen t.o.m. 29.09 = 39 = Data API 30.09). Instagram og TikTok: ikke satt (tall mangler);
+    UPDATE-setningene står kommentert ut i migreringen.
   - `account_daily` (2026-10-01_account_daily.sql): én rad per konto per Stillehavsdøgn per format med
     views, likes, comments, shares, saves (null for YouTube), interactions og raw. Hele kontoen, også eldre
     innlegg. PK (account_id, activity_date, format).
@@ -175,6 +180,8 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     STORY, SHORTS, VIDEO; AD og OTHER holdes utenfor), med `data_through` (siste døgn med data for kontoen;
     YouTube 2–3 døgn bak, TikTok 1–2), `takeover_date` og `day_tz` bakerst ('America/Los_Angeles' for
     Instagram og YouTube, 'UTC' for TikTok). TikTok har bare format ALL.
+  - `dashboard.followers` (2026-10-15_followers.sql, kjørt 15.10.2026): én rad per konto per dag fra
+    account_insights med followers_count (total) og new_followers (brutto), pluss startverdien fra accounts.
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -184,7 +191,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Standardrettigheter for nye objekter i public er strammet inn for eierrollene (også global
     EXECUTE-til-PUBLIC på nye funksjoner for eierrollen). En ny funksjon som authenticated skal bruke,
     trenger derfor eksplisitt grant.
-  - `authenticated` har bare USAGE på schema dashboard og SELECT på de fire viewene, og USAGE på schema
+  - `authenticated` har bare USAGE på schema dashboard og SELECT på de fem viewene, og USAGE på schema
     `tilkobling` med EXECUTE på `claim_tiktok_state` og `store_tiktok_token` (TikTok-koblingen). anon har ingenting.
   - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
@@ -356,7 +363,22 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 ## Frontend-regler (dashboard)
 - Frontend leser bare fra schema `dashboard`, aldri fra public.
 - Plattformer og formater vises hver for seg og sammenlignes aldri med hverandre.
-- Følgertall (new_followers, followers_end) vises som «ikke nok data» når `days_with_follower_data` er
+- Følgere (dashboard.followers, web/lib/oversikt/folgere.ts), samme metode for alle plattformer:
+  - «Følgere nå» = siste målte total. Netto i perioden = total ved periodens slutt (siste måling i perioden)
+    minus total ved utgangen av dagen før periodestart. Startverdien (accounts.followers_start) teller som
+    en måling ved utgangen av dagen før followers_start_date; en ekte måling samme dag går foran, og
+    startverdien er aldri en slutt.
+  - Merknaden står i selve tallraden, ikke bare i info-ikonet: «hittil» (uferdig periode), «målt fra dd.mm»
+    (første måling ligger inne i perioden og startverdi mangler; aldri vist som hele perioden), «fra X til Y»
+    + «startverdi oppgitt manuelt dd.mm» / «beregnet fra YouTube Analytics» (startverdi brukt), «t.o.m.
+    dd.mm» (ferdig periode med hull på slutten). «ikke nok data» når første måling er etter periodens slutt
+    eller det bare finnes én måling i perioden; «–» når det ikke finnes målinger.
+  - Summer bare «følgere nå» på tvers (Total: «Følgere nå: X · sum av kontoer, ikke unike personer»), aldri
+    netto. Ingen prosent og ingen pil mot forrige periode for netto.
+  - Brutto (Instagram «Nye følgere (Meta)», YouTube «Nye abonnenter»; TikTok ingen) er en dempet linje under
+    netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto.
+  - Uten dashboard.followers (eller ved feil) vises kortene som før, uten melding.
+- Brutto følgertall (new_followers) vises som «ikke nok data» når antall dager med tall er
   lavere enn antall dager i perioden. For en periode som ikke er ferdig (`period_complete = false`)
   sammenlignes det med antall dager som har gått: fra period_start til og med i går (dagens døgn er
   aldri ferdig hos Meta eller YouTube). YouTube Analytics ligger 2–3 døgn etter, så YouTube viser
@@ -389,7 +411,7 @@ Oversikt (`/`), i rekkefølge:
 1. Mørkeblått toppfelt: Uke | Måned | Total og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
    Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
    så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
-   trend siste 12 perioder, følgere, nye følgere, innlegg publisert). Standardperiode = alltid inneværende
+   trend siste 12 perioder, følgere, netto i perioden med merknad, dempet brutto-linje, innlegg publisert). Standardperiode = alltid inneværende
    uke/måned etter Oslo-kalenderen (osloToday), uten unntak; pilene stopper ved inneværende periode.
    Plattformenes døgn følger Stillehavstid: siste ferdige døgn = i går i Stillehavstid (pacificToday − 1).
    Uferdige perioder merkes «hittil, t.o.m. dd.mm» og sammenlignes med like mange dager i forrige periode.
@@ -411,7 +433,9 @@ Oversikt (`/`), i rekkefølge:
    Feed, alltid med uansett Feed-bryteren), YouTube (Shorts) og TikTok (levetidstall per innlegg); en
    TikTok-plassholder vises bare hvis TikTok mangler i viewene. Ett kort per plattform
    med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
-   noe mangler) og kumulativ kurve per publiseringsuke med dagens tall. Ingen piler, endringspiller,
+   noe mangler), kumulativ kurve per publiseringsuke med dagens tall, og «Følgere 515 · +10 siden 29.09»
+   (eller «siden 15.06» med startverdi). Under det store tallet: «Følgere nå: X · sum av kontoer, ikke unike
+   personer». Ingen piler, endringspiller,
    sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
    plattformene. Rekkefølge i Total: periodevelger → det store tallet (sentrert) → kortene → «Anbefalinger ·
    gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 14.10.2026 (lokal kontroll): 1 128 355 visninger
@@ -428,7 +452,7 @@ Oversikt (`/`), i rekkefølge:
    spesielle hendelser sammenfoldet, «Før konsepter» bak bryter `?vis=alle`).
 
 Struktur: all logikk i rene funksjoner i web/lib/oversikt/ (periode, aktivitet, endring, kort, sammendrag,
-graf, ferske, sist, konsepter, adresse, side, total) med tester ved siden av (tiktok.test.ts for TikTok og
+graf, ferske, sist, konsepter, adresse, side, total, folgere) med tester ved siden av (tiktok.test.ts for TikTok og
 for at siden tåler manglende/ukjente rader); komponentene i web/components/ bare
 viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
 Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
@@ -495,6 +519,13 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
   'morgen' selv om de ble hentet midt på dagen.
 - account_insights 30.08–28.09.2026 har bare new_followers (fra Metas historikk); followers_count lagres fra
   29.09.2026. August har følgerdata for bare 2 av 31 dager.
+- Datadekning for følgere (15.10.2026), uten hull:
+  - Instagram: total fra 29.09 (Oslo-dato, siste henting, vanligvis kl. 20); brutto (Meta, Stillehavsdøgn)
+    fra 30.08, t.o.m. i går. Netto og brutto avviker: f.eks. uke 42 netto +2 (513 → 515) med brutto 0, og
+    29.09–14.10 netto +10 med brutto 13. Meta teller bare nye (ikke tapte), og døgnene er forskjøvet.
+  - YouTube: total (Data API) fra 30.09; brutto (Analytics) 04.06 t.o.m. 2–3 døgn bak, så brutto er «ikke nok
+    data» i uferdige perioder. Fra 30.09 lagres bare gained, ikke lost (raw har begge før).
+  - TikTok: total fra 14.08 (UTC-døgn når ferdig, ellers Oslo-dato fra hentingen); ingen brutto.
 - Metas døgn for følgere og unik rekkevidde følger Stillehavstid, ikke Oslo-tid. TikToks døgn er UTC.
 - TikTok: account_daily og følgertotal per døgn finnes bare fra 14.08.2026 (60 døgn før første henting);
   eldre kontotall er borte. Innleggstallene (levetid) er komplette.
@@ -508,17 +539,18 @@ testet med en midlertidig, ikke-committet side som viser samme komponent med tal
 - Rapportene er på norsk; bare videoens tekster er på engelsk.
 
 ## Neste steg
-1. TikTok: kjør 2026-10-14_tiktok_dashboard.sql (etter at koden er i produksjon) og kontroller tallene i
-   produksjon; deretter TikTok-seksjonen i report.py. A, B og dashboard-koden for C er i drift.
-2. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
+1. TikTok-seksjonen i report.py (dashboardet har TikTok fra 14.10.2026).
+2. Følgere: startverdi per 15.06 for Instagram (Meta Insikt) og TikTok (TikTok Studio) når tallene finnes;
+   report.py bruker fortsatt new_followers (ikke netto).
+3. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
-3. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
+4. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
    konsept per dag og tidsrom.
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
    - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,
      og om Instagram fortsatt gir `online_followers`.
-4. Fase 2 (agenter med Claude API) når det finnes betalende kunder
+5. Fase 2 (agenter med Claude API) når det finnes betalende kunder
 
 ## Regler
 - Aldri skriv ut, logg eller commit innholdet i .env. Tokens og nøkler skal aldri stå i URL-er eller

@@ -7,6 +7,12 @@ import { joinNo } from "@/lib/oversikt/sammendrag";
 import { sinceLabel, type TotalModel, type TotalPlatform } from "@/lib/oversikt/total";
 
 /** Info-teksten for kortet, med antall innlegg som har delingstall når noen mangler. */
+const FOLLOWER_INFO: Record<TotalPlatform["platform"], string> = {
+  instagram: KILDER.folgereInstagram,
+  youtube: KILDER.folgereYoutube,
+  tiktok: KILDER.folgereTiktok,
+};
+
 const INFO: Record<TotalPlatform["platform"], string> = {
   instagram: KILDER.totalInstagram,
   youtube: KILDER.totalYoutube,
@@ -53,7 +59,8 @@ function Plattform({ p }: { p: TotalPlatform }) {
       {p.followers && (
         <p className="total-card-followers">
           {FOLLOWER_NAME[p.platform]} <b>{formatNumber(p.followers.now)}</b>
-          {p.followers.since && <> · {p.followers.since}</>}
+          {p.followers.since && <> · {p.followers.since}</>}{" "}
+          <InfoIkon id={`total-folgere-${p.platform}`} text={FOLLOWER_INFO[p.platform]} />
         </p>
       )}
     </article>
@@ -71,7 +78,8 @@ export function Total({ total, updated }: { total: TotalModel; updated: string |
         <div className="total-num">{formatNumber(total.views)}</div>
         {total.followersNow != null && (
           <p className="total-followers">
-            Følgere nå: <b>{formatNumber(total.followersNow)}</b> · sum av kontoer, ikke unike personer
+            Følgere nå: <b>{formatNumber(total.followersNow)}</b> · sum av kontoer, ikke unike personer{" "}
+            <InfoIkon id="total-folgere" text={KILDER.folgereTotal} />
           </p>
         )}
         <p className="total-sub">{joinNo(total.platforms.map((p) => p.name))}. Plattformene sammenlignes ikke med hverandre.</p>

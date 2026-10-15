@@ -5,6 +5,12 @@ import { KILDER } from "@/lib/kilder";
 import type { HeroCard } from "@/lib/oversikt/kort";
 import { Endring } from "./Endring";
 
+const FOLLOWER_INFO: Record<HeroCard["platform"], string> = {
+  instagram: KILDER.folgereInstagram,
+  youtube: KILDER.folgereYoutube,
+  tiktok: KILDER.folgereTiktok,
+};
+
 /** Plattformkort i det mørke toppfeltet: visninger, endring og trendlinje side om side. */
 export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel: string }) {
   return (
@@ -43,7 +49,8 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
             {card.followers.netto ? (
               <span>
                 Netto i perioden <b>{card.followers.netto.value}</b>
-                {card.followers.netto.note && <span className="follow-note"> · {card.followers.netto.note}</span>}
+                {card.followers.netto.note && <span className="follow-note"> · {card.followers.netto.note}</span>}{" "}
+                <InfoIkon id={`folgere-${card.id}`} text={FOLLOWER_INFO[card.platform]} />
               </span>
             ) : (
               <span>
