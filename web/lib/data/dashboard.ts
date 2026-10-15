@@ -6,6 +6,7 @@ import type {
   ContentLatestRow,
   DailyActivityRow,
   DashboardView,
+  FollowerPointRow,
   FollowerRow,
   PlatformSummaryRow,
   Result,
@@ -66,6 +67,14 @@ export async function getPlatformSummary(): Promise<Result<PlatformSummaryRow[]>
  */
 export async function getFollowers(): Promise<Result<FollowerRow[]>> {
   return keep(await selectAll<FollowerRow>("followers", "*", "account_id,day"), onlyKnownPlatforms);
+}
+
+/**
+ * dashboard.follower_points (2026-10-15_follower_checkpoints.sql). Valgfritt som followers: mangler viewet
+ * eller feiler spørringen, brukes de målte totalene fra dashboard.followers som før.
+ */
+export async function getFollowerPoints(): Promise<Result<FollowerPointRow[]>> {
+  return keep(await selectAll<FollowerPointRow>("follower_points", "*", "account_id,day"), onlyKnownPlatforms);
 }
 
 export async function getDailyActivity(): Promise<Result<DailyActivityRow[]>> {

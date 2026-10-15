@@ -65,7 +65,7 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
             </div>
           </div>
           {/* Brutto (dempet) og kildeetikett: egen linje under netto */}
-          {(card.followers.gross || card.followers.netto.startLabel) && (
+          {(card.followers.gross || card.followers.netto.sourceLabel) && (
             <p className="hero-follow-sub">
               {card.followers.gross && (
                 <>
@@ -73,8 +73,8 @@ export function Plattformkort({ card, trendLabel }: { card: HeroCard; trendLabel
                   {card.followers.gross.value == null ? "ikke nok data" : formatNumber(card.followers.gross.value)}
                 </>
               )}
-              {card.followers.gross && card.followers.netto.startLabel && " · "}
-              {card.followers.netto.startLabel}
+              {card.followers.gross && card.followers.netto.sourceLabel && " · "}
+              {card.followers.netto.sourceLabel}
             </p>
           )}
         </section>

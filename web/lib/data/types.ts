@@ -133,7 +133,32 @@ export type FollowerRow = {
   followers_start_source: string | null;
 };
 
-export type DashboardView = "content_latest" | "concept_summary" | "platform_summary" | "daily_activity" | "followers";
+/** Typen til et punkt i dashboard.follower_points. */
+export type FollowerPointKind = "målt" | "kontrollpunkt" | "beregnet";
+
+/**
+ * dashboard.follower_points (2026-10-15_follower_checkpoints.sql): ett punkt per konto per dag med totalen ved
+ * slutten av dagen. målt = API-et; kontrollpunkt = regnet fra avleste månedstall (Meta Insikt, TikTok Studio);
+ * beregnet = YouTube Analytics (nye − tapte) før første måling. source er null for målte punkter.
+ * Viewet finnes ikke før migreringen er kjørt.
+ */
+export type FollowerPointRow = {
+  platform: Platform;
+  account_id: number;
+  day: string;
+  total: number | null;
+  kind: FollowerPointKind;
+  source: string | null;
+  read_at: string | null;
+};
+
+export type DashboardView =
+  | "content_latest"
+  | "concept_summary"
+  | "platform_summary"
+  | "daily_activity"
+  | "followers"
+  | "follower_points";
 
 /** Resultat av en spørring: enten data, eller en feil som kan vises rolig til brukeren. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };

@@ -8,7 +8,7 @@
 import type { ContentLatestRow, Platform } from "../data/types";
 import { PLATFORM_NAME, PLATFORM_ORDER } from "../navn";
 import { formatDayMonth } from "../format";
-import { type FollowerSeries, followersNow, followersNowSum, netto, signed, sinceStartText, startLabel } from "./folgere";
+import { type FollowerSeries, followersNow, followersNowSum, netto, signed, sinceStartText, sourceLabels } from "./folgere";
 import { currentPeriod, nextPeriod, type Period, periodLabel, periodOf } from "./periode";
 
 export type TotalPoint = { key: string; label: string; value: number };
@@ -116,14 +116,14 @@ function followerInfo(fs: FollowerSeries | undefined, since: string, osloToday: 
   if (!fs) return null;
   const n = netto(fs, since, osloToday, osloToday);
   const fmt = new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 });
-  const usedStart = n.kind === "value" && n.start;
+  const notMeasured = n.kind === "value" && (n.fromKind !== "målt" || n.toKind !== "målt");
   return {
     now: followersNow(fs)?.value ?? null,
     since: sinceStartText(n),
     change: n.kind === "value" ? signed(n.change) : null,
     sinceLabel: n.kind === "value" ? `siden ${formatDayMonth(n.fromLabelDay)}` : null,
-    fromTo: usedStart ? `fra ${fmt.format(n.from)} til ${fmt.format(n.to)}` : null,
-    startLabel: usedStart && n.start ? startLabel(n.start) : null,
+    fromTo: notMeasured && n.kind === "value" ? `fra ${fmt.format(n.from)} til ${fmt.format(n.to)}` : null,
+    startLabel: sourceLabels(n),
   };
 }
 

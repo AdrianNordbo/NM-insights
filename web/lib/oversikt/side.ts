@@ -1,6 +1,6 @@
 // Setter sammen alt toppfeltet og «Engasjement i perioden» trenger, fra viewene og adressen.
 
-import type { ContentLatestRow, DailyActivityRow, FollowerRow, Platform, PlatformSummaryRow } from "../data/types";
+import type { ContentLatestRow, DailyActivityRow, FollowerPointRow, FollowerRow, Platform, PlatformSummaryRow } from "../data/types";
 import { buildSeries, PACIFIC_TZ, type Series, toPlain } from "./aktivitet";
 import { type FreshGroup, freshGroups } from "./ferske";
 import { buildFollowerSeries } from "./folgere";
@@ -46,9 +46,11 @@ export function buildTopp(
   expectedThrough: ExpectedThrough,
   /** dashboard.followers; null når viewet mangler (da vises følgertallene som før). */
   followerRows: FollowerRow[] | null = null,
+  /** dashboard.follower_points; null når viewet mangler (da brukes bare målte totaler). */
+  pointRows: FollowerPointRow[] | null = null,
 ): OversiktTopp {
   const series = buildSeries(daily);
-  const followers = followerRows ? buildFollowerSeries(followerRows) : [];
+  const followers = followerRows ? buildFollowerSeries(followerRows, pointRows) : [];
   const fsFor = (platform: Platform) => followers.find((f) => f.platform === platform);
   const state = readState(params, today);
   const shown = visibleSeries(series, state.feed);

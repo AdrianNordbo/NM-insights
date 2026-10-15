@@ -87,13 +87,13 @@ describe("netto = F(slutt) − F(dagen før start)", () => {
   it("hel periode med måling dagen før: ingen merknad", () => {
     const n = netto(tt, "2026-09-01", "2026-09-30", TODAY);
     expect(n).toMatchObject({ kind: "value", change: 30, measuredFrom: false, partial: false, start: null });
-    expect(nettoView(n)).toEqual({ value: "+30", note: null, startLabel: null });
+    expect(nettoView(n)).toEqual({ value: "+30", note: null, sourceLabel: null });
   });
 
   it("uferdig periode: «hittil»", () => {
     const n = netto(ig, "2026-10-12", "2026-10-18", TODAY);
     expect(n).toMatchObject({ kind: "value", from: 509, to: 510, partial: true });
-    expect(nettoView(n)).toEqual({ value: "+1", note: "hittil", startLabel: null });
+    expect(nettoView(n)).toEqual({ value: "+1", note: "hittil", sourceLabel: null });
   });
 
   it("første måling inne i perioden: «målt fra dd.mm», aldri som hele perioden", () => {
@@ -109,13 +109,13 @@ describe("netto = F(slutt) − F(dagen før start)", () => {
 
   it("ingen målinger og ingen startverdi: «–»", () => {
     const empty = buildFollowerSeries(rows("tiktok", "2026-10-01", "2026-10-02", () => null))[0];
-    expect(nettoView(netto(empty, "2026-10-01", "2026-10-31", TODAY))).toEqual({ value: "–", note: null, startLabel: null });
+    expect(nettoView(netto(empty, "2026-10-01", "2026-10-31", TODAY))).toEqual({ value: "–", note: null, sourceLabel: null });
   });
 
   it("hull før periodens slutt i en ferdig periode: «t.o.m. dd.mm»", () => {
     const holes = buildFollowerSeries(rows("tiktok", "2026-09-20", "2026-10-15", (d, i) => (d > "2026-09-27" && d < "2026-10-03" ? null : 200 + i)))[0];
     const n = netto(holes, "2026-09-21", "2026-09-30", TODAY);
-    expect(nettoView(n)).toEqual({ value: "+7", note: "t.o.m. 27.09", startLabel: null });
+    expect(nettoView(n)).toEqual({ value: "+7", note: "t.o.m. 27.09", sourceLabel: null });
   });
 
   it("negativ netto vises med minus, og 0 som 0", () => {
@@ -129,7 +129,7 @@ describe("startverdi", () => {
   it("brukes når perioden starter på startdatoen: «fra X til Y» og etikett", () => {
     const n = netto(yt, "2026-06-15", TODAY, TODAY);
     expect(n).toMatchObject({ kind: "value", from: 0, to: 40, change: 40, measuredFrom: false, fromLabelDay: "2026-06-15" });
-    expect(nettoView(n)).toEqual({ value: "+40", note: "fra 0 til 40, hittil", startLabel: "beregnet fra YouTube Analytics" });
+    expect(nettoView(n)).toEqual({ value: "+40", note: "hittil", sourceLabel: "beregnet fra YouTube Analytics" });
     expect(sinceStartText(n)).toBe("+40 siden 15.06");
   });
 
@@ -142,7 +142,7 @@ describe("startverdi", () => {
     const s = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, manual))[0];
     const n = netto(s, "2026-09-01", "2026-09-30", TODAY);
     expect(n).toMatchObject({ kind: "value", from: 432, to: 506, measuredFrom: true, fromLabelDay: "2026-09-29" });
-    expect(nettoView(n)).toEqual({ value: "+74", note: "fra 432 til 506", startLabel: "beregnet fra Meta Insikt" });
+    expect(nettoView(n)).toEqual({ value: "+74", note: "fra 29.09", sourceLabel: "beregnet fra Meta Insikt" });
   });
 
   it("uten startverdi faller Total tilbake til «siden» første måling", () => {
@@ -154,7 +154,7 @@ describe("startverdi", () => {
     const manual = { followers_start: 432, followers_start_date: "2026-09-29", followers_start_source: "manuelt (Meta Insikt)" };
     const s = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, manual))[0];
     const n = netto(s, "2026-09-29", TODAY, TODAY);
-    expect(nettoView(n)).toEqual({ value: "+89", note: "fra 432 til 521, hittil", startLabel: "beregnet fra Meta Insikt" });
+    expect(nettoView(n)).toEqual({ value: "+89", note: "hittil", sourceLabel: "beregnet fra Meta Insikt" });
     // Startdato 30.09: dagen før (29.09) er målt (505), så målingen brukes og ikke startverdien
     const s2 = buildFollowerSeries(rows("instagram", "2026-09-29", "2026-10-15", (_, i) => 505 + i, () => null, { ...manual, followers_start_date: "2026-09-30" }))[0];
     expect(netto(s2, "2026-09-30", TODAY, TODAY)).toMatchObject({ from: 505, start: null });
@@ -210,7 +210,7 @@ describe("kort og Total med og uten dashboard.followers", async () => {
     const topp = buildTopp(daily, [], content, { periode: "måned", p: "2026-10" }, TODAY, "2026-10-14", followerRows);
     const [igCard, ttCard] = topp.heroes;
     expect(igCard.followers?.total).toBe(510);
-    expect(igCard.followers?.netto).toEqual({ value: "+5", note: "hittil", startLabel: null });
+    expect(igCard.followers?.netto).toEqual({ value: "+5", note: "hittil", sourceLabel: null });
     expect(igCard.followers?.gross).toEqual({ label: "Nye følgere (Meta)", value: 14 });
     expect(ttCard.followers?.netto?.value).toBe("+15");
     expect(ttCard.followers?.gross).toBeNull();

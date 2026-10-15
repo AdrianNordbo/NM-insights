@@ -3,6 +3,7 @@ import {
   getConceptSummary,
   getContentLatest,
   getDailyActivity,
+  getFollowerPoints,
   getFollowers,
   getPlatformSummary,
 } from "@/lib/data/dashboard";
@@ -19,22 +20,25 @@ export default async function OversiktSide(props: PageProps<"/">) {
     "America/Los_Angeles": addDays(pacificToday(now), -1),
     UTC: addDays(utcToday(now), -1),
   };
-  const [daily, platformRows, content, concepts, followers] = await Promise.all([
+  const [daily, platformRows, content, concepts, followers, followerPoints] = await Promise.all([
     getDailyActivity(),
     getPlatformSummary(),
     getContentLatest(),
     getConceptSummary(),
     getFollowers(),
+    getFollowerPoints(),
   ]);
-  // Følgerviewet er valgfritt: uten det (før migreringen, eller ved feil) vises kortene som før.
+  // Følgerviewene er valgfrie: uten dashboard.followers vises kortene som før; uten follower_points brukes
+  // bare de målte totalene.
   const followerRows = followers.ok ? followers.data : null;
+  const pointRows = followerPoints.ok ? followerPoints.data : null;
 
   const failed = [daily, platformRows, content].find((r) => !r.ok);
   const topp: Result<OversiktTopp> =
     failed && !failed.ok
       ? failed
       : daily.ok && platformRows.ok && content.ok
-        ? { ok: true, data: buildTopp(daily.data, platformRows.data, content.data, params, today, expectedThrough, followerRows) }
+        ? { ok: true, data: buildTopp(daily.data, platformRows.data, content.data, params, today, expectedThrough, followerRows, pointRows) }
         : { ok: false, error: "Klarte ikke å hente tallene akkurat nå. Prøv igjen om litt." };
 
   return (
