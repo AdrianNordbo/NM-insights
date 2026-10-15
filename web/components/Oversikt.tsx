@@ -79,10 +79,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
                   ))}
                 </div>
               )}
-              <p className="band-meta">
-                {updated && <>{updated} · </>}
-                TikTok <span className="chip">kommer</span>
-              </p>
+              {updated && <p className="band-meta">{updated}</p>}
               {recommendations && <Anbefalinger line={recommendations} />}
               <div className="heroes">
                 {topp.data.heroes.map((card) => (
