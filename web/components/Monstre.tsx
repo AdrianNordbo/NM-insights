@@ -95,7 +95,11 @@ export function Monstre({ result }: { result: Result<MonsterSection[]> }) {
   if (!result.ok) return <p className="muted">{result.error}</p>;
   return (
     <>
-      <p className="monster-intro">Mønstre i egne tall, ikke bevis. 1,0 = vanlig visningstall for samme type innhold.</p>
+      <p className="monster-intro">
+        Mønstre i egne tall, ikke bevis. 1,0 = vanlig visningstall for samme type innhold.
+        <br />
+        Første versjon. Vi bygger videre og legger til mer.
+      </p>
       {result.data.length ? (
         result.data.map((s) => <Seksjon key={s.id} section={s} />)
       ) : (

@@ -7,7 +7,9 @@ export function HvaHarFungert({ rows }: { rows: FungertRow[] }) {
   return (
     <section className="block" aria-labelledby="fungert">
       <div className="block-head">
-        <h2 id="fungert">Hva har fungert</h2>
+        <h2 id="fungert">
+          Hva har fungert <span className="wip">Under utvikling</span>
+        </h2>
         <p className="block-sub">
           <Link href="/monstre">Se alle mønstre</Link>
         </p>

@@ -11,7 +11,7 @@ export default async function MonstreSide() {
   const result = features.ok ? { ok: true as const, data: buildMonstre(features.data) } : features;
   return (
     <>
-      <Toppfelt title="Mønster" />
+      <Toppfelt title="Mønster" controls={<span className="wip">Under utvikling</span>} />
       <main className="page">
         <Monstre result={result} />
       </main>
