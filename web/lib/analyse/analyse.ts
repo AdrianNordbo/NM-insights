@@ -53,6 +53,12 @@ export const BRUK_MIN_POSTS = 10;
 export const BRUK_MIN_RATIO = 1.15;
 export const BRUK_MIN_CONCEPTS = 2;
 export const TEST_MIN_POSTS = 3;
+/**
+ * Tidsrom: et konsept er «mulig tidstrend» når innleggene i tidsrommet starter eller slutter mer enn så mange
+ * dager innenfor konseptets første/siste publisering. Da kan forskjellen like gjerne skyldes når i perioden
+ * innleggene kom, og konseptet teller ikke som støtte for «bruk».
+ */
+export const TIDSTREND_DAGER = 21;
 /** Et konsept teller som «samme retning» eller «motsatt vei» bare med minst så mange innlegg i nivået. */
 export const RETNING_MIN_POSTS = 3;
 
@@ -170,8 +176,14 @@ export type Finding = {
   conceptsUp: string[];
   /** Antall konsepter med innlegg i nivået. */
   conceptCount: number;
-  /** Tall bare fra konsepter med minst 6 modne innlegg (grunnlaget for «bruk»). */
+  /**
+   * Grunnlaget for «bruk»: konsepter med minst 6 modne innlegg og uten tidstrend-flagg. conceptsDown gjelder alle
+   * solide konsepter, også flaggede.
+   */
   solid: { median: number | null; posts: number; conceptsUp: string[]; conceptsDown: string[] };
+  /** Bare tidsrom: konsepter der tidsrommet bare dekker en del av konseptets periode. */
+  tidstrend: string[];
+  mulig_tidstrend: boolean;
   /** Per konsept: median og antall i nivået. */
   perConcept: { concept: string; median: number; posts: number; preliminary: boolean }[];
 };
@@ -194,6 +206,31 @@ function stats(rs: RatedRow[]) {
   };
 }
 
+const DAY_MS = 86_400_000;
+const dayOf = (r: FeatureRow) => Date.parse(`${r.published_at.slice(0, 10)}T00:00:00Z`);
+
+/** Første og siste publiseringsdag per konsept (innenfor én plattform + format). */
+function conceptSpans(rows: RatedRow[]): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>();
+  for (const r of rows) {
+    const d = dayOf(r);
+    const cur = out.get(r.concept as string);
+    out.set(r.concept as string, cur ? [Math.min(cur[0], d), Math.max(cur[1], d)] : [d, d]);
+  }
+  return out;
+}
+
+/** Konseptene der innleggene i nivået starter eller slutter mer enn TIDSTREND_DAGER innenfor konseptets periode. */
+function partialConcepts(rs: RatedRow[], span: Map<string, [number, number]>): string[] {
+  const own = conceptSpans(rs);
+  return [...own]
+    .filter(([concept, [first, last]]) => {
+      const [cFirst, cLast] = span.get(concept) as [number, number];
+      return first - cFirst > TIDSTREND_DAGER * DAY_MS || cLast - last > TIDSTREND_DAGER * DAY_MS;
+    })
+    .map(([concept]) => concept);
+}
+
 /** Alle faktornivåer per plattform + format, med status. Sortert: bruk, test, resten; så høyest median. */
 export function analyse(rows: FeatureRow[]): Finding[] {
   const rated = rate(rows);
@@ -203,6 +240,7 @@ export function analyse(rows: FeatureRow[]): Finding[] {
   for (const [key, list] of groups) {
     const [platform, format] = key.split("|") as [Platform, string];
     const fns = levelFns(list);
+    const span = conceptSpans(list);
     for (const factor of VISTE_FAKTORER) {
       const byLevel = new Map<string, RatedRow[]>();
       for (const r of list) {
@@ -211,13 +249,15 @@ export function analyse(rows: FeatureRow[]): Finding[] {
       }
       for (const [level, rs] of byLevel) {
         const all = stats(rs);
+        const tidstrend = factor === "tidsrom" ? partialConcepts(rs, span) : [];
         const solidRows = rs.filter((r) => !r.preliminaryConcept);
-        const solid = stats(solidRows);
+        const solid = stats(solidRows.filter((r) => !tidstrend.includes(r.concept as string)));
+        const conceptsDown = stats(solidRows).conceptsDown;
         const bruk =
           solid.posts >= BRUK_MIN_POSTS &&
           (solid.median ?? 0) >= BRUK_MIN_RATIO &&
           solid.conceptsUp.length >= BRUK_MIN_CONCEPTS &&
-          solid.conceptsDown.length === 0;
+          conceptsDown.length === 0;
         const test = !bruk && all.posts >= TEST_MIN_POSTS && (all.median ?? 0) >= BRUK_MIN_RATIO;
         out.push({
           platform,
@@ -230,8 +270,10 @@ export function analyse(rows: FeatureRow[]): Finding[] {
           concepts: all.perConcept.map((c) => c.concept),
           conceptsUp: all.conceptsUp,
           conceptCount: all.perConcept.length,
-          solid: { median: solid.median, posts: solid.posts, conceptsUp: solid.conceptsUp, conceptsDown: solid.conceptsDown },
+          solid: { median: solid.median, posts: solid.posts, conceptsUp: solid.conceptsUp, conceptsDown },
           perConcept: all.perConcept,
+          tidstrend,
+          mulig_tidstrend: tidstrend.length > 0,
         });
       }
     }

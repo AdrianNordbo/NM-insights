@@ -237,3 +237,39 @@ describe("faktorer", () => {
     expect(analyse(rows).filter((f) => f.factor === "varighet")).toEqual([]);
   });
 });
+
+describe("mulig tidstrend", () => {
+  const dato = (i: number) => `2026-${String(6 + Math.floor(i / 28)).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}T19:00:00`;
+  /** n innlegg kl. 17 og n kl. 19 (dobbelt så bra), med publiseringsdager fra listene. */
+  const konsept = (concept: string, kl17: number[], kl19: number[]) => [
+    ...kl17.map((d) => row({ concept, views: 100, hour: 17, published_at: dato(d) })),
+    ...kl19.map((d) => row({ concept, views: 200, hour: 19, published_at: dato(d) })),
+  ];
+  const spredt = [0, 20, 40, 60, 80, 100]; // juni–september
+
+  it("et konsept med tidsrommet bare i deler av perioden får flagg og teller ikke som støtte", () => {
+    const rows = [
+      ...konsept("Folka Først", spredt, spredt),
+      // Sitcom: kl. 19 bare de siste ukene (fra dag 70), kl. 17 over hele perioden
+      ...konsept("Sitcom", spredt, [70, 75, 80, 85, 90, 100]),
+    ];
+    const f = find(rows, "kl. 19–21");
+    expect(f?.tidstrend).toEqual(["Sitcom"]);
+    expect(f?.mulig_tidstrend).toBe(true);
+    expect(f?.solid.conceptsUp).toEqual(["Folka Først"]);
+    expect(f?.status).toBe("test");
+  });
+
+  it("to konsepter uten flagg gir fortsatt «bruk»", () => {
+    const rows = [...konsept("Folka Først", spredt, spredt), ...konsept("Sitcom", spredt, [5, 25, 45, 65, 85, 95])];
+    const f = find(rows, "kl. 19–21");
+    expect(f?.tidstrend).toEqual([]);
+    expect(f?.mulig_tidstrend).toBe(false);
+    expect(f?.status).toBe("bruk");
+  });
+
+  it("flagget gjelder bare tidsrom", () => {
+    const rows = konsept("Sitcom", spredt, [70, 75, 80, 85, 90, 100]);
+    expect(analyse(rows).filter((f) => f.factor !== "tidsrom" && f.mulig_tidstrend)).toEqual([]);
+  });
+});
