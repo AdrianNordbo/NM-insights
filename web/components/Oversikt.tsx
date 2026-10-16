@@ -3,10 +3,12 @@ import { Anbefalinger } from "@/components/oversikt/Anbefalinger";
 import { Engasjement } from "@/components/oversikt/Engasjement";
 import { Ferske } from "@/components/oversikt/Ferske";
 import { HvaFunketSist } from "@/components/oversikt/HvaFunketSist";
+import { HvaHarFungert } from "@/components/oversikt/HvaHarFungert";
 import { Konsepter } from "@/components/oversikt/Konsepter";
 import { Plattformkort } from "@/components/oversikt/Plattformkort";
 import { Total } from "@/components/oversikt/Total";
 import { Periodevelger, Toppfelt } from "@/components/oversikt/Toppfelt";
+import type { FungertRow } from "@/lib/analyse/monstre";
 import type { ConceptSummaryRow, ContentLatestRow, Result } from "@/lib/data/types";
 import { formatFetched } from "@/lib/format";
 import { hrefFor } from "@/lib/oversikt/adresse";
@@ -30,10 +32,12 @@ export type OversiktData = {
   /** Dagens dato i Oslo, «YYYY-MM-DD». */
   today: string;
   showBeforeConcepts: boolean;
+  /** «Hva har fungert» fra dashboard.post_features; null når viewet ikke kan leses (da vises ikke kortet). */
+  fungert?: FungertRow[] | null;
 };
 
 /** Forsiden (presentasjon). Data hentes i app/(app)/page.tsx, tallene regnes ut i lib/oversikt. */
-export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }: OversiktData) {
+export function Oversikt({ topp, content, concepts, today, showBeforeConcepts, fungert }: OversiktData) {
   const feed = topp.ok ? topp.data.state.feed : false;
   const lastFetched = content.ok
     ? content.data.map((p) => p.fetched_at).filter((t): t is string => Boolean(t)).sort().at(-1)
@@ -104,6 +108,7 @@ export function Oversikt({ topp, content, concepts, today, showBeforeConcepts }:
         {content.ok && concepts.ok ? (
           <>
             <HvaFunketSist items={buildRecent(content.data, concepts.data, feed)} />
+            {fungert && <HvaHarFungert rows={fungert} />}
             <Konsepter
               blocks={buildConceptBlocks(concepts.data, content.data, today, showBeforeConcepts, feed)}
               showBeforeConcepts={showBeforeConcepts}

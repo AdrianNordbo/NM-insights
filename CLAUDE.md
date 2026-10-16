@@ -195,7 +195,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     time i Oslo-tid, hashtag_count, text_length (caption uten hashtags; YouTube tittel), duration_s og views.
     Varighet for Reels hentes fra TikTok/YouTube-versjonen (`duration_source`): manuell rad i reel_links går
     foran automatisk kobling (samme kunde og konsept, publisert innen 60 min, entydig). Bare egenskap ved videoen,
-    aldri til å sammenligne visninger på tvers. reel_links har 7 manuelle rader (bare service_role).
+    aldri til å sammenligne visninger på tvers. reel_links har 7 manuelle rader (bare service_role; supabase/seed/reel_links.sql).
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -485,9 +485,9 @@ for at siden tåler manglende/ukjente rader); komponentene i web/components/ bar
 viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
 Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
 testet med en midlertidig, ikke-committet side som viser samme komponent med tall fra viewene.
-«Trender og idéer» (`/trender`): tips fra analysen (web/lib/analyse/analyse.ts, visningsmodell tips.ts,
-komponent components/Tips.tsx), data fra dashboard.post_features.
-- Mål: innleggets visninger / median for konseptet på samme plattform og format (×1,00 = vanlig). Bare modne
+«Mønster» (`/monstre`, i menyen): mønstre fra analysen (regler i web/lib/analyse/analyse.ts, visningsmodell
+monstre.ts, komponent components/Monstre.tsx), data fra dashboard.post_features.
+- Mål: innleggets visninger / median for konseptet på samme plattform og format (1,0 = vanlig). Bare modne
   innlegg, special_event is null, ikke Bankinfo/Før konsepter/Ukjent/Annet/aktualitet. Instagram bare Reels.
 - Faktorer: tidsrom (før 17, 17–19, 19–21, 21+), ukedag (bare Folka Først), tekstlengde og varighet i tredeler
   innenfor konseptet. Antall hashtags regnes, men vises ikke (nesten alle har 5).
@@ -497,8 +497,13 @@ komponent components/Tips.tsx), data fra dashboard.post_features.
   Foreløpige konsepter (f.eks. På Gata) kan bare gi «Test».
 - Mulig tidstrend (bare tidsrom): konseptets innlegg i tidsrommet starter eller slutter mer enn 21 dager
   innenfor konseptets egen periode (TIDSTREND_DAGER); konseptet teller da ikke som støtte.
-- Siden viser fast forklaring øverst, seksjon per plattform og format med «Bruk» og «Test», hypotese og grunn
-  for «Test», og en sammenfoldet tidsrom-sjekk (innlegg, første–siste dato og median per konsept og tidsrom).
+- Visning: merkelapp «Sikkert» (Bruk), «Svakt» (Bruk med grunnlag under ×1,20, SVAKT_UNDER, bare visning) og
+  «Prøv» (Test), i den rekkefølgen per plattform og format. Hvert kort: råd i én setning, «1,3 ganger vanlig
+  visningstall · 35 innlegg» og «Vis detaljer» (tall per konsept, tidstrend, datoer, forslag for «Prøv»). Én linje
+  øverst; øvrige forklaringer i «Slik leser du tallene» nederst.
+- «Hva har fungert» på Oversikt (under «Hva funket sist»): bare «Sikkert», maks 3 per plattform og format, lenke
+  til /monstre. Kortet vises ikke hvis post_features ikke kan leses.
+«Trender og idéer» (`/trender`) er en tom plassholder (senere: AI-agent som ser på trender på sosiale medier).
 
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). «Adrians periode» = fra denne datoen.

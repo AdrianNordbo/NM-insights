@@ -1,19 +1,16 @@
 import type { Metadata } from "next";
-import { Tips } from "@/components/Tips";
 import { Toppfelt } from "@/components/oversikt/Toppfelt";
-import { buildTips } from "@/lib/analyse/tips";
-import { getPostFeatures } from "@/lib/data/dashboard";
 
 export const metadata: Metadata = { title: "Trender og idéer – NM Insights" };
 
-export default async function Trender() {
-  const features = await getPostFeatures();
-  const result = features.ok ? { ok: true as const, data: buildTips(features.data) } : features;
+export default function Trender() {
   return (
     <>
       <Toppfelt title="Trender og idéer" />
       <main className="page">
-        <Tips result={result} />
+        <section className="recommendations">
+          <p className="muted small">Kommer.</p>
+        </section>
       </main>
     </>
   );

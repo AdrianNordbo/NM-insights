@@ -1794,110 +1794,79 @@ a.recent-title:hover {
   }
 }
 
-/* --- Trender og idéer (tips) ----------------------------------------------- */
+/* --- Mønster (/monstre) og «Hva har fungert» ------------------------------ */
 
-.tips-intro {
-  margin-top: 24px;
-}
-
-.tips-intro h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.tips-intro ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--ink-2);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.tips-intro li + li {
-  margin-top: 4px;
-}
-
-.tips-h3 {
-  margin: 18px 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.monster-intro {
+  margin: 24px 0 0;
+  font-size: 15px;
   color: var(--ink-2);
 }
 
-.tips-grid {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+.monster-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: start;
 }
 
-.tips-item h4 {
-  margin: 6px 0 4px;
+.monster h3 {
+  margin: 8px 0 4px;
   font-size: 17px;
   line-height: 1.3;
 }
 
-.tips-item p {
-  margin: 6px 0 0;
-}
-
-.tips-kicker {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-}
-
-.tips-status {
+.monster-label {
+  display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
 }
 
-.tips-status.bruk {
+.monster-label.sikkert {
   color: var(--up);
   background: var(--up-bg);
 }
 
-.tips-status.test {
-  color: var(--same);
-  background: var(--same-bg);
+.monster-label.svakt {
+  color: var(--ink-2);
+  background: var(--tag-bg);
 }
 
-.tips-ratio {
-  font-size: 28px;
-  font-weight: 700;
+.monster-label.prøv {
+  color: var(--series-1);
+  background: var(--chip);
+  border: 1px dashed var(--axis);
+}
+
+.monster-num {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
-.tips-ratio span {
+.monster-more {
+  margin-top: 12px;
   font-size: 13px;
-  font-weight: 400;
-  color: var(--ink-2);
 }
 
-.tips-meta {
-  font-size: 14px;
+.monster-more summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--series-1);
 }
 
-.tips-hyp {
-  font-size: 14px;
+.monster-more p {
+  margin: 8px 0 0;
+  line-height: 1.45;
 }
 
-.tag.tips-trend {
-  margin-left: 6px;
-  color: var(--down);
-  background: var(--down-bg);
-}
-
-.tips-concepts {
-  margin: 12px 0 0;
+.monster-concepts {
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
 }
 
-.tips-concepts li {
+.monster-concepts li {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -1906,74 +1875,62 @@ a.recent-title:hover {
   border-top: 1px solid var(--grid);
 }
 
-.tips-cnum {
+.monster-cline {
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
-.tips-fold {
-  margin-top: 12px;
-  font-size: 13px;
+.monster-trend {
+  flex-basis: 100%;
+  color: var(--down);
 }
 
-.tips-fold summary {
+.monster-help {
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+.monster-help summary {
   cursor: pointer;
   font-weight: 600;
 }
 
-.tips-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.tips-table thead th {
-  padding: 0 6px 6px;
+.monster-help ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
   color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
+  line-height: 1.5;
 }
 
-.tips-table td {
-  padding: 6px;
+.monster-help li + li {
+  margin-top: 4px;
+}
+
+.fungert {
+  display: grid;
+  gap: 14px;
+}
+
+.fungert-row + .fungert-row {
+  padding-top: 14px;
   border-top: 1px solid var(--grid);
 }
 
-.tips-table .n {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.tips-table .tag {
-  margin-left: 6px;
-}
-
-.tips-table abbr {
-  text-decoration: none;
-}
-
-.tips-table td:nth-child(3),
-.tips-table thead th {
-  white-space: nowrap;
-}
-
-.tips-table tr.tips-group th {
-  padding: 12px 6px 4px;
-  text-align: left;
+.fungert-name {
+  margin-bottom: 4px;
+  font-size: 12px;
   font-weight: 600;
-  border-top: 1px solid var(--axis);
+  color: var(--ink-2);
 }
 
-.tips-table tr.tips-current td {
-  font-weight: 600;
-  background: var(--chip);
+.fungert ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.tips-item p > .tag.tips-trend:first-child {
-  margin-left: 0;
-}
-
-.tips-scroll {
-  overflow-x: auto;
+.fungert p {
+  margin: 0;
 }

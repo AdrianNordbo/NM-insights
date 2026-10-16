@@ -6,7 +6,9 @@ import {
   getFollowerPoints,
   getFollowers,
   getPlatformSummary,
+  getPostFeatures,
 } from "@/lib/data/dashboard";
+import { buildFungert, buildMonstre } from "@/lib/analyse/monstre";
 import type { Result } from "@/lib/data/types";
 import { addDays, osloToday, pacificToday, utcToday } from "@/lib/format";
 import { buildTopp, type OversiktTopp } from "@/lib/oversikt/side";
@@ -20,13 +22,14 @@ export default async function OversiktSide(props: PageProps<"/">) {
     "America/Los_Angeles": addDays(pacificToday(now), -1),
     UTC: addDays(utcToday(now), -1),
   };
-  const [daily, platformRows, content, concepts, followers, followerPoints] = await Promise.all([
+  const [daily, platformRows, content, concepts, followers, followerPoints, features] = await Promise.all([
     getDailyActivity(),
     getPlatformSummary(),
     getContentLatest(),
     getConceptSummary(),
     getFollowers(),
     getFollowerPoints(),
+    getPostFeatures(),
   ]);
   // Følgerviewene er valgfrie: uten dashboard.followers vises kortene som før; uten follower_points brukes
   // bare de målte totalene.
@@ -48,6 +51,7 @@ export default async function OversiktSide(props: PageProps<"/">) {
       concepts={concepts}
       today={today}
       showBeforeConcepts={params.vis === "alle"}
+      fungert={features.ok ? buildFungert(buildMonstre(features.data)) : null}
     />
   );
 }
