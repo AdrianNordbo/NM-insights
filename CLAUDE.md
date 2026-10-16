@@ -190,6 +190,12 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   - `dashboard.follower_points` (samme migrering): ett punkt per konto per dag med kind målt
     (account_insights) > kontrollpunkt (follower_checkpoints) > beregnet (YouTube: kumulativ sum av
     subscribers_gained − subscribers_lost fra raw, fra 04.06, bare før første måling 30.09).
+  - `public.reel_links` og `dashboard.post_features` (2026-10-16_post_features.sql, kjørt 16.10.2026):
+    én rad per innlegg til analysen (Instagram bare Reels uten Bankinfo, YouTube Shorts, TikTok), med ukedag og
+    time i Oslo-tid, hashtag_count, text_length (caption uten hashtags; YouTube tittel), duration_s og views.
+    Varighet for Reels hentes fra TikTok/YouTube-versjonen (`duration_source`): manuell rad i reel_links går
+    foran automatisk kobling (samme kunde og konsept, publisert innen 60 min, entydig). Bare egenskap ved videoen,
+    aldri til å sammenligne visninger på tvers. reel_links har 7 manuelle rader (bare service_role; supabase/seed/reel_links.sql).
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -199,7 +205,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Standardrettigheter for nye objekter i public er strammet inn for eierrollene (også global
     EXECUTE-til-PUBLIC på nye funksjoner for eierrollen). En ny funksjon som authenticated skal bruke,
     trenger derfor eksplisitt grant.
-  - `authenticated` har bare USAGE på schema dashboard og SELECT på de fem viewene, og USAGE på schema
+  - `authenticated` har bare USAGE på schema dashboard og SELECT på viewene der (også post_features), og USAGE på schema
     `tilkobling` med EXECUTE på `claim_tiktok_state` og `store_tiktok_token` (TikTok-koblingen). anon har ingenting.
   - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
@@ -479,7 +485,25 @@ for at siden tåler manglende/ukjente rader); komponentene i web/components/ bar
 viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
 Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
 testet med en midlertidig, ikke-committet side som viser samme komponent med tall fra viewene.
-«Trender og idéer» (`/trender`) er en tom plassholder.
+«Mønster» (`/monstre`, i menyen): mønstre fra analysen (regler i web/lib/analyse/analyse.ts, visningsmodell
+monstre.ts, komponent components/Monstre.tsx), data fra dashboard.post_features.
+- Mål: innleggets visninger / median for konseptet på samme plattform og format (1,0 = vanlig). Bare modne
+  innlegg, special_event is null, ikke Bankinfo/Før konsepter/Ukjent/Annet/aktualitet. Instagram bare Reels.
+- Faktorer: tidsrom (før 17, 17–19, 19–21, 21+), ukedag (bare Folka Først), tekstlengde og varighet i tredeler
+  innenfor konseptet. Antall hashtags regnes, men vises ikke (nesten alle har 5).
+- «Bruk»: grunnlaget er konsepter med ≥ 6 modne innlegg og uten «mulig tidstrend»; minst 10 innlegg, median
+  ≥ ×1,15, minst 2 konsepter i samme retning (≥ ×1,05 med ≥ 3 innlegg), og ingen solide konsepter under ×1,00
+  (med ≥ 3 innlegg). Mellom ×1,00 og ×1,05 teller verken for eller imot. «Test»: median ≥ ×1,15 på ≥ 3 innlegg.
+  Foreløpige konsepter (f.eks. På Gata) kan bare gi «Test».
+- Mulig tidstrend (bare tidsrom): konseptets innlegg i tidsrommet starter eller slutter mer enn 21 dager
+  innenfor konseptets egen periode (TIDSTREND_DAGER); konseptet teller da ikke som støtte.
+- Visning: merkelapp «Sikkert» (Bruk), «Svakt» (Bruk med grunnlag under ×1,20, SVAKT_UNDER, bare visning) og
+  «Prøv» (Test), i den rekkefølgen per plattform og format. Hvert kort: råd i én setning, «1,31 ganger vanlig
+  visningstall · 35 innlegg» og «Vis detaljer» (tall per konsept, tidstrend, datoer, forslag for «Prøv»). Én linje
+  øverst; øvrige forklaringer i «Slik leser du tallene» nederst.
+- «Hva har fungert» på Oversikt (under «Hva funket sist»): bare «Sikkert», maks 3 per plattform og format, lenke
+  til /monstre. Kortet vises ikke hvis post_features ikke kan leses.
+«Trender og idéer» (`/trender`) er en tom plassholder (senere: AI-agent som ser på trender på sosiale medier).
 
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). «Adrians periode» = fra denne datoen.

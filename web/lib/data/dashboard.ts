@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { FeatureRow } from "../analyse/analyse";
 import { onlyKnown, onlyKnownPlatforms } from "./kjente";
 import type {
   ConceptSummaryRow,
@@ -79,4 +80,19 @@ export async function getFollowerPoints(): Promise<Result<FollowerPointRow[]>> {
 
 export async function getDailyActivity(): Promise<Result<DailyActivityRow[]>> {
   return keep(await selectAll<DailyActivityRow>("daily_activity", "*", "account_id,activity_date,format"), onlyKnownPlatforms);
+}
+
+/**
+ * dashboard.post_features (2026-10-16_post_features.sql): én rad per innlegg til analysen på tips-siden.
+ * Instagram bare Reels, YouTube bare Shorts; analyse.ts filtrerer resten (modne, uten spesiell hendelse).
+ */
+export async function getPostFeatures(): Promise<Result<FeatureRow[]>> {
+  return keep(
+    await selectAll<FeatureRow>(
+      "post_features",
+      "platform,account_id,content_id,format,concept,special_event,published_at,weekday,hour,hashtag_count,hashtags,text_length,duration_s,duration_source,views,is_mature",
+      "platform,content_id",
+    ),
+    onlyKnown,
+  );
 }

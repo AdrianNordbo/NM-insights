@@ -1,6 +1,6 @@
 -- NM Insights - kontroll av tilgang etter 2026-09-30_dashboard.sql, 2026-10-01_account_daily.sql,
--- 2026-10-13_tiktok.sql, 2026-10-14_tiktok_dashboard.sql, 2026-10-15_followers.sql og
--- 2026-10-15_follower_checkpoints.sql
+-- 2026-10-13_tiktok.sql, 2026-10-14_tiktok_dashboard.sql, 2026-10-15_followers.sql,
+-- 2026-10-15_follower_checkpoints.sql og 2026-10-16_post_features.sql
 -- Kjør hver blokk for seg i Supabase SQL Editor. Ingen blokk endrer data.
 
 -- A. Hvem kan bruke hva (anon/authenticated). Forventet: allowed = true BARE for authenticated
@@ -163,3 +163,31 @@ select relname as table_name, relrowsecurity as rls
 from pg_class
 where relnamespace = 'public'::regnamespace and relkind = 'r' and relname like 'tiktok%'
 order by relname;
+
+-- P. Analyse (2026-10-16_post_features.sql). Kjør hver del for seg.
+-- P1. Rettigheter. Forventet: allowed = true bare for authenticated på dashboard.post_features;
+--     false for anon på begge, og for authenticated på public.reel_links.
+select r.rolname as role, o.obj, has_table_privilege(r.rolname, o.obj, 'select') as allowed
+from pg_roles r
+cross join (values ('dashboard.post_features'), ('public.reel_links')) as o(obj)
+where r.rolname in ('anon', 'authenticated')
+order by role, obj;
+
+-- P2. Som authenticated: post_features kan leses. Forventet: ett tall (antall innlegg, f.eks. 296).
+begin;
+set local role authenticated;
+select count(*) as post_features from dashboard.post_features;
+rollback;
+
+-- P3. Som authenticated: reel_links blokkeres. Forventet: ERROR permission denied for table reel_links.
+begin;
+set local role authenticated;
+select count(*) from public.reel_links;
+rollback;
+
+-- P4. security_invoker på post_features og RLS på reel_links.
+--     Forventet: security_invoker = false og rls = true.
+select (select coalesce((select option_value from pg_options_to_table(c.reloptions)
+                         where option_name = 'security_invoker'), 'false (standard)')
+        from pg_class c where c.oid = 'dashboard.post_features'::regclass) as security_invoker,
+       (select relrowsecurity from pg_class where oid = 'public.reel_links'::regclass) as rls;
