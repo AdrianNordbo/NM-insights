@@ -6,7 +6,7 @@
 // Aldri sammenligning på tvers av plattformer eller formater: alt grupperes per plattform + format.
 //
 // Status per faktornivå:
-//   «bruk»: minst BRUK_MIN_POSTS innlegg, median minst BRUK_MIN_RATIO, samme retning (median over 1, med minst
+//   «bruk»: minst BRUK_MIN_POSTS innlegg, median minst BRUK_MIN_RATIO, samme retning (median minst RETNING_MIN_RATIO, med minst
 //           RETNING_MIN_POSTS innlegg) i minst BRUK_MIN_CONCEPTS konsepter, og ingen konsepter som peker tydelig
 //           motsatt vei (median under 1 med minst RETNING_MIN_POSTS innlegg). Bare innlegg fra konsepter med minst
 //           FORELOPIG_GRENSE modne innlegg teller.
@@ -61,6 +61,11 @@ export const TEST_MIN_POSTS = 3;
 export const TIDSTREND_DAGER = 21;
 /** Et konsept teller som «samme retning» eller «motsatt vei» bare med minst så mange innlegg i nivået. */
 export const RETNING_MIN_POSTS = 3;
+/**
+ * Samme retning = konseptets median i gruppen er minst ×1,05. Under ×1,00 = motsatt vei (stopper «bruk»).
+ * Mellom ×1,00 og ×1,05 teller konseptet verken for eller imot.
+ */
+export const RETNING_MIN_RATIO = 1.05;
 
 export type FactorKey = "tidsrom" | "ukedag" | "tekstlengde" | "varighet" | "hashtags";
 export const FACTOR_NAME: Record<FactorKey, string> = {
@@ -171,7 +176,7 @@ export type Finding = {
   /** Median av forholdstallet (visninger / konseptets median) for alle innlegg i nivået. */
   median: number;
   posts: number;
-  /** Konsepter med innlegg i nivået, og hvilke som peker samme vei (median over 1, minst RETNING_MIN_POSTS innlegg). */
+  /** Konsepter med innlegg i nivået, og hvilke som peker samme vei (median minst RETNING_MIN_RATIO, minst RETNING_MIN_POSTS innlegg). */
   concepts: string[];
   conceptsUp: string[];
   /** Antall konsepter med innlegg i nivået. */
@@ -201,7 +206,7 @@ function stats(rs: RatedRow[]) {
     median: median(rs.map((r) => r.ratio)),
     posts: rs.length,
     perConcept: perConcept.sort((a, b) => b.posts - a.posts),
-    conceptsUp: perConcept.filter((c) => c.median > 1 && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
+    conceptsUp: perConcept.filter((c) => c.median >= RETNING_MIN_RATIO && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
     conceptsDown: perConcept.filter((c) => c.median < 1 && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
   };
 }

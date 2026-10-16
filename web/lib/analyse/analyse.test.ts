@@ -273,3 +273,32 @@ describe("mulig tidstrend", () => {
     expect(analyse(rows).filter((f) => f.factor !== "tidsrom" && f.mulig_tidstrend)).toEqual([]);
   });
 });
+
+describe("grenser for samme retning", () => {
+  // Folka Først: 10 innlegg kl. 19 på ×1,33. Sitcom: 7 kl. 17 på medianen og 3 kl. 19 med gitt forhold.
+  const sitcom = (ratio: number) => [
+    ...many("Sitcom", [100, 100, 100, 100, 100, 100, 100], { hour: 17 }),
+    ...many("Sitcom", Array(3).fill(100 * ratio), { hour: 19 }),
+  ];
+  const run = (ratio: number) => find([...eveningWins("Folka Først", 10), ...sitcom(ratio)], "kl. 19–21");
+
+  it("×1,05 teller som samme retning", () => {
+    const f = run(1.05);
+    expect(f?.solid.conceptsUp.sort()).toEqual(["Folka Først", "Sitcom"]);
+    expect(f?.status).toBe("bruk");
+  });
+
+  it("×1,04 teller verken for eller imot", () => {
+    const f = run(1.04);
+    expect(f?.solid.conceptsUp).toEqual(["Folka Først"]);
+    expect(f?.solid.conceptsDown).toEqual([]);
+    expect(f?.status).toBe("test");
+  });
+
+  it("×1,00 er ikke motsatt vei, ×0,99 er det", () => {
+    expect(run(1)?.solid.conceptsDown).toEqual([]);
+    const f = run(0.99);
+    expect(f?.solid.conceptsDown).toEqual(["Sitcom"]);
+    expect(f?.status).toBe("test");
+  });
+});
