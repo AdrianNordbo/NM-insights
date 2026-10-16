@@ -6,8 +6,10 @@
 // Aldri sammenligning på tvers av plattformer eller formater: alt grupperes per plattform + format.
 //
 // Status per faktornivå:
-//   «bruk»: minst BRUK_MIN_POSTS innlegg, median minst BRUK_MIN_RATIO, og samme retning (median over 1, med minst
-//           RETNING_MIN_POSTS innlegg) i minst BRUK_MIN_CONCEPTS konsepter. Bare innlegg fra konsepter med minst FORELOPIG_GRENSE modne innlegg teller.
+//   «bruk»: minst BRUK_MIN_POSTS innlegg, median minst BRUK_MIN_RATIO, samme retning (median over 1, med minst
+//           RETNING_MIN_POSTS innlegg) i minst BRUK_MIN_CONCEPTS konsepter, og ingen konsepter som peker tydelig
+//           motsatt vei (median under 1 med minst RETNING_MIN_POSTS innlegg). Bare innlegg fra konsepter med minst
+//           FORELOPIG_GRENSE modne innlegg teller.
 //   «test»: ellers lovende (median minst BRUK_MIN_RATIO og minst TEST_MIN_POSTS innlegg), også fra foreløpige
 //           konsepter (f.eks. På Gata), som derfor aldri kan gi «bruk».
 // Dette er mønstre i egne tall, ikke bevis.
@@ -47,12 +49,12 @@ export const ANALYSE_FORMATS: Record<Platform, string[]> = { instagram: ["REELS"
 export const UKEDAG_KONSEPTER = ["Folka Først"];
 
 export const FORELOPIG_GRENSE = 6;
-export const BRUK_MIN_POSTS = 6;
+export const BRUK_MIN_POSTS = 10;
 export const BRUK_MIN_RATIO = 1.15;
 export const BRUK_MIN_CONCEPTS = 2;
 export const TEST_MIN_POSTS = 3;
-/** Et konsept teller som «samme retning» bare med minst så mange innlegg i nivået (ett innlegg er tilfeldig). */
-export const RETNING_MIN_POSTS = 2;
+/** Et konsept teller som «samme retning» eller «motsatt vei» bare med minst så mange innlegg i nivået. */
+export const RETNING_MIN_POSTS = 3;
 
 export type FactorKey = "tidsrom" | "ukedag" | "tekstlengde" | "varighet" | "hashtags";
 export const FACTOR_NAME: Record<FactorKey, string> = {
@@ -62,6 +64,9 @@ export const FACTOR_NAME: Record<FactorKey, string> = {
   varighet: "Varighet",
   hashtags: "Antall hashtags",
 };
+
+/** Faktorene som tas med i resultatet. Antall hashtags er utelatt: nesten alle innlegg har 5. */
+export const VISTE_FAKTORER: FactorKey[] = ["tidsrom", "ukedag", "tekstlengde", "varighet"];
 
 const WEEKDAY = ["", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"];
 
@@ -163,8 +168,10 @@ export type Finding = {
   /** Konsepter med innlegg i nivået, og hvilke som peker samme vei (median over 1, minst RETNING_MIN_POSTS innlegg). */
   concepts: string[];
   conceptsUp: string[];
+  /** Antall konsepter med innlegg i nivået. */
+  conceptCount: number;
   /** Tall bare fra konsepter med minst 6 modne innlegg (grunnlaget for «bruk»). */
-  solid: { median: number | null; posts: number; conceptsUp: string[] };
+  solid: { median: number | null; posts: number; conceptsUp: string[]; conceptsDown: string[] };
   /** Per konsept: median og antall i nivået. */
   perConcept: { concept: string; median: number; posts: number; preliminary: boolean }[];
 };
@@ -183,6 +190,7 @@ function stats(rs: RatedRow[]) {
     posts: rs.length,
     perConcept: perConcept.sort((a, b) => b.posts - a.posts),
     conceptsUp: perConcept.filter((c) => c.median > 1 && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
+    conceptsDown: perConcept.filter((c) => c.median < 1 && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
   };
 }
 
@@ -195,7 +203,7 @@ export function analyse(rows: FeatureRow[]): Finding[] {
   for (const [key, list] of groups) {
     const [platform, format] = key.split("|") as [Platform, string];
     const fns = levelFns(list);
-    for (const factor of Object.keys(fns) as FactorKey[]) {
+    for (const factor of VISTE_FAKTORER) {
       const byLevel = new Map<string, RatedRow[]>();
       for (const r of list) {
         const level = fns[factor](r);
@@ -208,7 +216,8 @@ export function analyse(rows: FeatureRow[]): Finding[] {
         const bruk =
           solid.posts >= BRUK_MIN_POSTS &&
           (solid.median ?? 0) >= BRUK_MIN_RATIO &&
-          solid.conceptsUp.length >= BRUK_MIN_CONCEPTS;
+          solid.conceptsUp.length >= BRUK_MIN_CONCEPTS &&
+          solid.conceptsDown.length === 0;
         const test = !bruk && all.posts >= TEST_MIN_POSTS && (all.median ?? 0) >= BRUK_MIN_RATIO;
         out.push({
           platform,
@@ -220,7 +229,8 @@ export function analyse(rows: FeatureRow[]): Finding[] {
           posts: all.posts,
           concepts: all.perConcept.map((c) => c.concept),
           conceptsUp: all.conceptsUp,
-          solid: { median: solid.median, posts: solid.posts, conceptsUp: solid.conceptsUp },
+          conceptCount: all.perConcept.length,
+          solid: { median: solid.median, posts: solid.posts, conceptsUp: solid.conceptsUp, conceptsDown: solid.conceptsDown },
           perConcept: all.perConcept,
         });
       }
@@ -228,4 +238,42 @@ export function analyse(rows: FeatureRow[]): Finding[] {
   }
   const rank = (f: Finding) => (f.status === "bruk" ? 0 : f.status === "test" ? 1 : 2);
   return out.sort((a, b) => rank(a) - rank(b) || b.median - a.median);
+}
+
+export type TidsromRad = {
+  concept: string;
+  preliminary: boolean;
+  band: string;
+  posts: number;
+  /** Første og siste publiseringsdato (Oslo, "YYYY-MM-DD"). */
+  first: string;
+  last: string;
+  median: number;
+};
+
+/**
+ * Tidsrom-sjekk: per konsept og tidsrom antall innlegg, første og siste dato og median-forhold, for å se om et
+ * tidsrom bare er brukt tidlig eller sent i perioden (da kan funnet egentlig være en tidstrend).
+ */
+export function tidsromSjekk(rows: FeatureRow[], platform: Platform, format: string): TidsromRad[] {
+  const groups = new Map<string, RatedRow[]>();
+  for (const r of rate(rows).filter((x) => x.platform === platform && x.format === format)) {
+    const k = `${r.concept}|${hourBand(r.hour)}`;
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const order = ["før kl. 17", "kl. 17–19", "kl. 19–21", "kl. 21 eller senere"];
+  return [...groups.values()]
+    .map((rs) => {
+      const dates = rs.map((r) => r.published_at.slice(0, 10)).sort();
+      return {
+        concept: rs[0].concept as string,
+        preliminary: rs[0].preliminaryConcept,
+        band: hourBand(rs[0].hour),
+        posts: rs.length,
+        first: dates[0],
+        last: dates[dates.length - 1],
+        median: median(rs.map((r) => r.ratio)) as number,
+      };
+    })
+    .sort((a, b) => a.concept.localeCompare(b.concept, "nb") || order.indexOf(a.band) - order.indexOf(b.band));
 }

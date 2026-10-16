@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyse, conceptBaselines, eligible, type FeatureRow, hashtagBand, hourBand, median, rate } from "./analyse";
+import { analyse, conceptBaselines, eligible, type FeatureRow, hashtagBand, hourBand, median, rate, tidsromSjekk } from "./analyse";
 
 let id = 0;
 function row(p: Partial<FeatureRow>): FeatureRow {
@@ -105,10 +105,17 @@ const find = (rows: FeatureRow[], level: string) => analyse(rows).find((f) => f.
 
 describe("status", () => {
   it("«bruk» når to solide konsepter peker samme vei", () => {
-    const f = find([...eveningWins("Folka Først"), ...eveningWins("Sitcom")], "kl. 19–21");
+    const f = find([...eveningWins("Folka Først", 5), ...eveningWins("Sitcom", 5)], "kl. 19–21");
     expect(f?.status).toBe("bruk");
-    expect(f?.posts).toBe(8);
+    expect(f?.posts).toBe(10);
+    expect(f?.conceptCount).toBe(2);
     expect(f?.conceptsUp.sort()).toEqual(["Folka Først", "Sitcom"]);
+  });
+
+  it("«bruk» krever minst 10 innlegg i gruppen", () => {
+    const f = find([...eveningWins("Folka Først", 4), ...eveningWins("Sitcom", 4)], "kl. 19–21");
+    expect(f?.posts).toBe(8);
+    expect(f?.status).toBe("test");
   });
 
   it("bare «test» når mønsteret finnes i ett konsept", () => {
@@ -131,15 +138,74 @@ describe("status", () => {
   });
 
   it("ingen status når medianen er under 1,15", () => {
-    const f = find([...eveningWins("Folka Først"), ...eveningWins("Sitcom")], "kl. 17–19");
+    const f = find([...eveningWins("Folka Først", 5), ...eveningWins("Sitcom", 5)], "kl. 17–19");
     expect(f?.status).toBeNull();
   });
+});
 
-  it("et konsept med ett innlegg i nivået teller ikke som samme retning", () => {
-    const rows = [...eveningWins("Folka Først", 6), ...many("Sitcom", [100, 100, 100, 100, 100], { hour: 17 }), row({ concept: "Sitcom", views: 500, hour: 19 })];
-    const f = find(rows, "kl. 19–21");
+describe("motsatt retning", () => {
+  const base = () => [...eveningWins("Folka Først", 5), ...eveningWins("Sitcom", 5)];
+
+  it("et solid konsept med minst 3 innlegg under 1,00 stopper «bruk»", () => {
+    // Uten kompetanse: 6 modne (solid), 3 kl. 19 med halvparten av konseptets median
+    const uk = [...many("Uten kompetanse", [100, 100, 100], { hour: 17 }), ...many("Uten kompetanse", [50, 50, 50], { hour: 19 })];
+    const f = find([...base(), ...uk], "kl. 19–21");
+    expect(f?.solid.conceptsDown).toEqual(["Uten kompetanse"]);
+    expect(f?.status).toBe("test");
+  });
+
+  it("med bare 2 innlegg i gruppen teller konseptet ikke som motsatt vei", () => {
+    const uk = [...many("Uten kompetanse", [100, 100, 100, 100], { hour: 17 }), ...many("Uten kompetanse", [50, 50], { hour: 19 })];
+    const f = find([...base(), ...uk], "kl. 19–21");
+    expect(f?.solid.conceptsDown).toEqual([]);
+    expect(f?.status).toBe("bruk");
+  });
+
+  it("et foreløpig konsept under 1,00 stopper ikke «bruk»", () => {
+    const pg = many("På Gata", [100, 100, 50, 50, 50], { hour: 19 });
+    expect(find([...base(), ...pg], "kl. 19–21")?.status).toBe("bruk");
+  });
+});
+
+describe("minst 3 innlegg per konsept for samme retning", () => {
+  // Folka Først: 7 kl. 19 over medianen. Sitcom: n innlegg kl. 19 med dobbel median.
+  const rows = (n: number) => [
+    ...eveningWins("Folka Først", 7),
+    ...many("Sitcom", Array(8).fill(100), { hour: 17 }),
+    ...many("Sitcom", Array(n).fill(200), { hour: 19 }),
+  ];
+
+  it("2 innlegg: teller ikke, bare «test»", () => {
+    const f = find(rows(2), "kl. 19–21");
     expect(f?.conceptsUp).toEqual(["Folka Først"]);
     expect(f?.status).toBe("test");
+  });
+
+  it("3 innlegg: teller, «bruk»", () => {
+    const f = find(rows(3), "kl. 19–21");
+    expect(f?.conceptsUp.sort()).toEqual(["Folka Først", "Sitcom"]);
+    expect(f?.status).toBe("bruk");
+  });
+});
+
+describe("tidsromSjekk", () => {
+  it("per konsept og tidsrom: antall, første og siste dato, median-forhold", () => {
+    const rows = [
+      row({ concept: "Sitcom", views: 100, hour: 17, published_at: "2026-06-16T17:00:00" }),
+      row({ concept: "Sitcom", views: 100, hour: 17, published_at: "2026-07-01T17:00:00" }),
+      row({ concept: "Sitcom", views: 300, hour: 19, published_at: "2026-09-01T19:00:00" }),
+      row({ concept: "Sitcom", views: 200, hour: 19, published_at: "2026-08-01T19:00:00" }),
+    ];
+    expect(tidsromSjekk(rows, "instagram", "REELS")).toEqual([
+      { concept: "Sitcom", preliminary: true, band: "kl. 17–19", posts: 2, first: "2026-06-16", last: "2026-07-01", median: 2 / 3 },
+      { concept: "Sitcom", preliminary: true, band: "kl. 19–21", posts: 2, first: "2026-08-01", last: "2026-09-01", median: (4 / 3 + 2) / 2 },
+    ]);
+  });
+});
+
+describe("hashtags", () => {
+  it("antall hashtags er ikke med i resultatet", () => {
+    expect(analyse(eveningWins("Sitcom", 5)).some((f) => f.factor === "hashtags")).toBe(false);
   });
 });
 
@@ -153,16 +219,16 @@ describe("faktorer", () => {
 
   it("varighet i tredeler innenfor konseptet", () => {
     const rows = [
-      ...many("Sitcom", [100, 100, 100], { duration_s: 10 }),
-      ...many("Sitcom", [100, 100, 100], { duration_s: 20 }),
-      ...many("Sitcom", [300, 300, 300], { duration_s: 30 }),
+      ...many("Sitcom", Array(5).fill(100), { duration_s: 10 }),
+      ...many("Sitcom", Array(5).fill(100), { duration_s: 20 }),
+      ...many("Sitcom", Array(5).fill(300), { duration_s: 30 }),
       // Folka Først har helt andre lengder, men får egne tredeler
-      ...many("Folka Først", [100, 100, 100], { duration_s: 40 }),
-      ...many("Folka Først", [100, 100, 100], { duration_s: 50 }),
-      ...many("Folka Først", [300, 300, 300], { duration_s: 60 }),
+      ...many("Folka Først", Array(5).fill(100), { duration_s: 40 }),
+      ...many("Folka Først", Array(5).fill(100), { duration_s: 50 }),
+      ...many("Folka Først", Array(5).fill(300), { duration_s: 60 }),
     ];
     const f = analyse(rows).find((x) => x.factor === "varighet" && x.level === "lang video");
-    expect(f?.posts).toBe(6);
+    expect(f?.posts).toBe(10);
     expect(f?.status).toBe("bruk");
   });
 
