@@ -11,8 +11,9 @@ const konsept = (concept: string, x: number, p: Partial<FeatureRow> = {}) => [
 const kl19 = (rows: FeatureRow[]) => analyse(rows).find((f) => f.factor === "tidsrom" && f.level === "kl. 19–21");
 
 describe("tekst", () => {
-  it("ganger vanlig med én desimal, lister på norsk", () => {
-    expect(ganger(1.309)).toBe("1,3 ganger vanlig");
+  it("ganger vanlig med to desimaler, lister på norsk", () => {
+    expect(ganger(1.309)).toBe("1,31 ganger vanlig");
+    expect(ganger(1.15)).toBe("1,15 ganger vanlig");
     expect(list(["A", "B", "C"])).toBe("A, B og C");
   });
 });
@@ -50,7 +51,7 @@ describe("buildMonstre", () => {
     expect(s.cards.map((c) => order.indexOf(c.label))).toEqual([...s.cards.map((c) => order.indexOf(c.label))].sort());
     const c = s.cards.find((x) => x.advice === "Publiser Reels kl. 19–21");
     expect(c?.label).toBe("sikkert");
-    expect(c?.numbers).toBe("1,5 ganger vanlig visningstall · 10 innlegg");
+    expect(c?.numbers).toBe("1,50 ganger vanlig visningstall · 10 innlegg");
     expect(c?.details.concepts.map((x) => x.line)).toEqual([
       "1,50 ganger vanlig · 5 innlegg · 01.09",
       "1,50 ganger vanlig · 5 innlegg · 01.09",

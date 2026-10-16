@@ -58,13 +58,13 @@ function SlikLeser({ sections }: { sections: MonsterSection[] }) {
       <summary>Slik leser du tallene</summary>
       <ul>
         <li>
-          «1,3 ganger vanlig» betyr at innleggene fikk 30 % flere visninger enn det som er vanlig for samme type innhold
+          «1,30 ganger vanlig» betyr at innleggene fikk 30 % flere visninger enn det som er vanlig for samme type innhold
           (f.eks. Folka Først) på samme plattform. Typen innhold holdes dermed lik, så det er tidspunkt, lengde o.l. som
           sammenlignes.
         </li>
         <li>
           <strong>Sikkert</strong>: minst {BRUK_MIN_POSTS} innlegg, og minst to typer innhold viser det samme, uten at noen
-          viser det motsatte. <strong>Svakt</strong>: som Sikkert, men under 1,2 ganger vanlig. <strong>Prøv</strong>: lovende,
+          viser det motsatte. <strong>Svakt</strong>: som Sikkert, men under 1,20 ganger vanlig. <strong>Prøv</strong>: lovende,
           men for lite grunnlag.
         </li>
         <li>Visningstallene er levetidstall, så eldre innlegg har hatt mer tid til å samle visninger.</li>

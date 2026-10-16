@@ -498,7 +498,7 @@ monstre.ts, komponent components/Monstre.tsx), data fra dashboard.post_features.
 - Mulig tidstrend (bare tidsrom): konseptets innlegg i tidsrommet starter eller slutter mer enn 21 dager
   innenfor konseptets egen periode (TIDSTREND_DAGER); konseptet teller da ikke som støtte.
 - Visning: merkelapp «Sikkert» (Bruk), «Svakt» (Bruk med grunnlag under ×1,20, SVAKT_UNDER, bare visning) og
-  «Prøv» (Test), i den rekkefølgen per plattform og format. Hvert kort: råd i én setning, «1,3 ganger vanlig
+  «Prøv» (Test), i den rekkefølgen per plattform og format. Hvert kort: råd i én setning, «1,31 ganger vanlig
   visningstall · 35 innlegg» og «Vis detaljer» (tall per konsept, tidstrend, datoer, forslag for «Prøv»). Én linje
   øverst; øvrige forklaringer i «Slik leser du tallene» nederst.
 - «Hva har fungert» på Oversikt (under «Hva funket sist»): bare «Sikkert», maks 3 per plattform og format, lenke

@@ -25,12 +25,9 @@ export type Label = "sikkert" | "svakt" | "prøv";
 export const LABEL_NAME: Record<Label, string> = { sikkert: "Sikkert", svakt: "Svakt", prøv: "Prøv" };
 const LABEL_ORDER: Label[] = ["sikkert", "svakt", "prøv"];
 
-const one = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const two = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-/** 1.309 → «1,3 ganger vanlig» */
-export const ganger = (v: number) => `${one.format(v)} ganger vanlig`;
-/** 1.309 → «1,31 ganger vanlig» (detaljer) */
-export const ganger2 = (v: number) => `${two.format(v)} ganger vanlig`;
+/** 1.309 → «1,31 ganger vanlig». Alltid to desimaler, så 1,15 ikke ser ut som 1,2. */
+export const ganger = (v: number) => `${two.format(v)} ganger vanlig`;
 
 /** «A», «A og B», «A, B og C». */
 export function list(items: string[]): string {
@@ -91,7 +88,7 @@ function why(f: Finding): string[] {
       `${s.conceptsUp.length === 1 ? "bare én type innhold" : "ingen typer innhold"} viser det samme (minst ${two.format(RETNING_MIN_RATIO)} ganger vanlig på ${RETNING_MIN_POSTS} innlegg)`,
     );
   if (s.conceptsDown.length) out.push(`${list(s.conceptsDown)} viser det motsatte`);
-  if (s.posts > 0 && (s.median ?? 0) < BRUK_MIN_RATIO) out.push(`for lite forskjell (${ganger2(s.median ?? 0)}, trenger ${two.format(BRUK_MIN_RATIO)})`);
+  if (s.posts > 0 && (s.median ?? 0) < BRUK_MIN_RATIO) out.push(`for lite forskjell (${ganger(s.median ?? 0)}, trenger ${two.format(BRUK_MIN_RATIO)})`);
   return out;
 }
 
@@ -108,7 +105,7 @@ export type MonsterCard = {
   id: string;
   label: Label;
   advice: string;
-  /** «1,3 ganger vanlig visningstall · 35 innlegg» */
+  /** «1,31 ganger vanlig visningstall · 35 innlegg» */
   numbers: string;
   details: {
     concepts: DetailConcept[];
@@ -138,7 +135,7 @@ function details(rows: FeatureRow[], f: Finding): MonsterCard["details"] {
   const sjekk = f.factor === "tidsrom" ? tidsromSjekk(rows, f.platform, f.format) : [];
   const unit = f.factor === "varighet" ? "s" : "tegn";
   const concepts = f.perConcept.map((c) => {
-    const parts = [ganger2(c.median), `${c.posts} innlegg`];
+    const parts = [ganger(c.median), `${c.posts} innlegg`];
     if (c.range) {
       const [lo, hi] = c.range.map((v) => Math.round(v));
       parts.push(lo === hi ? `${lo} ${unit}` : `${lo}–${hi} ${unit}`);
@@ -160,7 +157,7 @@ function details(rows: FeatureRow[], f: Finding): MonsterCard["details"] {
   return {
     concepts,
     basis: bruk
-      ? `Bygger på ${list(f.solid.conceptsUp)}. Alle innlegg i gruppen: ${ganger2(f.median)} på ${f.posts} innlegg.`
+      ? `Bygger på ${list(f.solid.conceptsUp)}. Alle innlegg i gruppen: ${ganger(f.median)} på ${f.posts} innlegg.`
       : null,
     suggestion: bruk ? null : suggestion(f),
     why: bruk ? [] : why(f),
