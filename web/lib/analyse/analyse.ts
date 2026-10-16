@@ -189,8 +189,8 @@ export type Finding = {
   /** Bare tidsrom: konsepter der tidsrommet bare dekker en del av konseptets periode. */
   tidstrend: string[];
   mulig_tidstrend: boolean;
-  /** Per konsept: median og antall i nivået. */
-  perConcept: { concept: string; median: number; posts: number; preliminary: boolean }[];
+  /** Per konsept: median og antall i nivået, og for tekstlengde/varighet laveste–høyeste verdi i nivået. */
+  perConcept: { concept: string; median: number; posts: number; preliminary: boolean; range?: [number, number] }[];
 };
 
 function stats(rs: RatedRow[]) {
@@ -209,6 +209,16 @@ function stats(rs: RatedRow[]) {
     conceptsUp: perConcept.filter((c) => c.median >= RETNING_MIN_RATIO && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
     conceptsDown: perConcept.filter((c) => c.median < 1 && c.posts >= RETNING_MIN_POSTS).map((c) => c.concept),
   };
+}
+
+/** Tekstlengde (tegn) og varighet (sekunder) er tredeler innenfor konseptet: vis hva nivået betyr per konsept. */
+function withRange(factor: FactorKey, rs: RatedRow[], perConcept: Finding["perConcept"]): Finding["perConcept"] {
+  const value = factor === "tekstlengde" ? (r: RatedRow) => r.text_length : factor === "varighet" ? (r: RatedRow) => Number(r.duration_s) : null;
+  if (!value) return perConcept;
+  return perConcept.map((c) => {
+    const v = rs.filter((r) => r.concept === c.concept).map(value);
+    return { ...c, range: [Math.min(...v), Math.max(...v)] as [number, number] };
+  });
 }
 
 const DAY_MS = 86_400_000;
@@ -276,7 +286,7 @@ export function analyse(rows: FeatureRow[]): Finding[] {
           conceptsUp: all.conceptsUp,
           conceptCount: all.perConcept.length,
           solid: { median: solid.median, posts: solid.posts, conceptsUp: solid.conceptsUp, conceptsDown },
-          perConcept: all.perConcept,
+          perConcept: withRange(factor, rs, all.perConcept),
           tidstrend,
           mulig_tidstrend: tidstrend.length > 0,
         });

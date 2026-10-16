@@ -1,32 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyse, conceptBaselines, eligible, type FeatureRow, hashtagBand, hourBand, median, rate, tidsromSjekk } from "./analyse";
-
-let id = 0;
-function row(p: Partial<FeatureRow>): FeatureRow {
-  id += 1;
-  return {
-    platform: "instagram",
-    account_id: 1,
-    content_id: `c${id}`,
-    format: "REELS",
-    special_event: null,
-    published_at: "2026-09-01T19:00:00",
-    weekday: 1,
-    hour: 19,
-    hashtag_count: 5,
-    hashtags: null,
-    text_length: 100,
-    duration_s: 30,
-    duration_source: "TikTok-versjonen",
-    is_mature: true,
-    concept: "Sitcom",
-    views: 100,
-    ...p,
-  };
-}
-
-/** n innlegg i konseptet med gitte visninger. */
-const many = (concept: string, views: number[], p: Partial<FeatureRow> = {}) => views.map((v) => row({ concept, views: v, ...p }));
+import { many, row } from "./testdata";
 
 describe("median", () => {
   it("snitt av de to midterste (percentile_cont)", () => {
