@@ -1,7 +1,9 @@
 // Terskler og lister for anbefalingslinjen, samlet ett sted. Endres her, ikke i logikken.
 
+import { IKKE_ANALYSE } from "../regler/konsepter";
+
 /** Konsepter som aldri gir anbefalinger: samlekategorier og Veksthusets egne informasjonsinnlegg. */
-export const EXCLUDED_CONCEPTS: readonly string[] = ["Før konsepter", "Ukjent", "Annet/aktualitet", "Bankinfo"];
+export const EXCLUDED_CONCEPTS: readonly string[] = IKKE_ANALYSE;
 
 /** A: et innlegg som er 7–14 dager gammelt, med minst 1,5 × konseptets median visninger. */
 export const A_MIN_AGE_DAYS = 7;

@@ -85,3 +85,21 @@ export function isoWeek(date: string): number {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
 }
+
+const twoDecimals = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** 1.309 → «1,31» (ganger vanlig, heatmap) */
+export function formatTimes(value: number): string {
+  return twoDecimals.format(value);
+}
+
+/** Andel 0.0156 → «1,56 %» (engasjementsrate) */
+export function formatShare(value: number | null | undefined): string {
+  return value == null ? "–" : `${twoDecimals.format(value * 100)} %`;
+}
+
+/** Endring i andel 0.0087 → «+0,87 pp», −0.0002 → «−0,02 pp» */
+export function formatPp(diff: number): string {
+  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "±";
+  return `${sign}${twoDecimals.format(Math.abs(diff * 100))} pp`;
+}

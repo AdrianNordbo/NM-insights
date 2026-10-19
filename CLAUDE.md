@@ -168,7 +168,8 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     VIDEO/PHOTO, views = video_views (levetid, kan inneholde betalt visning), title = første linje av captionen
     uten hashtags bakerst. Ny kolonne bakerst: `pending` (true når TikTok ikke har behandlet tallene ennå:
     yngre enn 7 dager og 0 visninger eller ingen måling med reach; false for Instagram og YouTube).
-  - `dashboard.concept_summary`: median views/likes/comments per plattform + konto + format + konsept +
+  - `dashboard.concept_summary` (leses ikke av dashboardet fra 19.10.2026; samme medianer regnes i
+    web/lib/oversikt/konseptmedianer.ts): median views/likes/comments per plattform + konto + format + konsept +
     special_event, bare modne innlegg, med posts og preliminary (< 6). VM får egne rader.
     `median_engagement_per_view` = median av (likes + comments) / views per innlegg
     (2026-09-30_concept_engagement.sql). Bare sammenlignbar innenfor samme plattform og format, og ikke
@@ -376,134 +377,104 @@ Ukesrapport (kort, ingen konseptbeslutninger):
 
 ## Frontend-regler (dashboard)
 - Frontend leser bare fra schema `dashboard`, aldri fra public.
-- Plattformer og formater vises hver for seg og sammenlignes aldri med hverandre.
-- Følgere (dashboard.followers, web/lib/oversikt/folgere.ts), samme metode for alle plattformer:
-  - «Følgere nå» = siste målte total. Netto i perioden = total ved periodens slutt (siste måling i perioden)
-    minus total ved utgangen av dagen før periodestart. Startverdien (accounts.followers_start) teller som
-    en måling ved utgangen av dagen før followers_start_date; en ekte måling samme dag går foran, og
-    startverdien er aldri en slutt.
-  - Merknaden står i selve tallraden, ikke bare i info-ikonet: «hittil» (uferdig periode), «målt fra dd.mm»
-    (første måling ligger inne i perioden og startverdi mangler; aldri vist som hele perioden), «fra X til Y»
-    + kildeetikett fra followers_start_source («beregnet fra Meta Insikt», «beregnet fra YouTube Analytics»,
-    «kontoen startet på 0», ellers «startverdi oppgitt manuelt dd.mm») (startverdi brukt), «t.o.m.
-    dd.mm» (ferdig periode med hull på slutten). «ikke nok data» når første måling er etter periodens slutt
-    eller det bare finnes én måling i perioden; «–» når det ikke finnes målinger.
-  - Summer bare «følgere nå» på tvers (Total: «Følgere nå», forklart som sum av kontoer i info-ikonet), aldri
-    netto. Uke/Måned-kortene viser bare netto nye i perioden, ikke totalen. Ingen prosent og ingen pil mot forrige periode for netto.
-  - Brutto (Instagram «Nye følgere (Meta)», YouTube «Nye abonnenter»; TikTok ingen) er en dempet linje under
-    netto og blandes aldri med netto. Regelen under («ikke nok data») gjelder brutto. Brutto skjules når
-    netto bare dekker en del av perioden («målt fra dd.mm»), så netto og brutto aldri står side om side for
-    ulike tidsrom (f.eks. Instagram september: «+2 · målt fra 29.09» uten brutto-linje).
-  - Uten dashboard.followers (eller ved feil) vises kortene som før, uten melding. Uten follower_points brukes
-    bare de målte totalene fra dashboard.followers.
-  - Punktene: målt > kontrollpunkt > beregnet samme dag. Kontrollpunkter og beregnede punkter skal aldri
-    presenteres som målt: tallraden sier «målt fra dd.mm» bare når første punkt er målt, ellers «fra dd.mm»,
-    og den dempede kildelinjen viser «beregnet fra Meta Insikt» / «beregnet fra TikTok Studio» / «beregnet fra
-    YouTube Analytics» / «kontoen startet på 0» for alle endepunkter som ikke er målt. «fra X til Y» står
-    bare på Total-kortene. Info-tekstene sier at månedstall før 29.09 (Instagram) og 14.08 (TikTok) kan
-    avvike med noen få følgere.
-  - Instagram-uker før 29.09 og TikTok-uker før 14.08 er «ikke nok data» (bare månedstall finnes).
-- Brutto følgertall (new_followers) vises som «ikke nok data» når antall dager med tall er
-  lavere enn antall dager i perioden. For en periode som ikke er ferdig (`period_complete = false`)
-  sammenlignes det med antall dager som har gått: fra period_start til og med i går (dagens døgn er
-  aldri ferdig hos Meta eller YouTube). YouTube Analytics ligger 2–3 døgn etter, så YouTube viser
-  «ikke nok data» de første dagene av en ny periode.
-- `median_engagement_per_view` vises bare side om side med konsepter på samme plattform og format.
-- Konseptet «Før konsepter» er skjult som standard.
-- Grupper med `preliminary = true` merkes «foreløpig».
-- Innhold med special_event (f.eks. VM 2026) vises som egne rader, ikke blandet inn i konseptene.
-- Konsepter er «inaktiv» når det er 21 dager eller mer siden siste innlegg (`INACTIVE_AFTER_DAYS` i
-  web/lib/oversikt/konsepter.ts), og aktive igjen ved neste innlegg. Ingen manuell statusliste.
-- Instagram Feed er av som standard i alle seksjoner og slås på med `?feed=1`.
-- Endring mot forrige periode vises i prosent bare når forrige verdi er minst 1 000; ellers pil + forrige verdi.
-- Annonsevisninger (AD) holdes utenfor for Instagram, og døgnene er Stillehavsdøgn for Instagram og
-  YouTube og UTC-døgn for TikTok (sagt i info-ikonene). TikTok-visninger kan inneholde betalt visning.
+- Plattformer og formater sammenlignes aldri med hverandre. Unntak: summene for «Alle plattformer» (Totale
+  visninger, Engasjement, Følgere nå) er merket med info-ikon om ulike visningsdefinisjoner, AD holdt utenfor,
+  UTC for TikTok og Stillehavstid for de andre.
+- Konfigurasjon samlet ett sted:
+  - `web/lib/regler/konsepter.ts`: `UTELATTE_KONSEPTER` (Bankinfo), `SAMLEKATEGORIER`, `IKKE_ANALYSE`,
+    `KONSEPTBRUDD` (Folka Først fra 26.10.2026, ny teksting) og `LAAS_UKER` (4).
+    `EXCLUDED_CONCEPTS` (anbefalinger) og `ANALYSE_UTELATT` (mønstre) leser derfra.
+  - `web/lib/regler/plattformer.ts`: plattformvalgene (`PLATTFORM_VALG`) og plattformene i publiseringsutkastet
+    (`PLAN_PLATTFORMER`: Instagram, YouTube, TikTok). Facebook legges til der senere.
+- Bankinfo: utelatt fra konsepter, anbefalinger, mønstre, medianer, heatmap, ferske innlegg og «Hva funket
+  sist», men med i totaler og kontotall (forklart i info-ikonene). Felles forberedelse i `web/lib/data/forbered.ts`.
+- Konseptbrudd: innlegg fra bruddatoen får eget navn («Folka Først (fra 26.10)») og blandes aldri med innleggene
+  før i medianer, mønstre og heatmap. Frem til den nye gruppen har ≥ 6 modne innlegg er den «foreløpig», og
+  medianer og mønstre for Folka Først bygger bare på innleggene før.
+- Konseptmedianene regnes i `web/lib/oversikt/konseptmedianer.ts` fra content_latest (samme definisjon som
+  dashboard.concept_summary, kontrollert likt for alle 23 grupper 19.10.2026), så bruddet og Bankinfo-filteret
+  kan håndteres uten databaseendring. Dashboardet leser ikke concept_summary lenger.
+- Plattformvalg (nedtrekk, alle sider): Alle plattformer, Instagram Reels, Instagram Feed, YouTube, TikTok.
+  «Alle» tar ikke med Instagram Feed i lister, kort, konsepter og mønstre, men det store totaltallet,
+  engasjementet og grafen tar med Feed (info-ikonet sier det).
+- Periodevalg (Oversikt): Total siden start (standard), Denne uken, Forrige uke, Denne måneden, Forrige måned,
+  Siste 7/30/90 dager. Standardadresse `?plattform=alle&periode=total`. Kalenderperioder følger Oslo-kalenderen
+  og kuttes ved siste døgn med data; rullerende perioder slutter på siste døgn.
+- Siste døgn: «Alle» bruker siste døgn alle plattformene har data for («alle plattformer, t.o.m. dd.mm»);
+  én plattform bruker sitt eget («data til og med dd.mm»).
+- Sammenligning alltid mot like mange dager rett før («07.10–11.10 (5 dager før)»). Har ikke alle valgte
+  plattformer data for både perioden og dagene før, vises ingen sammenligning, men en merknad
+  («TikTok har tall fra 14.08 …»). Prosent bare når forrige verdi er minst 1 000; ellers pil + forrige verdi.
+- Engasjement = likes + kommentarer + delinger (lagringer er ikke med). Engasjementsrate = engasjement /
+  visninger, bare for én plattform, endring i prosentpoeng. Ingen rate for «Alle».
+- Total siden start: levetidstall per innlegg fra content_latest publisert fra `takeover_date` (som før), Bankinfo
+  med. Grafen for Total viser døgn fra første døgn alle valgte plattformer har døgntall (TikTok fra 14.08).
+- Følgere (dashboard.followers + follower_points, web/lib/oversikt/folgere.ts), samme metode som før:
+  - Netto = total ved periodens slutt minus total ved utgangen av dagen før periodestart. Kalenderperioder bruker
+    hele perioden («hittil» når den ikke er ferdig), uavhengig av døgntallene for visninger.
+  - Netto summeres aldri på tvers: for «Alle» én linje per plattform. «Følgere nå» summeres (sum av kontoer).
+  - Instagram Reels og Feed viser følgerne for hele Instagram-kontoen (merket).
+  - Punktene: målt > kontrollpunkt > beregnet; merknader («målt fra», «fra», «hittil», «t.o.m.») og kildeetiketter
+    («beregnet fra Meta Insikt» o.l.) som før. Total: «+177 siden 15.06» med kilde.
+- Mønsteretiketter: «Basert på data» (Bruk) med «Tydelig mønster» (grunnlag ≥ ×1,20) eller «Svakt mønster»,
+  og «Prøv» (Test). Maks 3 «Prøv» per plattform og format (de sterkeste). Alle tekster sier at mønstre er
+  hypoteser, ikke bevis. Anbefalingenes regel A/B heter «Mønster», C «Følg med», lovende nye konsepter «Test».
+- Grupper med `preliminary = true` merkes «foreløpig». Innhold med special_event (VM) vises som egne rader.
+- Konsepter er «inaktiv» når det er 21 dager eller mer siden siste innlegg (`INACTIVE_AFTER_DAYS`).
 - Dashboardet viser bare plattformer og formater i KNOWN_FORMATS (web/lib/navn.ts); andre rader ignoreres.
-- TikTok: kortet bygger på hele kontoen (daily_activity format ALL) og heter bare «TikTok»; innleggene er
-  «TikTok · Video». Siste ferdige døgn regnes per series.dayTz (i går i UTC for TikTok). Ferske innlegg med
-  `pending` vises som «venter på TikTok», aldri som 0. Nye følgere vises som «ikke nok data» (null fordi
-  kontoen ikke er Business).
-- Fast rekkefølge overalt: Instagram, YouTube, TikTok (PLATFORM_ORDER), så Reels, Feed, Shorts, Video, Foto.
-- Etiketter ved topper i grafene er «Mulig årsak: …», aldri en fasit.
+- TikTok: ferske innlegg med `pending` vises som «venter på TikTok», aldri som 0.
+- Fast rekkefølge overalt: Instagram, YouTube, TikTok, så Reels, Feed, Shorts, Video, Foto.
 
 ## Dashboard (web/)
 Adresse: https://insights.nordbomarketing.no (reserve: https://nm-insights-seven.vercel.app).
-Next.js 16 (App Router) på Vercel, Recharts for grafer, Vitest for tester (`npm test` i web/). Design etter
-v5-forhåndsvisningen (data/forhandsvisning/, lokal og gitignored). Siden er alltid lys når den åpnes;
-sol/måne-knappen øverst til høyre slår mørk modus av og på mens siden er åpen (ingen lagring).
+Next.js 16 (App Router) på Vercel, Vitest for tester (`npm test` i web/). Design etter forhåndsvisning 4
+(data/forhandsvisning/nytt-design-4.html, lokal og gitignored), tatt i bruk 19.10.2026. Siden er alltid lys når
+den åpnes; «Mørk modus» i sidemenyen slår mørk modus av og på mens siden er åpen (ingen lagring).
+Tokens (farger, radius, skygge) i web/app/globals.css med lys og mørk variant; blått er hovedaksenten,
+plattformfargene brukes bare som prikk og tynn stripe.
 
-Oversikt (`/`), i rekkefølge:
-1. Mørkeblått toppfelt: Uke | Måned | Total og piler (`?periode=uke&p=2026-W39`, `?periode=måned&p=2026-09`),
-   Feed-bryteren, én regelbasert sammendragssetning per plattform og format (med «… inneholdt VM-innhold,
-   så sammenligningen er skjev»), og plattformkort som stikker 70 px ut over kanten (visninger, endring,
-   trend siste 12 perioder, et eget følgerfelt med «Netto nye følgere» / «Netto nye abonnenter» som stort tall
-   med merknad i tallraden og dempet brutto-linje under, innlegg publisert). Totalen («følgere nå») vises
-   bare i Total. Standardperiode = alltid inneværende
-   uke/måned etter Oslo-kalenderen (osloToday), uten unntak; pilene stopper ved inneværende periode.
-   Plattformenes døgn følger Stillehavstid: siste ferdige døgn = i går i Stillehavstid (pacificToday − 1).
-   Uferdige perioder merkes «hittil, t.o.m. dd.mm» og sammenlignes med like mange dager i forrige periode.
-   En plattform som ligger etter siste ferdige døgn (YouTube Analytics), eller som ennå ikke har data i
-   perioden (f.eks. mandag morgen), merkes «data til og med dd.mm»; tallene vises da som «–», og det
-   lages ingen sammendragssetning for den. Ingen andre tekster for tynne perioder.
-   Rett over plattformkortene: «Anbefalinger · gjelder nå» (web/lib/oversikt/anbefalinger.ts, tersklene i
-   anbefalinger-regler.ts). Én linje per plattform og format, uavhengig av valgt periode. Bare aktive, ikke
-   foreløpige konsepter uten spesiell hendelse; Før konsepter, Ukjent, Annet/aktualitet og Bankinfo er utelatt.
-   Prioritet: C (de 3 siste modne under ⅔ av median) → A (innlegg 7–14 dager med ≥ 1,5 × median) → B/B2
-   (samme/ulike ledere på median visninger og engasjement per visning, lederen ≥ 10 % foran). Maks 3.
-   Nye, foreløpige konsepter vises som tilleggslinje: «lovende, men for tidlig å si» når medianen er minst
-   like høy som beste godkjente konsept, ellers «nytt konsept, for tidlig å si». Konsepter med ≥ 14 dager
-   siden siste innlegg vises med «(siste innlegg dd.mm)». Hver linje har info-ikon med tallene.
-   «Total» (`?periode=total`, web/lib/oversikt/total.ts): ett stort tall «Totalt siden start (dd.mm)» =
-   summen av visninger per innlegg i content_latest publisert fra og med `takeover_date` (Oslo-dato), alle
-   aldre, siste måling, uten annonsevisninger, uavhengig av special_event (VM skilles bare ut i konsepttabellen
-   og anbefalingene). Instagram (Reels og
-   Feed, alltid med uansett Feed-bryteren), YouTube (Shorts) og TikTok (levetidstall per innlegg); en
-   TikTok-plassholder vises bare hvis TikTok mangler i viewene. Ett kort per plattform
-   med visninger, likes, kommentarer og delinger (delinger bare der tallet finnes, med «N av M innlegg» når
-   noe mangler), kumulativ kurve per publiseringsuke med dagens tall, og «Følgere 515 · +10 siden 29.09»
-   (eller «siden 15.06» med startverdi), i to like brede kolonner (følgere | netto) med «fra X til Y» og
-   kildeetikett under. Ved siden av det store tallet: «Følgere nå» som like stort tall; «sum av kontoer, ikke
-   unike personer» står bare i info-ikonet. Ingen piler, endringspiller,
-   sammendragssetninger eller «Engasjement i perioden» i Total; ingen sammenligning eller andel mellom
-   plattformene. Rekkefølge i Total: periodevelger → det store tallet (sentrert) → kortene → «Anbefalinger ·
-   gjelder nå» som eget kort på den lyse bakgrunnen. I Uke/Måned står anbefalingene i toppfeltet. Standardvalget er fortsatt inneværende uke. Per 14.10.2026 (lokal kontroll): 1 128 355 visninger
-   (Instagram 503 225, YouTube 93 241, TikTok 531 889).
-2. Engasjement i perioden (likes, kommentarer, delinger, lagringer for Instagram) fra daily_activity.
-3. Ferske innlegg (under 7 dager), «tidlig signal · ikke endelige tall», per plattform og format, nyeste først.
-4. Utvikling per dag: visninger og interaksjoner (likes + kommentarer + delinger + lagringer for Instagram,
-   ikke Metas total_interactions) i to synkroniserte grafer, 7d/30d/90d/Alt (uavhengig av Uke/Måned),
-   forrige periode stiplet, opptil 3 toppetiketter i rader, markering fra `takeover_date`. Plattformene
-   rapporterer nettotall per døgn som kan være negative (f.eks. −1 like); grafen klipper ved 0, tooltipen
-   viser faktisk verdi.
-5. Hva funket sist (beste innlegg 7–14 dager gammelt, «×N av vanlig for konseptet»).
-6. Konsepttabellen (median, modne innlegg, aktive → inaktive → foreløpige, trendlinje siste 10 innlegg,
-   spesielle hendelser sammenfoldet, «Før konsepter» bak bryter `?vis=alle`).
+Ramme: sidemeny (Oversikt, Innholdsserier, Publiseringstid; mobil: topplinje med faner), e-post, Mørk modus og
+Logg ut nederst. Plattformvalget følger med når man bytter side. «Trender og idéer» (`/trender`) er en tom
+plassholder og ikke i menyen (senere: agent som ser på trender i sosiale medier). `/monstre` sender videre til
+`/publiseringstid?visning=monstre`.
 
-Struktur: all logikk i rene funksjoner i web/lib/oversikt/ (periode, aktivitet, endring, kort, sammendrag,
-graf, ferske, sist, konsepter, adresse, side, total, folgere) med tester ved siden av (tiktok.test.ts for TikTok og
-for at siden tåler manglende/ukjente rader); komponentene i web/components/ bare
-viser. Data hentes i web/app/(app)/page.tsx fra de fire dashboard-viewene som innlogget bruker.
+Oversikt (`/`): filterlinje øverst til høyre (plattform og periode, vanlig GET-skjema som byttes straks med
+JavaScript). Fire KPI-kort: Totale visninger, Engasjement, Engasjementsrate (én plattform) eller Følgere nå
+(Alle), og Nye følgere (netto). Under: børsgraf (visninger øverst, interaksjoner under, felles tidsakse, forrige
+periode stiplet, felles markør) til venstre; «Kort fortalt» (én setning per plattform) og «Anbefalinger» (de
+tre sterkeste mønstrene med lenke til Publiseringstid, så regelbaserte anbefalinger) til høyre. Deretter ett kort
+per plattform (bare for Alle, hver plattform med egen siste dag, Instagram = Reels), Ferske innlegg og «Hva funket
+sist?».
+
+Innholdsserier (`/innholdsserier`): per plattform og format anbefalingen, konseptene som kort (median visninger,
+stolpe, innlegg, engasjement per visning, siste 10 innlegg, aktiv/inaktiv/foreløpig, merknad om bruddet),
+spesielle hendelser sammenfoldet, «Vis Før konsepter» (`?vis=alle`) og lenke til mønstrene.
+
+Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
+- Mønstre: regler i web/lib/analyse/analyse.ts (uendret), visningsmodell monstre.ts. «Basert på data» og «Prøv»
+  per plattform og format, «Slik leser du tallene» nederst.
+- Heatmap (web/lib/analyse/heatmap.ts): ukedag × tidsblokk (06–11, 11–16, 16–20, 20–24, Oslo-tid; 7 × 4 valgt
+  etter kartlegging 19.10.2026) per plattform og format. Verdi = median av visninger / medianen for samme type
+  innhold; celler med færre enn 3 innlegg er grå, antall i alle celler, filter for type innhold (`?konsept=`).
+  Ingen «beste tid» og ingen rangering; teksten sier at det er et mønster, ikke bevis.
+- Kalender (web/lib/plan/utkast.ts): køen (tittel, type innhold, avhukede plattformer) og reglene (første dag,
+  14/21/28 dager, maks per dag og minste mellomrom per plattform, tester per plattform og uke 0–2). Utkastet
+  velger bare dag og klokkeslett; hver plattform plasseres etter egne tall, på samme dag som videoens første
+  plattform der det er mulig. «Basert på data» = tidsrom med ≥ 3 innlegg for typen innhold på plattformen;
+  «Test» = kveldstidsrom uten nok tall (maks 2 per plattform og uke). Folka Først holder fast tidspunkt
+  26.10–22.11 på alle plattformer og testes aldri i den perioden. CSV-utkast med én rad per plattform og kolonnen
+  «Merking». Ingen automatisk publisering.
+- Oppfølging av tester (web/lib/plan/oppfolging.ts): lagrede tester matches mot innlegg (samme plattform,
+  format og type innhold, innen én dag) og vurderes etter 7 dager som «ganger vanlig»; lovende fra ×1,15.
+- Køen og testene lagres bare i nettleseren (localStorage). Ingen database i denne versjonen.
+
+Struktur: all logikk i rene funksjoner i web/lib/ med tester ved siden av (oversikt/: valg, periodemodell,
+konseptmedianer, folgere, anbefalinger, konsepter, ferske, sist, total m.fl.; analyse/: analyse, monstre, heatmap;
+plan/: utkast, oppfolging; data/forbered.ts; regler/). web/lib/sider.ts bygger visningsmodellene for sidene.
+Komponentene i web/components/dashboard/ bare viser. Noen eldre funksjoner i lib/ (kort.ts, side.ts, graf.ts,
+sammendrag.ts) brukes ikke av sidene lenger, men er beholdt med tester.
 Lokal test: web/.env.local trenger publishable-nøkkelen, og innlogging krever e-postlenken. Claude Code har
-testet med en midlertidig, ikke-committet side som viser samme komponent med tall fra viewene.
-«Mønster» (`/monstre`, i menyen): mønstre fra analysen (regler i web/lib/analyse/analyse.ts, visningsmodell
-monstre.ts, komponent components/Monstre.tsx), data fra dashboard.post_features.
-- Mål: innleggets visninger / median for konseptet på samme plattform og format (1,0 = vanlig). Bare modne
-  innlegg, special_event is null, ikke Bankinfo/Før konsepter/Ukjent/Annet/aktualitet. Instagram bare Reels.
-- Faktorer: tidsrom (før 17, 17–19, 19–21, 21+), ukedag (bare Folka Først), tekstlengde og varighet i tredeler
-  innenfor konseptet. Antall hashtags regnes, men vises ikke (nesten alle har 5).
-- «Bruk»: grunnlaget er konsepter med ≥ 6 modne innlegg og uten «mulig tidstrend»; minst 10 innlegg, median
-  ≥ ×1,15, minst 2 konsepter i samme retning (≥ ×1,05 med ≥ 3 innlegg), og ingen solide konsepter under ×1,00
-  (med ≥ 3 innlegg). Mellom ×1,00 og ×1,05 teller verken for eller imot. «Test»: median ≥ ×1,15 på ≥ 3 innlegg.
-  Foreløpige konsepter (f.eks. På Gata) kan bare gi «Test».
-- Mulig tidstrend (bare tidsrom): konseptets innlegg i tidsrommet starter eller slutter mer enn 21 dager
-  innenfor konseptets egen periode (TIDSTREND_DAGER); konseptet teller da ikke som støtte.
-- Visning: merkelapp «Sikkert» (Bruk), «Svakt» (Bruk med grunnlag under ×1,20, SVAKT_UNDER, bare visning) og
-  «Prøv» (Test), i den rekkefølgen per plattform og format. Hvert kort: råd i én setning, «1,31 ganger vanlig
-  visningstall · 35 innlegg» og «Vis detaljer» (tall per konsept, tidstrend, datoer, forslag for «Prøv»). Én linje
-  øverst; øvrige forklaringer i «Slik leser du tallene» nederst.
-- «Hva har fungert» på Oversikt (under «Hva funket sist»): bare «Sikkert», maks 3 per plattform og format, lenke
-  til /monstre. Kortet vises ikke hvis post_features ikke kan leses.
-«Trender og idéer» (`/trender`) er en tom plassholder (senere: AI-agent som ser på trender på sosiale medier).
+testet med en midlertidig, ikke-committet rute som viser de samme komponentene med tall fra viewene.
 
 ## Veksthuset: kontekst
 - Adrian tok over kontoen 15.06.2026 (første publiserte video). «Adrians periode» = fra denne datoen.
@@ -590,8 +561,8 @@ monstre.ts, komponent components/Monstre.tsx), data fra dashboard.post_features.
    report.py bruker fortsatt new_followers (ikke netto).
 3. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
-4. Publiseringsplan (planlagt side i dashboardet, ikke bygget): anbefalt plan for neste uke/måned med
-   konsept per dag og tidsrom.
+4. Publiseringsplan: første versjon er bygget (Publiseringstid → Kalender, 19.10.2026). Neste: lagre køen og
+   testene i databasen (krever migrering), og Facebook i PLAN_PLATTFORMER når kontoen er koblet.
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
    - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,

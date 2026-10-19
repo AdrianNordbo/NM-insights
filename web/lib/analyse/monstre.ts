@@ -22,7 +22,12 @@ import {
 export const SVAKT_UNDER = 1.2;
 
 export type Label = "sikkert" | "svakt" | "prøv";
-export const LABEL_NAME: Record<Label, string> = { sikkert: "Sikkert", svakt: "Svakt", prøv: "Prøv" };
+/** Styrken på et mønster med nok grunnlag («Basert på data»), og «Prøv» for forslag til tester. */
+export const LABEL_NAME: Record<Label, string> = { sikkert: "Tydelig mønster", svakt: "Svakt mønster", prøv: "Prøv" };
+/** Kategorien: «Basert på data» (Bruk) eller «Prøv» (Test). */
+export const KATEGORI: Record<Label, "Basert på data" | "Prøv"> = { sikkert: "Basert på data", svakt: "Basert på data", prøv: "Prøv" };
+/** Høyst så mange «Prøv» vises per plattform og format (de sterkeste). */
+export const PROV_MAX = 3;
 const LABEL_ORDER: Label[] = ["sikkert", "svakt", "prøv"];
 
 const two = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -107,6 +112,8 @@ export type MonsterCard = {
   advice: string;
   /** «1,31 ganger vanlig visningstall · 35 innlegg» */
   numbers: string;
+  /** Forholdstallet kortet bygger på (til sortering). */
+  strength: number;
   details: {
     concepts: DetailConcept[];
     /** For «Sikkert»/«Svakt»: hvilke typer innhold tallet bygger på, og alle innlegg i gruppen. */
@@ -175,6 +182,7 @@ function card(rows: FeatureRow[], f: Finding): MonsterCard {
     label: lab,
     advice: advice(f),
     numbers: `${ganger(r)} visningstall · ${n} innlegg`,
+    strength: r,
     details: details(rows, f),
   };
 }
@@ -223,4 +231,19 @@ export function buildFungert(sections: MonsterSection[]): FungertRow[] {
       .slice(0, FUNGERT_MAX)
       .map((c) => ({ advice: c.advice, numbers: c.numbers })),
   }));
+}
+
+/** Kortene som vises: alle «Basert på data» og de PROV_MAX sterkeste «Prøv». */
+export function visteKort(section: MonsterSection): { data: MonsterCard[]; prov: MonsterCard[]; provTotalt: number } {
+  const data = section.cards.filter((c) => c.label !== "prøv");
+  const prov = section.cards.filter((c) => c.label === "prøv").sort((a, b) => b.strength - a.strength);
+  return { data, prov: prov.slice(0, PROV_MAX), provTotalt: prov.length };
+}
+
+/** De sterkeste mønstrene med nok grunnlag på tvers av seksjonene (tydelige før svake), til Oversikt. */
+export function sterkesteMonstre(sections: MonsterSection[], n = 3): (MonsterCard & { section: MonsterSection })[] {
+  return sections
+    .flatMap((s) => s.cards.filter((c) => c.label !== "prøv").map((c) => ({ ...c, section: s })))
+    .sort((a, b) => (a.label === b.label ? 0 : a.label === "sikkert" ? -1 : 1) || b.strength - a.strength)
+    .slice(0, n);
 }
