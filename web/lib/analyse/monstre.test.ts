@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyse, type FeatureRow } from "./analyse";
-import { advice, buildFungert, buildMonstre, ganger, label, list } from "./monstre";
+import { advice, buildFungert, buildMonstre, ganger, KATEGORI, LABEL_NAME, label, list, sterkesteMonstre, visteKort } from "./monstre";
 import { many } from "./testdata";
 
 /** Konsept med 7 innlegg kl. 17 på medianen og 5 kl. 19 med forholdet x (kl. 19 får da nøyaktig x). */
@@ -80,5 +80,28 @@ describe("buildFungert", () => {
     const [a, b] = buildFungert([many, svakt]);
     expect(a.lines).toHaveLength(3);
     expect(b.lines).toEqual([]);
+  });
+});
+
+describe("etiketter og utvalg", () => {
+  it("nye navn: Tydelig mønster / Svakt mønster / Prøv, og kategori Basert på data / Prøv", () => {
+    expect(LABEL_NAME).toEqual({ sikkert: "Tydelig mønster", svakt: "Svakt mønster", prøv: "Prøv" });
+    expect(KATEGORI).toEqual({ sikkert: "Basert på data", svakt: "Basert på data", prøv: "Prøv" });
+  });
+
+  it("maks tre «Prøv», de sterkeste", () => {
+    const base = buildMonstre([...konsept("Folka Først", 1.5), ...konsept("Sitcom", 1.5)])[0];
+    const prov = (strength: number) => ({ ...base.cards[0], id: `p${strength}`, label: "prøv" as const, strength });
+    const v = visteKort({ ...base, cards: [base.cards[0], prov(1.2), prov(1.9), prov(1.5), prov(1.3)] });
+    expect(v.data).toHaveLength(1);
+    expect(v.prov.map((c) => c.strength)).toEqual([1.9, 1.5, 1.3]);
+    expect(v.provTotalt).toBe(4);
+  });
+
+  it("de sterkeste til Oversikt: tydelige før svake, ingen «Prøv»", () => {
+    const base = buildMonstre([...konsept("Folka Først", 1.5), ...konsept("Sitcom", 1.5)])[0];
+    const c = (id: string, label: "sikkert" | "svakt" | "prøv", strength: number) => ({ ...base.cards[0], id, label, strength });
+    const top = sterkesteMonstre([{ ...base, cards: [c("a", "svakt", 1.19), c("b", "sikkert", 1.3), c("c", "prøv", 3), c("d", "sikkert", 1.6)] }], 3);
+    expect(top.map((x) => x.id)).toEqual(["d", "b", "a"]);
   });
 });

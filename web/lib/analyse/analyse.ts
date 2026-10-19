@@ -15,6 +15,7 @@
 // Dette er mønstre i egne tall, ikke bevis.
 
 import type { Platform } from "../data/types";
+import { IKKE_ANALYSE } from "../regler/konsepter";
 
 export type FeatureRow = {
   platform: Platform;
@@ -40,7 +41,7 @@ export type FeatureRow = {
 };
 
 /** Konsepter som aldri er med i analysen (ikke innholdskonsepter, eller ikke konsept i det hele tatt). */
-export const ANALYSE_UTELATT = ["Bankinfo", "Før konsepter", "Ukjent", "Annet/aktualitet"];
+export const ANALYSE_UTELATT: readonly string[] = IKKE_ANALYSE;
 
 /** Formatene som analyseres per plattform (Instagram bare Reels). */
 export const ANALYSE_FORMATS: Record<Platform, string[]> = { instagram: ["REELS"], youtube: ["SHORTS"], tiktok: ["VIDEO"] };
