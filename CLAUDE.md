@@ -393,13 +393,14 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   UTC for TikTok og Stillehavstid for de andre.
 - Konfigurasjon samlet ett sted:
   - `web/lib/regler/konsepter.ts`: `UTELATTE_KONSEPTER` (Bankinfo), `SAMLEKATEGORIER`, `IKKE_ANALYSE`,
-    `KONSEPTBRUDD` (Folka Først fra 19.10.2026, ny teksting; flyttet fra 26.10 den 21.10.2026) og `LAAS_UKER` (4).
+    `KONSEPTBRUDD` (Folka Først fra søndag 18.10.2026, ny teksting; rettet 21.10.2026, først satt til 26.10 og 19.10)
+    med låsen `laas` uke 43–46 (19.10–15.11), og `LAAS_UKER` (4) for brudd uten oppgitt lås.
     `EXCLUDED_CONCEPTS` (anbefalinger) og `ANALYSE_UTELATT` (mønstre) leser derfra.
   - `web/lib/regler/plattformer.ts`: plattformvalgene (`PLATTFORM_VALG`) og plattformene i publiseringsutkastet
     (`PLAN_PLATTFORMER`: Instagram, YouTube, TikTok). Facebook legges til der senere.
 - Bankinfo: utelatt fra konsepter, anbefalinger, mønstre, medianer, heatmap, ferske innlegg og «Hva funket
   sist», men med i totaler og kontotall (forklart i info-ikonene). Felles forberedelse i `web/lib/data/forbered.ts`.
-- Konseptbrudd: innlegg fra bruddatoen får eget navn («Folka Først (fra 19.10)») og blandes aldri med innleggene
+- Konseptbrudd: innlegg fra bruddatoen får eget navn («Folka Først (fra 18.10)») og blandes aldri med innleggene
   før i medianer, mønstre og heatmap. Frem til den nye gruppen har ≥ 6 modne innlegg er den «foreløpig», og
   medianer og mønstre for Folka Først bygger bare på innleggene før.
 - Konseptmedianene regnes i `web/lib/oversikt/konseptmedianer.ts` fra content_latest (samme definisjon som
@@ -479,7 +480,7 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
     innlegg i tidsrommet) eller «Test» (TESTER_PER_UKE = 1 per plattform og uke, kan settes til 0–2 på siden).
     Maks per dag og minste mellomrom per plattform. Videoer som allerede ligger i uken flyttes ikke. Er uken full,
     blir plattformen «ikke plassert» i uken; den flyttes aldri til en annen uke. Bare dager etter i dag brukes.
-  - Folka Først holder fast tidspunkt 19.10–15.11 på alle plattformer og lagres som «Folka Først (fra 19.10)».
+  - Folka Først holder fast tidspunkt 19.10–15.11 på alle plattformer og lagres som «Folka Først (fra 18.10)» (bruddet er 18.10, låsen uke 43–46).
   - Fast ukemiks UKEMIKS = { Folka Først: 3, Sitcom: 1, På Gata: 1 } (web/lib/regler/plan.ts). Kalenderen
     endrer aldri miks eller frekvens, men viser «Miks: Folka Først 2/3 …» og advarsler som «Uke 45 mangler 1
     Sitcom» / «Uke 46 har 4 Folka Først» (blokkerer ikke).

@@ -17,7 +17,7 @@ export type PlanRad = {
   aar: number;
   uke: number;
   tittel: string;
-  /** Visningsnavn: «Folka Først (fra 19.10)» for plasseringer fra bruddatoen. */
+  /** Visningsnavn: «Folka Først (fra 18.10)» for plasseringer fra bruddatoen. */
   konsept: string;
   plattform: string;
   /** null = ikke plassert i uken. */
@@ -32,14 +32,14 @@ export type PlanRad = {
 /** En ny rad som skal lagres (id, status og flyttet_manuelt settes av databasen). */
 export type NyRad = Omit<PlanRad, "id" | "status" | "flyttetManuelt">;
 
-/** «Folka Først» → «Folka Først (fra 19.10)» når datoen er fra bruddatoen. */
+/** «Folka Først» → «Folka Først (fra 18.10)» når datoen er fra bruddatoen. */
 export function konseptNavn(konsept: string, dato: string | null): string {
   if (!dato) return konsept;
   const b = bruddFor(konsept, dato);
   return b ? bruddNavn(b) : konsept;
 }
 
-/** «Folka Først (fra 19.10)» → «Folka Først». */
+/** «Folka Først (fra 18.10)» → «Folka Først». */
 export function grunnKonsept(navn: string): string {
   return KONSEPTBRUDD.find((b) => bruddNavn(b) === navn)?.concept ?? navn;
 }

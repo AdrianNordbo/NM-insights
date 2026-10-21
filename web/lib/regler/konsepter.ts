@@ -14,13 +14,22 @@ export const SAMLEKATEGORIER: readonly string[] = ["Før konsepter", "Ukjent", "
 /** Alt som aldri gir anbefalinger eller mønstre. */
 export const IKKE_ANALYSE: readonly string[] = [...SAMLEKATEGORIER, ...UTELATTE_KONSEPTER];
 
-export type Konseptbrudd = { concept: string; from: string; reason: string };
+export type Konseptbrudd = {
+  concept: string;
+  from: string;
+  reason: string;
+  /** Hele ISO-uker der konseptet holder fast tidspunkt i publiseringsutkastet (mandag–søndag). */
+  laas?: { from: string; to: string };
+};
 
 /**
  * Kjente brudd: innlegg før og etter datoen blandes aldri i medianer og mønstre. Innlegg fra datoen får
- * eget konseptnavn («Folka Først (fra 19.10)») og er en foreløpig gruppe til den har nok modne innlegg.
+ * eget konseptnavn («Folka Først (fra 18.10)») og er en foreløpig gruppe til den har nok modne innlegg.
  */
-export const KONSEPTBRUDD: readonly Konseptbrudd[] = [{ concept: "Folka Først", from: "2026-10-19", reason: "ny teksting" }];
+export const KONSEPTBRUDD: readonly Konseptbrudd[] = [
+  // Ny teksting fra søndag 18.10.2026. Låsen gjelder uke 43–46 (mandag 19.10–søndag 15.11).
+  { concept: "Folka Først", from: "2026-10-18", reason: "ny teksting", laas: { from: "2026-10-19", to: "2026-11-15" } },
+];
 
 /** Antall uker etter et brudd der konseptet holder fast tidspunkt i publiseringsutkastet. */
 export const LAAS_UKER = 4;
@@ -32,7 +41,7 @@ export function utenUtelatte<T extends { concept: string | null }>(rows: T[]): T
   return rows.filter((r) => !isUtelatt(r.concept));
 }
 
-/** «Folka Først (fra 19.10)» */
+/** «Folka Først (fra 18.10)» */
 export const bruddNavn = (b: Konseptbrudd) => `${b.concept} (fra ${formatDayMonth(b.from)})`;
 
 /** Bruddet som gjelder innlegget (konsept + publiseringsdato i Oslo-tid), eller null. */
@@ -48,5 +57,5 @@ export function delVedBrudd<T extends { concept: string | null; published_at: st
   });
 }
 
-/** Perioden etter bruddet der konseptet holder fast tidspunkt: fra og med bruddatoen, LAAS_UKER uker. */
-export const laasPeriode = (b: Konseptbrudd) => ({ from: b.from, to: addDays(b.from, LAAS_UKER * 7 - 1) });
+/** Perioden der konseptet holder fast tidspunkt: oppgitte uker, ellers fra bruddatoen i LAAS_UKER uker. */
+export const laasPeriode = (b: Konseptbrudd) => b.laas ?? { from: b.from, to: addDays(b.from, LAAS_UKER * 7 - 1) };

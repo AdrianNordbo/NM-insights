@@ -70,7 +70,7 @@ export function publiseringstidSide(raw: Raadata, params: Params, today: string,
   const followContent = f.listContent
     .filter((r) => PLAN_PLATTFORMER.some((pp) => pp.platform === r.platform && pp.format === r.format) && r.published_at.slice(0, 10) >= since)
     .map((r) => ({ ...r, permalink: null, fetched_at: null, title: (r.title ?? "").split("\n")[0].slice(0, 120) }));
-  // Typene innhold i utkastet: fast liste i konfigurasjonen (Folka Først blir «(fra 19.10)» automatisk).
+  // Typene innhold i utkastet: fast liste i konfigurasjonen (Folka Først blir «(fra 18.10)» automatisk).
   const planConcepts = [...PLAN_KONSEPTER];
   return {
     valg: v,

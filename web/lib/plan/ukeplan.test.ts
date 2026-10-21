@@ -79,12 +79,12 @@ describe("plassering innenfor valgt uke", () => {
     expect(test[0]).toMatchObject({ merking: "Test" });
   });
 
-  it("Folka Først fra 19.10 lagres som «Folka Først (fra 19.10)» og holder fast tidspunkt i låsen", () => {
+  it("Folka Først fra 19.10 lagres som «Folka Først (fra 18.10)» og holder fast tidspunkt i låsen", () => {
     const r = plasserIUke(v("8", "Folka Først"), { aar: 2026, uke: 45 }, [], { ...regler, testsPerWeek: 1 }, heat, TODAY);
-    expect(r.every((x) => x.konsept === "Folka Først (fra 19.10)" && x.merking === "Basert på data")).toBe(true);
+    expect(r.every((x) => x.konsept === "Folka Først (fra 18.10)" && x.merking === "Basert på data")).toBe(true);
     expect(r[0].grunnlag).toMatch(/^Fast tidspunkt for Folka Først på alle plattformer fra 19.10 til 15.11/);
-    expect(konseptNavn("Folka Først", "2026-10-18")).toBe("Folka Først");
-    expect(grunnKonsept("Folka Først (fra 19.10)")).toBe("Folka Først");
+    expect(konseptNavn("Folka Først", "2026-10-17")).toBe("Folka Først");
+    expect(grunnKonsept("Folka Først (fra 18.10)")).toBe("Folka Først");
   });
 });
 
@@ -96,11 +96,11 @@ describe("ukemiks", () => {
 
   it("teller videoer (ikke plattformer) og varsler ved avvik uten å blokkere", () => {
     const rows = [
-      rad({ videoId: "a", konsept: "Folka Først (fra 19.10)", plattform: "instagram" }),
-      rad({ videoId: "a", konsept: "Folka Først (fra 19.10)", plattform: "tiktok" }),
-      rad({ videoId: "b", konsept: "Folka Først (fra 19.10)" }),
-      rad({ videoId: "c", konsept: "Folka Først (fra 19.10)" }),
-      rad({ videoId: "d", konsept: "Folka Først (fra 19.10)" }),
+      rad({ videoId: "a", konsept: "Folka Først (fra 18.10)", plattform: "instagram" }),
+      rad({ videoId: "a", konsept: "Folka Først (fra 18.10)", plattform: "tiktok" }),
+      rad({ videoId: "b", konsept: "Folka Først (fra 18.10)" }),
+      rad({ videoId: "c", konsept: "Folka Først (fra 18.10)" }),
+      rad({ videoId: "d", konsept: "Folka Først (fra 18.10)" }),
       rad({ videoId: "e", konsept: "På Gata", dato: null, klokkeslett: null }),
       rad({ videoId: "x", uke: 46, konsept: "Sitcom" }),
     ];

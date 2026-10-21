@@ -1,6 +1,6 @@
 // Konseptmedianer regnet fra dashboard.content_latest, med samme definisjon som viewet dashboard.concept_summary
 // (percentile_cont, bare modne innlegg, special_event som egne rader, foreløpig under 6). Regnes her i stedet for i
-// databasen fordi konseptbrudd (Folka Først fra 19.10) og utelatte konsepter (Bankinfo) håndteres i lib/.
+// databasen fordi konseptbrudd (Folka Først fra 18.10) og utelatte konsepter (Bankinfo) håndteres i lib/.
 
 import { median } from "../analyse/analyse";
 import type { ConceptSummaryRow, ContentLatestRow } from "../data/types";

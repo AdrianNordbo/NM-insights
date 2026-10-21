@@ -13,7 +13,7 @@ describe("tid", () => {
 });
 
 describe("grunnlag", () => {
-  it("bare modne innlegg, uten hendelse, Bankinfo og samlekategorier; Folka Først delt ved 19.10", () => {
+  it("bare modne innlegg, uten hendelse, Bankinfo og samlekategorier; Folka Først delt ved 18.10", () => {
     const rows = [
       sitcom("2026-10-13", 100),
       sitcom("2026-10-13", 100, { is_mature: false }),
@@ -22,7 +22,7 @@ describe("grunnlag", () => {
       sitcom("2026-10-13", 100, { concept: "Før konsepter" }),
       post("instagram", "REELS", "2026-10-27T19:00:00", 100, { concept: "Folka Først" }),
     ];
-    expect(heatGrunnlag(rows).map((r) => r.concept)).toEqual(["Sitcom", "Folka Først (fra 19.10)"]);
+    expect(heatGrunnlag(rows).map((r) => r.concept)).toEqual(["Sitcom", "Folka Først (fra 18.10)"]);
   });
 });
 
