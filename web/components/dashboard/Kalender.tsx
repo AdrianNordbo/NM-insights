@@ -5,6 +5,7 @@ import { HEAT_MIN_N, type HeatSection, TIDSBLOKKER, UKEDAGER, UKEDAGER_LANG } fr
 import type { ContentLatestRow } from "@/lib/data/types";
 import { addDays, formatDayMonth, formatNumber, formatTimes } from "@/lib/format";
 import { KONSEPTBRUDD, laasPeriode } from "@/lib/regler/konsepter";
+import { TESTER_PER_UKE } from "@/lib/regler/plan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
 import { eksempel, folgOpp, type LagretTest, trengerFlere } from "@/lib/plan/oppfolging";
 import { type KoVideo, lagUtkast, MAKS_TESTER_PER_UKE, OPPFOLGING_DAGER, type Regler, ukedag, ukeStart, utkastCsv } from "@/lib/plan/utkast";
@@ -52,7 +53,7 @@ function useStored<T>(key: string): T[] {
 export function Kalender({ heat, concepts, followContent, today }: { heat: Record<string, HeatSection>; concepts: string[]; followContent: ContentLatestRow[]; today: string }) {
   const queue = useStored<KoVideo>(KO_KEY);
   const tests = useStored<LagretTest>(TEST_KEY);
-  const [regler, setRegler] = useState<Regler>({ start: addDays(today, 1), horizon: 14, maxPerDay: 1, gapHours: 3, testsPerWeek: 1 });
+  const [regler, setRegler] = useState<Regler>({ start: addDays(today, 1), horizon: 14, maxPerDay: 1, gapHours: 3, testsPerWeek: TESTER_PER_UKE });
   const [made, setMade] = useState(false);
   const [platforms, setPlatforms] = useState<string[]>(PLAN_PLATTFORMER.map((p) => p.key));
   const plan = useMemo(() => (made ? lagUtkast(queue, regler, heat, today) : null), [made, queue, regler, heat, today]);

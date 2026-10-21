@@ -10,7 +10,8 @@ import { buildOversikt } from "./oversikt/periodemodell";
 import { buildRecent } from "./oversikt/sist";
 import { lesValg, perioder } from "./oversikt/valg";
 import { addDays } from "./format";
-import { bruddNavn, IKKE_ANALYSE, KONSEPTBRUDD } from "./regler/konsepter";
+import { fraView, type PlanRad } from "./plan/ukeplan";
+import { PLAN_KONSEPTER } from "./regler/plan";
 import { iValg, PLAN_PLATTFORMER, PLATTFORM_VALG, plattformValg } from "./regler/plattformer";
 
 export const plattformOptions = () => PLATTFORM_VALG.map((p) => ({ key: p.key, label: p.label }));
@@ -51,7 +52,8 @@ export function innholdsserierSide(raw: Raadata, params: Params, today: string) 
 export type Visning = "monstre" | "heatmap" | "kalender";
 const VISNINGER: Visning[] = ["monstre", "heatmap", "kalender"];
 
-export function publiseringstidSide(raw: Raadata, params: Params, today: string) {
+/** plan: rader fra dashboard.planned_posts (null når viewet ikke finnes ennå) og om brukeren er redaktør. */
+export function publiseringstidSide(raw: Raadata, params: Params, today: string, plan: { rader: Record<string, unknown>[] | null; editor: boolean } = { rader: null, editor: false }) {
   const v = plattformValg(params.plattform);
   const f = forbered(raw, today);
   const visning: Visning = VISNINGER.find((x) => x === params.visning) ?? "monstre";
@@ -68,12 +70,8 @@ export function publiseringstidSide(raw: Raadata, params: Params, today: string)
   const followContent = f.listContent
     .filter((r) => PLAN_PLATTFORMER.some((pp) => pp.platform === r.platform && pp.format === r.format) && r.published_at.slice(0, 10) >= since)
     .map((r) => ({ ...r, permalink: null, fetched_at: null, title: (r.title ?? "").split("\n")[0].slice(0, 120) }));
-  // Typene innhold i utkastet: alle konsepter med innlegg (uten utelatte og samlekategorier); brudd-gruppen
-  // planlegges under konseptets eget navn.
-  const breakNames = new Set(KONSEPTBRUDD.map(bruddNavn));
-  const planConcepts = [...new Set([...Object.values(planHeat).flatMap((h) => h.concepts), ...f.listContent.map((r) => r.concept ?? "")])]
-    .filter((c) => c && !IKKE_ANALYSE.includes(c) && !breakNames.has(c))
-    .sort((a, b) => a.localeCompare(b, "nb"));
+  // Typene innhold i utkastet: fast liste i konfigurasjonen (Folka Først blir «(fra 19.10)» automatisk).
+  const planConcepts = [...PLAN_KONSEPTER];
   return {
     valg: v,
     plattformer: plattformOptions(),
@@ -86,5 +84,6 @@ export function publiseringstidSide(raw: Raadata, params: Params, today: string)
     planConcepts,
     followContent,
     today,
+    plan: { rows: plan.rader ? plan.rader.map(fraView).filter((r): r is PlanRad => r != null) : null, editor: plan.editor },
   };
 }
