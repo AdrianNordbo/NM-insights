@@ -197,6 +197,16 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Varighet for Reels hentes fra TikTok/YouTube-versjonen (`duration_source`): manuell rad i reel_links går
     foran automatisk kobling (samme kunde og konsept, publisert innen 60 min, entydig). Bare egenskap ved videoen,
     aldri til å sammenligne visninger på tvers. reel_links har 7 manuelle rader (bare service_role; supabase/seed/reel_links.sql).
+  - Delt publiseringskalender (2026-10-21_planned_posts.sql, IKKE KJØRT per 21.10.2026):
+    `public.planned_posts` (én rad per video per plattform: video_id, aar, uke, tittel, konsept, plattform,
+    planlagt_dato + klokkeslett (null = ikke plassert i uken), merking «Basert på data»/«Test», grunnlag, status
+    Utkast/Klar/Publisert, flyttet_manuelt, opprettet_av, opprettet, oppdatert). Constraint: en plassering ligger
+    alltid i sin egen ISO-uke; unik (video_id, plattform). `public.plan_editors` (user_id fra auth.users) styrer
+    hvem som kan skrive; fylles med supabase/seed/plan_editors.sql (e-postadressen står ikke i repoet). Begge
+    tabellene bare service_role. Lesing: `dashboard.planned_posts` (security_invoker = false). Skriving: schema
+    `planlegging` med `er_redaktor()`, `legg_til(jsonb)`, `flytt(uuid, date, time)`, `sett_status(uuid, text)`
+    og `fjern_video(uuid)` (SECURITY DEFINER, search_path = '', krever redaktør). Etter kjøring må
+    «planlegging» legges til under Exposed schemas. Kontroll: blokk K i supabase/checks/dashboard_access.sql.
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -207,7 +217,8 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     EXECUTE-til-PUBLIC på nye funksjoner for eierrollen). En ny funksjon som authenticated skal bruke,
     trenger derfor eksplisitt grant.
   - `authenticated` har bare USAGE på schema dashboard og SELECT på viewene der (også post_features), og USAGE på schema
-    `tilkobling` med EXECUTE på `claim_tiktok_state` og `store_tiktok_token` (TikTok-koblingen). anon har ingenting.
+    `tilkobling` med EXECUTE på `claim_tiktok_state` og `store_tiktok_token` (TikTok-koblingen), og (etter
+    2026-10-21_planned_posts.sql) USAGE på schema `planlegging` med EXECUTE på de fem kalenderfunksjonene. anon har ingenting.
   - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
     advisor flagger dem som «security definer views»; det er forventet.
@@ -457,16 +468,31 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
   etter kartlegging 19.10.2026) per plattform og format. Verdi = median av visninger / medianen for samme type
   innhold; celler med færre enn 3 innlegg er grå, antall i alle celler, filter for type innhold (`?konsept=`).
   Ingen «beste tid» og ingen rangering; teksten sier at det er et mønster, ikke bevis.
-- Kalender (web/lib/plan/utkast.ts): køen (tittel, type innhold, avhukede plattformer) og reglene (første dag,
-  14/21/28 dager, maks per dag og minste mellomrom per plattform, tester per plattform og uke 0–2). Utkastet
-  velger bare dag og klokkeslett; hver plattform plasseres etter egne tall, på samme dag som videoens første
-  plattform der det er mulig. «Basert på data» = tidsrom med ≥ 3 innlegg for typen innhold på plattformen;
-  «Test» = kveldstidsrom uten nok tall (maks 2 per plattform og uke). Folka Først holder fast tidspunkt
-  19.10–15.11 på alle plattformer og testes aldri i den perioden. CSV-utkast med én rad per plattform og kolonnen
-  «Merking». Ingen automatisk publisering.
-- Oppfølging av tester (web/lib/plan/oppfolging.ts): lagrede tester matches mot innlegg (samme plattform,
-  format og type innhold, innen én dag) og vurderes etter 7 dager som «ganger vanlig»; lovende fra ×1,15.
-- Køen og testene lagres bare i nettleseren (localStorage). Ingen database i denne versjonen.
+- Kalender: den delte kalenderen (web/lib/plan/ukeplan.ts, uke.ts; komponent KalenderDelt) når
+  dashboard.planned_posts kan leses; ellers en rolig melding og nettleserkøen fra før (utkast.ts, Kalender,
+  localStorage).
+  - Redaktøren (planlegging.er_redaktor) legger inn video med tittel, type innhold (fast liste PLAN_KONSEPTER:
+    Folka Først, Sitcom, På Gata), plattformer (PLAN_PLATTFORMER) og ISO-uke. En videofil kan dras inn i skjemaet;
+    bare filnavnet brukes som tittel, filen lastes ikke opp og leses ikke. Alle andre innloggede ser kalenderen
+    skrivebeskyttet (status og merking, ingen skjema eller flytting).
+  - Hver plattform plasseres innenfor valgt uke (dag og klokkeslett) etter heatmapet: «Basert på data» (≥ 3
+    innlegg i tidsrommet) eller «Test» (TESTER_PER_UKE = 1 per plattform og uke, kan settes til 0–2 på siden).
+    Maks per dag og minste mellomrom per plattform. Videoer som allerede ligger i uken flyttes ikke. Er uken full,
+    blir plattformen «ikke plassert» i uken; den flyttes aldri til en annen uke. Bare dager etter i dag brukes.
+  - Folka Først holder fast tidspunkt 19.10–15.11 på alle plattformer og lagres som «Folka Først (fra 19.10)».
+  - Fast ukemiks UKEMIKS = { Folka Først: 3, Sitcom: 1, På Gata: 1 } (web/lib/regler/plan.ts). Kalenderen
+    endrer aldri miks eller frekvens, men viser «Miks: Folka Først 2/3 …» og advarsler som «Uke 45 mangler 1
+    Sitcom» / «Uke 46 har 4 Folka Først» (blokkerer ikke).
+  - Manuell flytting innenfor uken (merkes «Flyttet manuelt»), status Utkast/Klar/Publisert, fjerning av video.
+    CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status.
+  - Skriving via server actions (app/(app)/publiseringstid/actions.ts) som kaller funksjonene i schema planlegging.
+  - Oppfølging av tester (oppfolging.ts): testene i kalenderen matches mot innlegg og vurderes etter 7 dager.
+- Opplasting og automatisk publisering kommer senere. Det som må til: Meta-appen må få `instagram_content_publish`
+  (og `pages_manage_posts` for Facebook) gjennom App Review og forretningsverifisering, og appen ut av
+  utviklingsmodus; YouTube trenger scope `youtube.upload` og Googles verifisering av OAuth-appen; TikTok trenger
+  Content Posting API (egen søknad og revisjon); filene må lagres et sted (f.eks. Supabase Storage med
+  størrelsesgrense og kostnad), og publiseringen må kjøres av en planlagt jobb med logg og mulighet for å stoppe.
+  Til da er kalenderen et utkast, og publiseringen gjøres manuelt.
 
 Struktur: all logikk i rene funksjoner i web/lib/ med tester ved siden av (oversikt/: valg, periodemodell,
 konseptmedianer, folgere, anbefalinger, konsepter, ferske, sist, total m.fl.; analyse/: analyse, monstre, heatmap;
@@ -561,8 +587,9 @@ testet med en midlertidig, ikke-committet rute som viser de samme komponentene m
    report.py bruker fortsatt new_followers (ikke netto).
 3. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
-4. Publiseringsplan: første versjon er bygget (Publiseringstid → Kalender, 19.10.2026). Neste: lagre køen og
-   testene i databasen (krever migrering), og Facebook i PLAN_PLATTFORMER når kontoen er koblet.
+4. Publiseringsplan: delt kalender bygget 21.10.2026 (krever 2026-10-21_planned_posts.sql + redaktør-seed +
+   «planlegging» under Exposed schemas). Neste: Facebook i PLAN_PLATTFORMER når kontoen er koblet, og
+   opplasting/automatisk publisering (se Publiseringstid).
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.
    - AI-delen venter til fase 2. Start da med å kartlegge hvilke data som finnes per ukedag og tidspunkt,
