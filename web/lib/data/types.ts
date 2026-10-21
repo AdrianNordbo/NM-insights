@@ -159,7 +159,8 @@ export type DashboardView =
   | "daily_activity"
   | "followers"
   | "follower_points"
-  | "post_features";
+  | "post_features"
+  | "planned_posts";
 
 /** Resultat av en spørring: enten data, eller en feil som kan vises rolig til brukeren. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };

@@ -96,3 +96,22 @@ export async function getPostFeatures(): Promise<Result<FeatureRow[]>> {
     onlyKnown,
   );
 }
+
+/**
+ * dashboard.planned_posts (2026-10-21_planned_posts.sql): den delte publiseringskalenderen. Valgfri: finnes ikke
+ * viewet ennå (før migreringen) eller feiler lesingen, viser Publiseringstid nettleserkøen i stedet.
+ */
+export async function getPlannedPosts(): Promise<Result<Record<string, unknown>[]>> {
+  return selectAll<Record<string, unknown>>("planned_posts", "*", "aar,uke,id");
+}
+
+/** Om innlogget bruker kan skrive i kalenderen (planlegging.er_redaktor). False ved feil eller manglende funksjon. */
+export async function erRedaktor(): Promise<boolean> {
+  try {
+    const { data, error } = await (await createClient()).schema("planlegging").rpc("er_redaktor");
+    return !error && data === true;
+  } catch (error) {
+    unstable_rethrow(error);
+    return false;
+  }
+}

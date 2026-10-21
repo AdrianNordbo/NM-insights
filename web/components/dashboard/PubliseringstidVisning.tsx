@@ -6,10 +6,12 @@ import { formatDayMonth, formatTimes } from "@/lib/format";
 import { FORMAT_NAME, PLATFORM_NAME } from "@/lib/navn";
 import { KONSEPTBRUDD } from "@/lib/regler/konsepter";
 import type { PlattformValgDef } from "@/lib/regler/plattformer";
+import type { PlanRad } from "@/lib/plan/ukeplan";
 import type { Visning } from "@/lib/sider";
 import { Filtre } from "./Filtre";
 import { bruddTekst } from "./InnholdsserierVisning";
 import { Kalender } from "./Kalender";
+import { KalenderDelt } from "./KalenderDelt";
 import { KonseptVelger } from "./KonseptVelger";
 
 type Option = { key: string; label: string };
@@ -31,6 +33,7 @@ export type PubliseringstidProps = {
   planHeat: Record<string, HeatSection>;
   planConcepts: string[];
   followContent: ContentLatestRow[];
+  plan: { rows: PlanRad[] | null; editor: boolean };
   today: string;
 };
 
@@ -58,7 +61,14 @@ export function PubliseringstidVisning(p: PubliseringstidProps) {
       {p.visning === "monstre" && <MonstreFane {...p} />}
       {p.visning === "heatmap" && <HeatmapFane {...p} />}
       {p.visning === "kalender" && (
-        <Kalender heat={p.planHeat} concepts={p.planConcepts} followContent={p.followContent} today={p.today} />
+        p.plan.rows ? (
+          <KalenderDelt heat={p.planHeat} rows={p.plan.rows} editor={p.plan.editor} today={p.today} followContent={p.followContent} />
+        ) : (
+          <>
+            <p className="notice">Den delte kalenderen er ikke satt opp ennå. Utkastet under lagres bare i denne nettleseren.</p>
+            <Kalender heat={p.planHeat} concepts={p.planConcepts} followContent={p.followContent} today={p.today} />
+          </>
+        )
       )}
     </>
   );

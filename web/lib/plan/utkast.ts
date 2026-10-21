@@ -55,20 +55,27 @@ export function lagUtkast(
   /** Dagens Oslo-dato: utkastet starter tidligst i morgen. */
   today: string,
   brudd: readonly Konseptbrudd[] = KONSEPTBRUDD,
+  /**
+   * days: dagene utkastet kan bruke (f.eks. bare én uke); ellers fra regler.start i regler.horizon dager.
+   * occupied: plasseringer som allerede er tatt (teller med i maks per dag, mellomrom og tester, men flyttes ikke).
+   */
+  opts: { days?: string[]; occupied?: Pick<Plassering, "platform" | "date" | "time" | "concept" | "kind">[] } = {},
 ): Utkast {
   const first = regler.start > today ? regler.start : addDays(today, 1);
-  const days = Array.from({ length: regler.horizon }, (_, i) => addDays(first, i));
+  const days = opts.days ? opts.days.filter((d) => d > today) : Array.from({ length: regler.horizon }, (_, i) => addDays(first, i));
   const testsPerWeek = Math.max(0, Math.min(MAKS_TESTER_PER_UKE, regler.testsPerWeek));
   const placed: Plassering[] = [];
+  const occupied = opts.occupied ?? [];
+  const taken = () => [...occupied, ...placed];
   const unplaced: Utkast["unplaced"] = [];
 
   const free = (platform: string, date: string, time: string, concept: string) => {
-    const same = placed.filter((p) => p.platform === platform && p.date === date);
+    const same = taken().filter((p) => p.platform === platform && p.date === date);
     if (same.length >= regler.maxPerDay) return false;
     if (same.some((p) => p.concept === concept)) return false;
     return !same.some((p) => Math.abs(toMin(p.time) - toMin(time)) < regler.gapHours * 60);
   };
-  const testsIn = (platform: string, date: string) => placed.filter((p) => p.platform === platform && p.kind === "Test" && ukeStart(p.date) === ukeStart(date)).length;
+  const testsIn = (platform: string, date: string) => taken().filter((p) => p.platform === platform && p.kind === "Test" && ukeStart(p.date) === ukeStart(date)).length;
 
   for (const video of queue) {
     const b = brudd.find((x) => x.concept === video.concept);
@@ -122,7 +129,7 @@ export function lagUtkast(
         if (t) choice = t;
       }
       // Ingen tidsrom med data for typen innhold: bare test
-      if (!choice) for (const d of order) if ((choice = testOn(d))) break;
+      if (!choice && !dataCeller(sec, video.concept).length) for (const d of order) if ((choice = testOn(d))) break;
 
       if (choice) {
         placed.push(choice);
@@ -131,7 +138,9 @@ export function lagUtkast(
         unplaced.push({
           video,
           platform: pp,
-          reason: dataCeller(sec, video.concept).length
+          reason: !days.length
+            ? "ingen dager igjen i perioden"
+            : dataCeller(sec, video.concept).length
             ? "ingen ledig plass i tidsrommene med tall i perioden"
             : "ingen tidsrom med tall for typen innhold, og ingen plass til flere tester",
         });

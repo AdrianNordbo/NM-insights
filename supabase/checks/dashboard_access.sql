@@ -191,3 +191,40 @@ select (select coalesce((select option_value from pg_options_to_table(c.reloptio
                          where option_name = 'security_invoker'), 'false (standard)')
         from pg_class c where c.oid = 'dashboard.post_features'::regclass) as security_invoker,
        (select relrowsecurity from pg_class where oid = 'public.reel_links'::regclass) as rls;
+
+-- K. Delt publiseringskalender (2026-10-21_planned_posts.sql). Kjør hver del for seg.
+-- K1. Rettigheter. Forventet: authenticated kan lese dashboard.planned_posts; ingen tilgang til tabellene;
+--     anon har ingenting.
+select r.rolname as role, o.obj, has_table_privilege(r.rolname, o.obj, 'select') as allowed
+from pg_roles r
+cross join (values ('dashboard.planned_posts'), ('public.planned_posts'), ('public.plan_editors')) as o(obj)
+where r.rolname in ('anon', 'authenticated')
+order by role, obj;
+
+-- K2. Funksjonene: security definer, fast search_path, og hvem som kan kjøre dem.
+--     Forventet: fem rader, security_definer = true, config = {search_path=""}, anon_kan = false,
+--     authenticated_kan = true.
+select p.proname, p.prosecdef as security_definer, p.proconfig as config,
+       has_function_privilege('anon', p.oid, 'execute') as anon_kan,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated_kan
+from pg_proc p
+where p.pronamespace = 'planlegging'::regnamespace
+order by p.proname;
+
+-- K3. Som authenticated uten innlogget bruker: skriving avvises. Forventet: ERROR Ikke innlogget.
+begin;
+set local role authenticated;
+select planlegging.legg_til('[]'::jsonb);
+rollback;
+
+-- K4. Som authenticated: tabellen kan ikke leses direkte. Forventet: ERROR permission denied for table planned_posts.
+begin;
+set local role authenticated;
+select count(*) from public.planned_posts;
+rollback;
+
+-- K5. RLS og security_invoker. Forventet: rls = true for begge tabellene, security_invoker = false for viewet.
+select relname, relrowsecurity as rls from pg_class
+where oid in ('public.planned_posts'::regclass, 'public.plan_editors'::regclass);
+select coalesce((select option_value from pg_options_to_table(c.reloptions) where option_name = 'security_invoker'), 'false (standard)') as security_invoker
+from pg_class c where c.oid = 'dashboard.planned_posts'::regclass;
