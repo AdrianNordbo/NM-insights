@@ -103,12 +103,12 @@ describe("tester", () => {
   });
 });
 
-describe("Folka Først-låsen (26.10–22.11)", () => {
+describe("Folka Først-låsen (19.10–15.11)", () => {
   it("fast tidspunkt på alle plattformer, aldri test", () => {
     const q = [v("1", "Folka Først", ["instagram", "youtube", "tiktok"]), v("2", "Folka Først", ["instagram", "youtube", "tiktok"])];
     const u = lagUtkast(q, regler({ start: "2026-10-26", testsPerWeek: 2 }), heat, TODAY);
     expect(u.placed.every((p) => p.kind === "Basert på data")).toBe(true);
-    expect(u.placed.every((p) => p.why.startsWith("Fast tidspunkt for Folka Først på alle plattformer fra 26.10 til 22.11"))).toBe(true);
+    expect(u.placed.every((p) => p.why.startsWith("Fast tidspunkt for Folka Først på alle plattformer fra 19.10 til 15.11"))).toBe(true);
     // Søndag 20–24 har for få innlegg til å være et fast tidspunkt
     expect(u.placed.some((p) => ukedag(p.date) === 6)).toBe(false);
   });
@@ -119,9 +119,12 @@ describe("Folka Først-låsen (26.10–22.11)", () => {
     expect(u.placed.find((p) => p.concept === "Folka Først")?.kind).toBe("Basert på data");
   });
 
-  it("før bruddet planlegges Folka Først som vanlig (høyest median)", () => {
-    const u = lagUtkast([v("1", "Folka Først")], regler({ start: "2026-10-20", horizon: 3 }), heat, TODAY);
-    expect(u.placed[0]).toMatchObject({ date: "2026-10-21", time: "18:00" });
+  it("låsen gjelder til og med søndag 15.11; fra mandag 16.11 planlegges som vanlig (første dag med data)", () => {
+    const inne = lagUtkast([v("1", "Folka Først")], regler({ start: "2026-11-11", horizon: 1 }), heat, TODAY); // onsdag
+    expect(inne.placed[0].why).toMatch(/^Fast tidspunkt/);
+    const etter = lagUtkast([v("1", "Folka Først")], regler({ start: "2026-11-16", horizon: 7 }), heat, TODAY);
+    expect(etter.placed[0]).toMatchObject({ date: "2026-11-16", time: "19:00" });
+    expect(etter.placed[0].why).not.toMatch(/Fast tidspunkt/);
   });
 });
 

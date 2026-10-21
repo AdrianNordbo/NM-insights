@@ -382,13 +382,13 @@ Ukesrapport (kort, ingen konseptbeslutninger):
   UTC for TikTok og Stillehavstid for de andre.
 - Konfigurasjon samlet ett sted:
   - `web/lib/regler/konsepter.ts`: `UTELATTE_KONSEPTER` (Bankinfo), `SAMLEKATEGORIER`, `IKKE_ANALYSE`,
-    `KONSEPTBRUDD` (Folka Først fra 26.10.2026, ny teksting) og `LAAS_UKER` (4).
+    `KONSEPTBRUDD` (Folka Først fra 19.10.2026, ny teksting; flyttet fra 26.10 den 21.10.2026) og `LAAS_UKER` (4).
     `EXCLUDED_CONCEPTS` (anbefalinger) og `ANALYSE_UTELATT` (mønstre) leser derfra.
   - `web/lib/regler/plattformer.ts`: plattformvalgene (`PLATTFORM_VALG`) og plattformene i publiseringsutkastet
     (`PLAN_PLATTFORMER`: Instagram, YouTube, TikTok). Facebook legges til der senere.
 - Bankinfo: utelatt fra konsepter, anbefalinger, mønstre, medianer, heatmap, ferske innlegg og «Hva funket
   sist», men med i totaler og kontotall (forklart i info-ikonene). Felles forberedelse i `web/lib/data/forbered.ts`.
-- Konseptbrudd: innlegg fra bruddatoen får eget navn («Folka Først (fra 26.10)») og blandes aldri med innleggene
+- Konseptbrudd: innlegg fra bruddatoen får eget navn («Folka Først (fra 19.10)») og blandes aldri med innleggene
   før i medianer, mønstre og heatmap. Frem til den nye gruppen har ≥ 6 modne innlegg er den «foreløpig», og
   medianer og mønstre for Folka Først bygger bare på innleggene før.
 - Konseptmedianene regnes i `web/lib/oversikt/konseptmedianer.ts` fra content_latest (samme definisjon som
@@ -462,7 +462,7 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
   velger bare dag og klokkeslett; hver plattform plasseres etter egne tall, på samme dag som videoens første
   plattform der det er mulig. «Basert på data» = tidsrom med ≥ 3 innlegg for typen innhold på plattformen;
   «Test» = kveldstidsrom uten nok tall (maks 2 per plattform og uke). Folka Først holder fast tidspunkt
-  26.10–22.11 på alle plattformer og testes aldri i den perioden. CSV-utkast med én rad per plattform og kolonnen
+  19.10–15.11 på alle plattformer og testes aldri i den perioden. CSV-utkast med én rad per plattform og kolonnen
   «Merking». Ingen automatisk publisering.
 - Oppfølging av tester (web/lib/plan/oppfolging.ts): lagrede tester matches mot innlegg (samme plattform,
   format og type innhold, innen én dag) og vurderes etter 7 dager som «ganger vanlig»; lovende fra ×1,15.

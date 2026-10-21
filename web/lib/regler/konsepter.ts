@@ -18,9 +18,9 @@ export type Konseptbrudd = { concept: string; from: string; reason: string };
 
 /**
  * Kjente brudd: innlegg før og etter datoen blandes aldri i medianer og mønstre. Innlegg fra datoen får
- * eget konseptnavn («Folka Først (fra 26.10)») og er en foreløpig gruppe til den har nok modne innlegg.
+ * eget konseptnavn («Folka Først (fra 19.10)») og er en foreløpig gruppe til den har nok modne innlegg.
  */
-export const KONSEPTBRUDD: readonly Konseptbrudd[] = [{ concept: "Folka Først", from: "2026-10-26", reason: "ny teksting" }];
+export const KONSEPTBRUDD: readonly Konseptbrudd[] = [{ concept: "Folka Først", from: "2026-10-19", reason: "ny teksting" }];
 
 /** Antall uker etter et brudd der konseptet holder fast tidspunkt i publiseringsutkastet. */
 export const LAAS_UKER = 4;
@@ -32,7 +32,7 @@ export function utenUtelatte<T extends { concept: string | null }>(rows: T[]): T
   return rows.filter((r) => !isUtelatt(r.concept));
 }
 
-/** «Folka Først (fra 26.10)» */
+/** «Folka Først (fra 19.10)» */
 export const bruddNavn = (b: Konseptbrudd) => `${b.concept} (fra ${formatDayMonth(b.from)})`;
 
 /** Bruddet som gjelder innlegget (konsept + publiseringsdato i Oslo-tid), eller null. */

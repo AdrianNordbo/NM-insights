@@ -1,7 +1,7 @@
 // Gjør radene fra dashboard-viewene klare for sidene. Ett sted for reglene som gjelder alle sider:
 // - Totaler og kontotall bruker alle innlegg (også Bankinfo).
 // - Lister, konsepter, anbefalinger, mønstre og medianer bruker innlegg uten utelatte konsepter, med
-//   konseptbrudd delt (Folka Først fra 26.10 som egen gruppe).
+//   konseptbrudd delt (Folka Først fra 19.10 som egen gruppe).
 // - Konseptmedianene regnes fra content_latest (samme definisjon som dashboard.concept_summary).
 
 import type { FeatureRow } from "../analyse/analyse";

@@ -6,7 +6,7 @@
 // - «Basert på data»: tidsrom (ukedag × tidsblokk) der samme type innhold har minst HEAT_MIN_N innlegg på
 //   plattformen, på klokkeslettet som er brukt der før. «Test»: kveldstidsrom uten nok tall, høyst
 //   testerPerUke per plattform og uke (maks 2).
-// - Konsept med brudd (Folka Først fra 26.10) holder fast tidspunkt i LAAS_UKER uker på alle plattformer og
+// - Konsept med brudd (Folka Først fra 19.10) holder fast tidspunkt i LAAS_UKER uker på alle plattformer og
 //   brukes aldri til tester i den perioden.
 // - Maks per dag, minste mellomrom og én video per konsept og dag gjelder per plattform.
 
