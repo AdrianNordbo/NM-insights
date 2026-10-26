@@ -228,3 +228,68 @@ select relname, relrowsecurity as rls from pg_class
 where oid in ('public.planned_posts'::regclass, 'public.plan_editors'::regclass);
 select coalesce((select option_value from pg_options_to_table(c.reloptions) where option_name = 'security_invoker'), 'false (standard)') as security_invoker
 from pg_class c where c.oid = 'dashboard.planned_posts'::regclass;
+
+-- DR. Drive til kalenderen (2026-10-26_drive_kalender.sql). Kjør hver del for seg.
+--     (Blokk D finnes fra før, derfor DR.)
+-- DR1. Rettigheter. Forventet: authenticated kan lese dashboard.planned_posts og dashboard.drive_innboks;
+--      ingen tilgang til public.drive_videos eller public.planned_posts; anon har ingenting.
+select r.rolname as role, o.obj, has_table_privilege(r.rolname, o.obj, 'select') as allowed
+from pg_roles r
+cross join (values ('dashboard.planned_posts'), ('dashboard.drive_innboks'), ('public.drive_videos'),
+                   ('public.planned_posts')) as o(obj)
+where r.rolname in ('anon', 'authenticated')
+order by role, obj;
+
+-- DR2. authenticated har bare SELECT på viewene, ingen skriving. Forventet: alle kolonnene false.
+select o.obj,
+       has_table_privilege('authenticated', o.obj, 'insert') as insert,
+       has_table_privilege('authenticated', o.obj, 'update') as update,
+       has_table_privilege('authenticated', o.obj, 'delete') as delete
+from (values ('dashboard.planned_posts'), ('dashboard.drive_innboks')) as o(obj);
+
+-- DR3. Funksjonene: security definer, fast search_path, og hvem som kan kjøre dem.
+--      Forventet: sju rader (de fem fra K2 + legg_til_fra_drive og lagre_caption), security_definer = true,
+--      config = {search_path=""}, anon_kan = false, authenticated_kan = true.
+select p.proname, pg_get_function_identity_arguments(p.oid) as args, p.prosecdef as security_definer,
+       p.proconfig as config,
+       has_function_privilege('anon', p.oid, 'execute') as anon_kan,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated_kan
+from pg_proc p
+where p.pronamespace = 'planlegging'::regnamespace
+order by p.proname;
+
+-- DR4. Ingen grants til anon/authenticated på noe i public (tabeller, views, sekvenser).
+--      Forventet: ingen rader.
+select table_schema, table_name, grantee, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public' and grantee in ('anon', 'authenticated', 'PUBLIC');
+
+-- DR5. Som authenticated uten innlogget bruker: innboksen gir 0 rader, og skriving avvises.
+--      Forventet: 0, deretter ERROR Ikke innlogget (to ganger, kjør linjene hver for seg).
+begin;
+set local role authenticated;
+select count(*) from dashboard.drive_innboks;
+select planlegging.legg_til_fra_drive('x', '[]'::jsonb);
+rollback;
+begin;
+set local role authenticated;
+select planlegging.lagre_caption('00000000-0000-0000-0000-000000000000', 'x');
+rollback;
+
+-- DR6. Som anon: innboksen blokkeres. Forventet: ERROR permission denied for schema dashboard.
+begin;
+set local role anon;
+select count(*) from dashboard.drive_innboks;
+rollback;
+
+-- DR7. RLS, security_invoker, kolonnerekkefølgen i viewet og den unike indeksen.
+--      Forventet: rls = true; security_invoker = false for begge viewene; kolonnene i dashboard.planned_posts
+--      er de 15 fra før i samme rekkefølge (id … oppdatert) og så drive_file_id, caption_skjelett, caption_tekst;
+--      indeksen planned_posts_drive_unik finnes.
+select relname, relrowsecurity as rls from pg_class where oid = 'public.drive_videos'::regclass;
+select c.relname, coalesce((select option_value from pg_options_to_table(c.reloptions)
+                            where option_name = 'security_invoker'), 'false (standard)') as security_invoker
+from pg_class c where c.oid in ('dashboard.planned_posts'::regclass, 'dashboard.drive_innboks'::regclass);
+select ordinal_position, column_name from information_schema.columns
+where table_schema = 'dashboard' and table_name = 'planned_posts' order by ordinal_position;
+select indexname, indexdef from pg_indexes where indexname = 'planned_posts_drive_unik';

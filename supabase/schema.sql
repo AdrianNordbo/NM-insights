@@ -1202,7 +1202,8 @@ comment on view dashboard.post_features is
 revoke all on dashboard.post_features from public, anon;
 grant select on dashboard.post_features to authenticated, service_role;
 
--- Delt publiseringskalender (2026-10-21_planned_posts.sql). Redaktører legges inn med supabase/seed/plan_editors.sql.
+-- Delt publiseringskalender (2026-10-21_planned_posts.sql) med Drive-innboks og caption (2026-10-26_drive_kalender.sql).
+-- Redaktører legges inn med supabase/seed/plan_editors.sql.
 
 -- ---------------------------------------------------------------------------
 -- 1. Redaktører
@@ -1256,6 +1257,57 @@ revoke all on public.plan_editors, public.planned_posts from public, anon, authe
 grant select, insert, update, delete on public.plan_editors, public.planned_posts to service_role;
 
 -- ---------------------------------------------------------------------------
+-- 2a. Innboks fra Drive (2026-10-26_drive_kalender.sql)
+-- ---------------------------------------------------------------------------
+create table if not exists public.drive_videos (
+    drive_file_id       text primary key,                       -- fil-ID i Drive (fast ved nytt navn og flytting)
+    konsept             text not null check (konsept in ('Folka Først', 'Sitcom', 'På Gata')),
+    aar                 integer not null,                       -- ISO-uke-år fra ukemappen
+    uke                 integer not null check (uke between 1 and 53),
+    mappe               text not null check (length(mappe) <= 300),
+    filnavn             text not null check (length(filnavn) between 1 and 300),
+    drive_lenke         text check (length(drive_lenke) <= 500),
+    tittel              text check (length(tittel) between 1 and 200),
+    gjest               text check (length(gjest) <= 100),
+    yrke                text check (length(yrke) <= 100),
+    videonr             integer,
+    tema                text check (length(tema) <= 200),
+    tolkning            text not null check (tolkning in ('ok', 'stopp', 'ikke tolket')),
+    melding             text not null default '' check (length(melding) <= 1000),
+    caption_skjelett    text check (length(caption_skjelett) <= 2200),
+    finnes_i_drive      boolean not null default true,
+    endret_i_drive      timestamptz,
+    forst_sett          timestamptz not null default now(),
+    sist_sett           timestamptz not null default now(),
+    constraint drive_videos_ok_har_skjelett check (tolkning <> 'ok' or (tittel is not null and caption_skjelett is not null))
+);
+
+create index if not exists drive_videos_uke_idx on public.drive_videos (aar, uke);
+
+comment on table public.drive_videos is
+    'Videofiler fra Google Drive tolket av fetch_drive.py. Bare metadata (navn), aldri selve filen. Skrives bare av service_role.';
+
+alter table public.drive_videos enable row level security;
+revoke all on public.drive_videos from public, anon, authenticated;
+grant select, insert, update, delete on public.drive_videos to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 2b. Nye kolonner i planned_posts (2026-10-26, null for eldre rader)
+-- ---------------------------------------------------------------------------
+alter table public.planned_posts
+    add column if not exists drive_file_id    text references public.drive_videos (drive_file_id) on delete set null,
+    add column if not exists caption_skjelett text check (length(caption_skjelett) <= 2200),
+    add column if not exists caption_tekst    text check (length(caption_tekst) <= 2200);
+
+create unique index if not exists planned_posts_drive_unik
+    on public.planned_posts (drive_file_id, plattform) where drive_file_id is not null;
+
+comment on column public.planned_posts.caption_skjelett is
+    'Skjelett fra Drive-innboksen, fryst da posten ble lagt inn. [SKRIV …] fylles ut manuelt.';
+comment on column public.planned_posts.caption_tekst is
+    'Ferdig caption skrevet av redaktøren. Kan ikke være Klar mens teksten (eller skjelettet) har [SKRIV.';
+
+-- ---------------------------------------------------------------------------
 -- 3. Lesing: dashboard.planned_posts (alle innloggede)
 -- ---------------------------------------------------------------------------
 create or replace view dashboard.planned_posts
@@ -1275,7 +1327,10 @@ select
     p.status,
     p.flyttet_manuelt,
     p.opprettet,
-    p.oppdatert
+    p.oppdatert,
+    p.drive_file_id,
+    p.caption_skjelett,
+    p.caption_tekst
 from public.planned_posts p;
 
 comment on view dashboard.planned_posts is
@@ -1283,6 +1338,41 @@ comment on view dashboard.planned_posts is
 
 revoke all on dashboard.planned_posts from public, anon;
 grant select on dashboard.planned_posts to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- 3b. Lesing: dashboard.drive_innboks (bare redaktører, 2026-10-26)
+-- ---------------------------------------------------------------------------
+-- Viewet kjører med eierens rettigheter (som de andre dashboard-viewene), men gir bare rader når innlogget
+-- bruker står i plan_editors. Andre innloggede (og SQL Editor, uten innlogget bruker) får 0 rader.
+create or replace view dashboard.drive_innboks
+with (security_invoker = false) as
+select
+    d.drive_file_id,
+    d.konsept,
+    d.aar,
+    d.uke,
+    d.mappe,
+    d.filnavn,
+    d.drive_lenke,
+    d.tittel,
+    d.gjest,
+    d.yrke,
+    d.videonr,
+    d.tema,
+    d.tolkning,
+    d.melding,
+    d.caption_skjelett,
+    d.finnes_i_drive,
+    d.sist_sett,
+    exists (select 1 from public.planned_posts p where p.drive_file_id = d.drive_file_id) as i_kalenderen
+from public.drive_videos d
+where exists (select 1 from public.plan_editors e where e.user_id = auth.uid());
+
+comment on view dashboard.drive_innboks is
+    'Videoer fra Drive som kan legges i kalenderen. Rader bare for redaktører (plan_editors).';
+
+revoke all on dashboard.drive_innboks from public, anon, authenticated;
+grant select on dashboard.drive_innboks to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 4. Skriving: schema planlegging
@@ -1370,7 +1460,8 @@ begin
     end if;
 end $$;
 
--- Setter status (Utkast, Klar, Publisert).
+-- Setter status (Utkast, Klar, Publisert). Som 2026-10-21, pluss: ikke Klar mens captionen har [SKRIV.
+-- Poster uten caption (lagt inn manuelt) kan settes til Klar som før.
 create or replace function planlegging.sett_status(p_id uuid, p_status text)
 returns void
 language plpgsql
@@ -1384,7 +1475,111 @@ begin
     if not exists (select 1 from public.plan_editors e where e.user_id = auth.uid()) then
         raise exception 'Bare redaktører kan endre kalenderen';
     end if;
+    if p_status = 'Klar' and exists (
+        select 1 from public.planned_posts p
+        where p.id = p_id and coalesce(p.caption_tekst, p.caption_skjelett, '') like '%[SKRIV%'
+    ) then
+        raise exception 'Captionen har fortsatt [SKRIV …] og kan ikke settes til Klar';
+    end if;
     update public.planned_posts set status = p_status, oppdatert = now() where id = p_id;
+    if not found then
+        raise exception 'Fant ikke plasseringen';
+    end if;
+end $$;
+
+-- Legger inn én Drive-video: én rad per plattform. Samme validering som legg_til (innlogget, redaktør,
+-- 1–10 rader, og tabellens sjekker for plattform, uke, tittel, konsept, dag/klokkeslett i uken og unik
+-- video per plattform), pluss: filen finnes i innboksen og er tolket ok, ligger ikke i kalenderen fra før,
+-- alle radene gjelder samme video og uken fra Drive-mappen, og konseptet er Drive-konseptet (eventuelt med
+-- bruddnavn, f.eks. «Folka Først (fra 18.10)»). Skjelettet kopieres fra innboksen.
+create or replace function planlegging.legg_til_fra_drive(p_drive_file_id text, p_rader jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+    v_rad    jsonb;
+    v_antall integer := 0;
+    v_d      public.drive_videos;
+begin
+    if auth.uid() is null then
+        raise exception 'Ikke innlogget';
+    end if;
+    if not exists (select 1 from public.plan_editors e where e.user_id = auth.uid()) then
+        raise exception 'Bare redaktører kan endre kalenderen';
+    end if;
+    if jsonb_typeof(p_rader) <> 'array' or jsonb_array_length(p_rader) not between 1 and 10 then
+        raise exception 'Ugyldig liste med rader';
+    end if;
+
+    select * into v_d from public.drive_videos d where d.drive_file_id = p_drive_file_id;
+    if not found then
+        raise exception 'Fant ikke videoen i Drive-innboksen';
+    end if;
+    if v_d.tolkning <> 'ok' then
+        raise exception 'Videoen er ikke tolket ok (%): %', v_d.tolkning, v_d.melding;
+    end if;
+    if exists (select 1 from public.planned_posts p where p.drive_file_id = p_drive_file_id) then
+        raise exception 'Videoen ligger allerede i kalenderen';
+    end if;
+    if (select count(distinct e ->> 'video_id') from jsonb_array_elements(p_rader) as r(e)) <> 1 then
+        raise exception 'Alle radene må gjelde samme video';
+    end if;
+
+    for v_rad in select * from jsonb_array_elements(p_rader) loop
+        if (v_rad ->> 'aar')::integer is distinct from v_d.aar or (v_rad ->> 'uke')::integer is distinct from v_d.uke then
+            raise exception 'Uken må være uken fra Drive-mappen (% uke %)', v_d.aar, v_d.uke;
+        end if;
+        if split_part(v_rad ->> 'konsept', ' (fra ', 1) is distinct from v_d.konsept then
+            raise exception 'Konseptet må være % (fra Drive-mappen)', v_d.konsept;
+        end if;
+        insert into public.planned_posts (
+            video_id, aar, uke, tittel, konsept, plattform, planlagt_dato, klokkeslett, merking, grunnlag, opprettet_av,
+            drive_file_id, caption_skjelett
+        ) values (
+            (v_rad ->> 'video_id')::uuid,
+            (v_rad ->> 'aar')::integer,
+            (v_rad ->> 'uke')::integer,
+            v_rad ->> 'tittel',
+            v_rad ->> 'konsept',
+            v_rad ->> 'plattform',
+            nullif(v_rad ->> 'planlagt_dato', '')::date,
+            nullif(v_rad ->> 'klokkeslett', '')::time,
+            nullif(v_rad ->> 'merking', ''),
+            coalesce(v_rad ->> 'grunnlag', ''),
+            auth.uid(),
+            p_drive_file_id,
+            v_d.caption_skjelett
+        );
+        v_antall := v_antall + 1;
+    end loop;
+    return v_antall;
+end $$;
+
+-- Lagrer ferdig caption for én plassering. Tom tekst = null (skjelettet gjelder). En post som er Klar
+-- settes tilbake til Utkast hvis teksten (eller skjelettet, når teksten er tom) fortsatt har [SKRIV.
+create or replace function planlegging.lagre_caption(p_id uuid, p_tekst text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+    if auth.uid() is null then
+        raise exception 'Ikke innlogget';
+    end if;
+    if not exists (select 1 from public.plan_editors e where e.user_id = auth.uid()) then
+        raise exception 'Bare redaktører kan endre kalenderen';
+    end if;
+    update public.planned_posts
+    set caption_tekst = nullif(btrim(p_tekst), ''),
+        status = case
+            when status = 'Klar' and coalesce(nullif(btrim(p_tekst), ''), caption_skjelett, '') like '%[SKRIV%' then 'Utkast'
+            else status
+        end,
+        oppdatert = now()
+    where id = p_id;
     if not found then
         raise exception 'Fant ikke plasseringen';
     end if;
@@ -1414,7 +1609,9 @@ end $$;
 comment on function planlegging.er_redaktor() is 'Om innlogget bruker kan skrive i den delte kalenderen.';
 comment on function planlegging.legg_til(jsonb) is 'Legger inn én video (én rad per plattform). Bare redaktører.';
 comment on function planlegging.flytt(uuid, date, time) is 'Flytter en plassering innenfor samme uke og merker den flyttet manuelt. Bare redaktører.';
-comment on function planlegging.sett_status(uuid, text) is 'Setter status Utkast/Klar/Publisert. Bare redaktører.';
+comment on function planlegging.sett_status(uuid, text) is 'Setter status Utkast/Klar/Publisert; ikke Klar med [SKRIV i captionen. Bare redaktører.';
+comment on function planlegging.legg_til_fra_drive(text, jsonb) is 'Legger inn én Drive-video (én rad per plattform), aldri to ganger. Bare redaktører.';
+comment on function planlegging.lagre_caption(uuid, text) is 'Lagrer ferdig caption; Klar med [SKRIV settes tilbake til Utkast. Bare redaktører.';
 comment on function planlegging.fjern_video(uuid) is 'Fjerner en video (alle plattformer) fra kalenderen. Bare redaktører.';
 
 revoke all on function planlegging.er_redaktor() from public, anon, authenticated;
@@ -1422,11 +1619,15 @@ revoke all on function planlegging.legg_til(jsonb) from public, anon, authentica
 revoke all on function planlegging.flytt(uuid, date, time) from public, anon, authenticated;
 revoke all on function planlegging.sett_status(uuid, text) from public, anon, authenticated;
 revoke all on function planlegging.fjern_video(uuid) from public, anon, authenticated;
+revoke all on function planlegging.legg_til_fra_drive(text, jsonb) from public, anon, authenticated;
+revoke all on function planlegging.lagre_caption(uuid, text) from public, anon, authenticated;
 grant execute on function planlegging.er_redaktor() to authenticated, service_role;
 grant execute on function planlegging.legg_til(jsonb) to authenticated, service_role;
 grant execute on function planlegging.flytt(uuid, date, time) to authenticated, service_role;
 grant execute on function planlegging.sett_status(uuid, text) to authenticated, service_role;
 grant execute on function planlegging.fjern_video(uuid) to authenticated, service_role;
+grant execute on function planlegging.legg_til_fra_drive(text, jsonb) to authenticated, service_role;
+grant execute on function planlegging.lagre_caption(uuid, text) to authenticated, service_role;
 
 
 commit;

@@ -3,3 +3,7 @@
 __pycache__/
 /data/
 secrets/
+
+# Private lister (navn, yrker, budskap). Committes ikke.
+config/gjester.csv
+config/notater/
