@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { fjernVideo, flyttPlassering, leggTilVideo, settStatus } from "@/app/(app)/publiseringstid/actions";
 import { blokkFor, HEAT_MIN_N, type HeatSection, TIDSBLOKKER, UKEDAGER, UKEDAGER_LANG } from "@/lib/analyse/heatmap";
 import type { ContentLatestRow } from "@/lib/data/types";
+import type { InnboksRad } from "@/lib/plan/innboks";
 import { formatDayMonth, formatNumber, formatTimes } from "@/lib/format";
 import { folgOpp, type LagretTest, trengerFlere } from "@/lib/plan/oppfolging";
 import { isoUke, kommendeUker, lesUke, type Uke, ukeDager, ukeKey, ukeLabel } from "@/lib/plan/uke";
@@ -13,12 +14,14 @@ import { MAKS_TESTER_PER_UKE, OPPFOLGING_DAGER, ukedag } from "@/lib/plan/utkast
 import { KONSEPTBRUDD, laasPeriode } from "@/lib/regler/konsepter";
 import { PLAN_KONSEPTER, STATUSER, TESTER_PER_UKE } from "@/lib/regler/plan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
+import { DriveInnboks } from "./DriveInnboks";
 
-type Props = { heat: Record<string, HeatSection>; rows: PlanRad[]; editor: boolean; today: string; followContent: ContentLatestRow[] };
+/** innboks: Drive-innboksen, bare for redaktører (null for andre og når viewet mangler). */
+type Props = { heat: Record<string, HeatSection>; rows: PlanRad[]; editor: boolean; today: string; followContent: ContentLatestRow[]; innboks?: InnboksRad[] | null };
 
 const label = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
 
-export function KalenderDelt({ heat, rows, editor, today, followContent }: Props) {
+export function KalenderDelt({ heat, rows, editor, today, followContent, innboks = null }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [melding, setMelding] = useState<string | null>(null);
@@ -97,6 +100,17 @@ export function KalenderDelt({ heat, rows, editor, today, followContent }: Props
           </select>
         </label>
       </div>
+
+      {editor && innboks && (
+        <>
+          <DriveInnboks innboks={innboks} rows={rows} heat={heat} regler={regler} today={today} pending={pending} run={run} />
+          {melding && (
+            <p className="small" role="status" style={{ margin: "-6px 0 16px" }}>
+              {melding}
+            </p>
+          )}
+        </>
+      )}
 
       {editor && (
         <div className="planning-grid">

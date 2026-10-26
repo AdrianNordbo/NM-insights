@@ -105,6 +105,14 @@ export async function getPlannedPosts(): Promise<Result<Record<string, unknown>[
   return selectAll<Record<string, unknown>>("planned_posts", "*", "aar,uke,id");
 }
 
+/**
+ * dashboard.drive_innboks (2026-10-26_drive_kalender.sql): videoer fra Drive til kalenderen. Hentes bare for
+ * redaktører (viewet gir uansett bare rader til brukere i plan_editors). Feil eller manglende view: ingen innboks.
+ */
+export async function getDriveInnboks(): Promise<Result<Record<string, unknown>[]>> {
+  return selectAll<Record<string, unknown>>("drive_innboks", "*", "aar,uke,drive_file_id");
+}
+
 /** Om innlogget bruker kan skrive i kalenderen (planlegging.er_redaktor). False ved feil eller manglende funksjon. */
 export async function erRedaktor(): Promise<boolean> {
   try {

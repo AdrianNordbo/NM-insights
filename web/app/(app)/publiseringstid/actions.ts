@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
+import { feilmeldingDrive, sjekkDriveRader } from "@/lib/plan/innboks";
 import { isoUke, sammeUke } from "@/lib/plan/uke";
 import { gyldigStatus, kanFlytte, type NyRad } from "@/lib/plan/ukeplan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
@@ -15,11 +16,12 @@ export type Svar = { ok: true } | { ok: false; error: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FEIL = "Klarte ikke å lagre. Prøv igjen, eller sjekk at du er redaktør.";
 
-async function rpc(fn: string, args: Record<string, unknown>): Promise<Svar> {
+async function rpc(fn: string, args: Record<string, unknown>, feilmelding?: (code: string, message: string) => string): Promise<Svar> {
   try {
     const { error } = await (await createClient()).schema("planlegging").rpc(fn, args);
     if (error) {
       console.error(`planlegging.${fn} feilet:`, JSON.stringify({ code: error.code, message: error.message }));
+      if (feilmelding) return { ok: false, error: feilmelding(error.code, error.message) };
       return { ok: false, error: error.message.includes("redaktør") ? "Bare redaktører kan endre kalenderen." : FEIL };
     }
     revalidatePath("/publiseringstid");
@@ -57,6 +59,31 @@ export async function leggTilVideo(rader: NyRad[]): Promise<Svar> {
       grunnlag: r.grunnlag,
     })),
   });
+}
+
+/** Legger inn én video fra Drive-innboksen. Databasen avviser dubletter, feil uke og videoer som ikke er tolket ok. */
+export async function leggTilFraDrive(driveFileId: string, rader: NyRad[]): Promise<Svar> {
+  const feil = sjekkDriveRader(driveFileId, rader);
+  if (feil) return { ok: false, error: feil };
+  return rpc(
+    "legg_til_fra_drive",
+    {
+      p_drive_file_id: driveFileId,
+      p_rader: rader.map((r) => ({
+        video_id: r.videoId,
+        aar: r.aar,
+        uke: r.uke,
+        tittel: r.tittel.trim(),
+        konsept: r.konsept,
+        plattform: r.plattform,
+        planlagt_dato: r.dato ?? "",
+        klokkeslett: r.klokkeslett ?? "",
+        merking: r.merking ?? "",
+        grunnlag: r.grunnlag,
+      })),
+    },
+    feilmeldingDrive,
+  );
 }
 
 export async function flyttPlassering(id: string, aar: number, uke: number, dato: string, klokkeslett: string): Promise<Svar> {

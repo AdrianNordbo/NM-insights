@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PubliseringstidVisning } from "@/components/dashboard/PubliseringstidVisning";
-import { erRedaktor, getContentLatest, getDailyActivity, getPlannedPosts, getPostFeatures } from "@/lib/data/dashboard";
+import { erRedaktor, getContentLatest, getDailyActivity, getDriveInnboks, getPlannedPosts, getPostFeatures } from "@/lib/data/dashboard";
 import { osloToday } from "@/lib/format";
 import { publiseringstidSide } from "@/lib/sider";
 
@@ -18,11 +18,13 @@ export default async function Publiseringstid(props: PageProps<"/publiseringstid
     kalender ? erRedaktor() : false,
   ]);
   if (!content.ok) return <p className="notice">{content.error}</p>;
+  // Drive-innboksen hentes bare for redaktører (andre får ingen spørring og ingen data). Feil: ingen innboks.
+  const innboks = kalender && editor ? await getDriveInnboks() : null;
   const side = publiseringstidSide(
     { daily: daily.ok ? daily.data : [], content: content.data, features: features.ok ? features.data : null },
     params,
     osloToday(),
-    { rader: planned?.ok ? planned.data : null, editor },
+    { rader: planned?.ok ? planned.data : null, editor, innboks: innboks?.ok ? innboks.data : null },
   );
   return <PubliseringstidVisning {...side} />;
 }
