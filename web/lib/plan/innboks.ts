@@ -6,7 +6,7 @@
 import type { HeatSection } from "../analyse/heatmap";
 import { PLAN_KONSEPTER } from "../regler/plan";
 import { PLAN_PLATTFORMER } from "../regler/plattformer";
-import { isoUke, sammeUke } from "./uke";
+import { isoUke, sammeUke, type Uke, ukeKey } from "./uke";
 import { grunnKonsept, type NyRad, type PlanRad, plasserIUke, type UkeRegler } from "./ukeplan";
 import type { KoVideo } from "./utkast";
 
@@ -78,6 +78,48 @@ export function delInnboks(rader: InnboksRad[]): { klare: InnboksRad[]; probleme
   return {
     klare: ute.filter((r) => r.tolkning === "ok").sort(rekkefolge),
     problemer: ute.filter((r) => r.tolkning !== "ok").sort(rekkefolge),
+  };
+}
+
+/** En uke i ukevelgeren: antall klare videoer og antall som ikke kan legges inn. */
+export type InnboksUke = Uke & { klare: number; problemer: number };
+
+const forUke = (a: Uke, b: Uke) => a.aar - b.aar || a.uke - b.uke;
+
+/** Ukene som har videoer i innboksen (klare eller problemer), sortert på (år, uke), så 2026-W53 kommer før 2027-W01. */
+export function innboksUker(rader: InnboksRad[]): InnboksUke[] {
+  const { klare, problemer } = delInnboks(rader);
+  const uker = new Map<string, InnboksUke>();
+  const hent = (r: InnboksRad) => {
+    const key = ukeKey(r);
+    if (!uker.has(key)) uker.set(key, { aar: r.aar, uke: r.uke, klare: 0, problemer: 0 });
+    return uker.get(key) as InnboksUke;
+  };
+  for (const r of klare) hent(r).klare += 1;
+  for (const r of problemer) hent(r).problemer += 1;
+  return [...uker.values()].sort(forUke);
+}
+
+/**
+ * Uken som skal vises: den valgte hvis den fortsatt har videoer; ellers neste uke med videoer etter den
+ * (eller den nærmeste før, hvis det ikke finnes noen etter); uten valg den første. Null når innboksen er tom.
+ */
+export function velgUke(uker: InnboksUke[], valgt: Uke | null): Uke | null {
+  if (!uker.length) return null;
+  const pick = (u: InnboksUke): Uke => ({ aar: u.aar, uke: u.uke });
+  if (!valgt) return pick(uker[0]);
+  const samme = uker.find((u) => sammeUke(u, valgt));
+  if (samme) return pick(samme);
+  const etter = uker.find((u) => forUke(u, valgt) > 0);
+  return pick(etter ?? uker[uker.length - 1]);
+}
+
+/** Videoene i én uke: klare gruppert per konsept (Folka Først, Sitcom, På Gata), og de som ikke kan legges inn. */
+export function innboksForUke(rader: InnboksRad[], uke: Uke): { grupper: { konsept: string; rader: InnboksRad[] }[]; problemer: InnboksRad[] } {
+  const { klare, problemer } = delInnboks(rader.filter((r) => sammeUke(r, uke)));
+  return {
+    grupper: PLAN_KONSEPTER.map((konsept) => ({ konsept: konsept as string, rader: klare.filter((r) => r.konsept === konsept) })).filter((g) => g.rader.length),
+    problemer,
   };
 }
 

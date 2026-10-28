@@ -5,11 +5,14 @@ import {
   FEIL_LAGRE,
   feilmeldingDrive,
   fraInnboks,
+  innboksForUke,
+  innboksUker,
   type InnboksRad,
   muligDuplikat,
   normTittel,
   plasserFraInnboks,
   sjekkDriveRader,
+  velgUke,
 } from "./innboks";
 import type { PlanRad } from "./ukeplan";
 import { ukeDager } from "./uke";
@@ -107,6 +110,50 @@ describe("lesing fra dashboard.drive_innboks", () => {
     // fjern_video sletter radene i planned_posts; viewet regner i_kalenderen fra planned_posts.drive_file_id
     expect(delInnboks([rad({ i_kalenderen: true })]).klare).toEqual([]);
     expect(delInnboks([rad({ i_kalenderen: false })]).klare).toHaveLength(1);
+  });
+});
+
+describe("ukevelgeren", () => {
+  const id = (n: number) => `fil${String(n).padStart(8, "0")}`;
+  const rader = [
+    rad({ drive_file_id: id(1), aar: 2027, uke: 1 }),
+    rad({ drive_file_id: id(2), aar: 2026, uke: 53 }),
+    rad({ drive_file_id: id(3), aar: 2026, uke: 52, konsept: "På Gata", tittel: "Impulskjøp", gjest: null, yrke: null }),
+    rad({ drive_file_id: id(4), aar: 2026, uke: 52 }),
+    rad({ drive_file_id: id(5), aar: 2026, uke: 52, konsept: "Sitcom", tittel: "Kaffe", gjest: null, yrke: null }),
+    rad({ drive_file_id: id(6), aar: 2026, uke: 52, tolkning: "ikke tolket", tittel: null, caption_skjelett: null, melding: "kopi" }),
+    rad({ drive_file_id: id(7), aar: 2026, uke: 46, i_kalenderen: true }),
+    rad({ drive_file_id: id(8), aar: 2026, uke: 47, tolkning: "stopp", caption_skjelett: null, melding: "Ukjent gjest: Ola" }),
+  ];
+
+  it("uker sortert på (år, uke) over årsskiftet, med antall og markering av problemer; lagt inn teller ikke", () => {
+    expect(innboksUker(rader)).toEqual([
+      { aar: 2026, uke: 47, klare: 0, problemer: 1 },
+      { aar: 2026, uke: 52, klare: 3, problemer: 1 },
+      { aar: 2026, uke: 53, klare: 1, problemer: 0 },
+      { aar: 2027, uke: 1, klare: 1, problemer: 0 },
+    ]);
+  });
+
+  it("standard er første uke; valgt uke beholdes; tom uke hopper til neste; ingen etter gir nærmeste før", () => {
+    const uker = innboksUker(rader);
+    expect(velgUke(uker, null)).toEqual({ aar: 2026, uke: 47 });
+    expect(velgUke(uker, { aar: 2026, uke: 53 })).toEqual({ aar: 2026, uke: 53 });
+    expect(velgUke(uker, { aar: 2026, uke: 49 })).toEqual({ aar: 2026, uke: 52 }); // uke 49 ble tom etter «Legg inn»
+    expect(velgUke(uker.filter((u) => u.aar === 2026), { aar: 2027, uke: 1 })).toEqual({ aar: 2026, uke: 53 });
+    expect(velgUke([], { aar: 2026, uke: 52 })).toBeNull();
+    expect(velgUke(innboksUker([rad({ i_kalenderen: true })]), null)).toBeNull(); // tom innboks: seksjonen skjules
+  });
+
+  it("valgt uke viser bare sine videoer, gruppert per konsept i fast rekkefølge, og problemene for samme uke", () => {
+    const { grupper, problemer } = innboksForUke(rader, { aar: 2026, uke: 52 });
+    expect(grupper.map((g) => [g.konsept, g.rader.map((r) => r.driveFileId)])).toEqual([
+      ["Folka Først", [id(4)]],
+      ["Sitcom", [id(5)]],
+      ["På Gata", [id(3)]],
+    ]);
+    expect(problemer.map((r) => r.driveFileId)).toEqual([id(6)]);
+    expect(innboksForUke(rader, { aar: 2026, uke: 47 })).toEqual({ grupper: [], problemer: [rader[7]] });
   });
 });
 

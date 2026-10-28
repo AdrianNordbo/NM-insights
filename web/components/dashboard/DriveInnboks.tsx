@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { leggTilFraDrive } from "@/app/(app)/publiseringstid/actions";
 import type { HeatSection } from "@/lib/analyse/heatmap";
-import { delInnboks, type InnboksRad, muligDuplikat, plasserFraInnboks } from "@/lib/plan/innboks";
+import { type InnboksRad, innboksForUke, innboksUker, muligDuplikat, plasserFraInnboks, velgUke } from "@/lib/plan/innboks";
+import { lesUke, sammeUke, ukeKey } from "@/lib/plan/uke";
 import type { PlanRad, UkeRegler } from "@/lib/plan/ukeplan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
 
@@ -20,20 +21,55 @@ type Props = {
 
 const label = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
 
-/** Nye videoer fra Drive (bare for redaktører). Ingenting legges inn før redaktøren trykker «Legg inn». */
+/**
+ * Nye videoer fra Drive (bare for redaktører), én uke om gangen. Valgt uke beholdes etter «Legg inn»; blir den tom,
+ * vises neste uke med videoer. Tom innboks: ingenting vises. Ingenting legges inn før redaktøren trykker «Legg inn».
+ */
 export function DriveInnboks({ innboks, rows, heat, regler, today, pending, run }: Props) {
-  const { klare, problemer } = delInnboks(innboks);
+  const [valgt, setValgt] = useState<string | null>(null);
+  const uker = innboksUker(innboks);
+  const uke = velgUke(uker, lesUke(valgt));
+  if (!uke) return null;
+  const { grupper, problemer } = innboksForUke(innboks, uke);
+  const totalt = uker.reduce((s, u) => s + u.klare, 0);
   return (
     <div className="card innboks">
-      <h2>Nye videoer fra Drive ({klare.length})</h2>
+      <h2>Nye videoer fra Drive ({totalt})</h2>
       <div className="sub">
         Fra Drive-mappen, tolket av fetch_drive.py. «Legg inn» plasserer videoen i uken fra mappen etter reglene under, på samme måte som «Legg til video».
         Ingenting legges inn før du trykker.
       </div>
-      {klare.length ? (
-        klare.map((r) => <Video key={r.driveFileId} rad={r} rows={rows} heat={heat} regler={regler} today={today} pending={pending} run={run} />)
+      <div className="ukevelger" role="group" aria-label="Uke i innboksen">
+        {uker.map((u) => {
+          const aktiv = sammeUke(u, uke);
+          return (
+            <button key={ukeKey(u)} type="button" aria-pressed={aktiv} className={aktiv ? "aktiv" : undefined} onClick={() => setValgt(ukeKey(u))}>
+              Uke {u.uke} · {u.aar}
+              <span className="antall" aria-label={`${u.klare} klare`}>
+                {u.klare}
+              </span>
+              {u.problemer > 0 && (
+                <span className="varsel" title={`${u.problemer} kan ikke legges inn`} aria-label={`${u.problemer} kan ikke legges inn`}>
+                  !
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {grupper.length ? (
+        grupper.map((g) => (
+          <div key={g.konsept}>
+            <div className="sub-h">
+              {g.konsept} ({g.rader.length})
+            </div>
+            {g.rader.map((r) => (
+              <Video key={r.driveFileId} rad={r} rows={rows} heat={heat} regler={regler} today={today} pending={pending} run={run} />
+            ))}
+          </div>
+        ))
       ) : (
-        <p className="empty-state">Ingen nye videoer fra Drive.</p>
+        <p className="empty-state">Ingen videoer som kan legges inn i uke {uke.uke}.</p>
       )}
       {problemer.length > 0 && (
         <>
