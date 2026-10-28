@@ -289,6 +289,91 @@ class ListerOgMaler(unittest.TestCase):
         self.assertEqual(dt.ukjente_notater(notater, ["A.mp4"]), ["finnes ikke.mp4"])
 
 
+VARIANTER = dt.les_varianter(Path("config/caption_varianter.csv").read_text(encoding="utf-8"))
+GJESTER_JA_NEI = dt.les_gjester(
+    "navn;yrke;arbeidssted;bruk_arbeidssted\n"
+    "Christian;regnskapsfører;Eika Økonomi Øst;ja\n"
+    "Line;rådgiver;Navigatio;nei\n"
+)
+
+
+def gjestelinje(fil_id, navn="Christian", varianter=VARIANTER, filnavn=None):
+    f = dt.tolk_fil("Folka Først", 2026, 45, filnavn or f"Veksthuset Folka Først {navn} Video 3.mp4",
+                    gjester=GJESTER_JA_NEI, notater={}, maler=MALER, varianter=varianter, fil_id=fil_id)
+    return f, f.caption_skjelett.split("\n\n")[1]
+
+
+class Varianter(unittest.TestCase):
+    def test_filen_har_fire_med_og_fire_uten_arbeidssted(self):
+        self.assertEqual({k: len(v) for k, v in VARIANTER.items()}, {("Folka Først", True): 4, ("Folka Først", False): 4})
+
+    def test_samme_fil_gir_samme_variant(self):
+        # crc32 er stabil mellom kjøringer og Python-prosesser (ikke hash(), som er tilfeldig per prosess)
+        self.assertEqual(gjestelinje("1AbCdEfGhIjK")[1], gjestelinje("1AbCdEfGhIjK")[1])
+        self.assertEqual(dt.velg_variant(["a", "b", "c", "d"], "1AbCdEfGhIjK"), ["a", "b", "c", "d"][__import__("zlib").crc32(b"1AbCdEfGhIjK") % 4])
+
+    def test_ulike_filer_gir_flere_varianter(self):
+        linjer = {gjestelinje(f"fil-{i:03d}-abcdef")[1] for i in range(40)}
+        self.assertEqual(len(linjer), 4)
+
+    def test_med_og_uten_arbeidssted(self):
+        alle_med = {gjestelinje(f"fil-{i:03d}-abcdef")[1] for i in range(40)}
+        self.assertIn("Christian jobber som regnskapsfører i Eika Økonomi Øst og snakker om [SKRIV TEMA]!", alle_med)
+        self.assertIn("Møt Christian, regnskapsfører i Eika Økonomi Øst. I dag snakker vi om [SKRIV TEMA]!", alle_med)
+        self.assertTrue(all("Eika Økonomi Øst" in x for x in alle_med))
+        alle_uten = {gjestelinje(f"fil-{i:03d}-abcdef", navn="Line")[1] for i in range(40)}
+        self.assertEqual(len(alle_uten), 4)
+        self.assertIn("Line er rådgiver og forteller om [SKRIV TEMA].", alle_uten)
+        self.assertFalse(any("Navigatio" in x or " i " in x.split(",")[0] for x in alle_uten))
+
+    def test_skriv_finnes_alltid_og_resten_er_uendret(self):
+        for i in range(40):
+            f, linje = gjestelinje(f"fil-{i:03d}-abcdef")
+            deler = f.caption_skjelett.split("\n\n")
+            self.assertEqual(deler[0], "[SKRIV BUDSKAP]")
+            self.assertIn("[SKRIV TEMA]", linje)
+            self.assertEqual(deler[2], "#podkast #norskepodkaster #arbeidslivet #oppstartsbedrift #grunder")
+
+    def test_uten_fil_id_brukes_filnavnet(self):
+        f1, a = gjestelinje(None)
+        _, b = gjestelinje(None)
+        self.assertEqual(a, b)
+        navn = "Veksthuset Folka Først Christian Video 3.mp4"
+        self.assertEqual(a, dt.velg_variant(VARIANTER[("Folka Først", True)], navn).format(
+            navn="Christian", yrke="regnskapsfører", arbeidssted="Eika Økonomi Øst"))
+
+    def test_mangler_eller_tom_fil_gir_standardmalen(self):
+        for varianter in (None, {}, dt.les_varianter("konsept;med_arbeidssted;mal\n")):
+            self.assertEqual(gjestelinje("1AbCdEfGhIjK", varianter=varianter)[1],
+                             "Christian jobber som regnskapsfører i Eika Økonomi Øst og snakker om [SKRIV TEMA]!")
+
+    def test_paa_gata_og_sitcom_er_uendret(self):
+        pg = dt.tolk_fil("På Gata", 2026, 46, "Impulskjøp.mp4", gjester={}, notater={}, maler=MALER, varianter=VARIANTER, fil_id="x1234567890")
+        sc = dt.tolk_fil("Sitcom", 2026, 45, "45. Kaffe.mp4", gjester={}, notater={}, maler=MALER, varianter=VARIANTER, fil_id="x1234567890")
+        self.assertEqual(pg.caption_skjelett, "[SKRIV BUDSKAP]\n\nVi spør folk på gata: Impulskjøp\n\n#PåGata #Økonomi #ViralNorge")
+        self.assertEqual(sc.caption_skjelett, "[SKRIV BUDSKAP]\n\n[SKRIV SPØRSMÅL TIL FØLGERNE]\n\n#sitcom #humor #norskhumor")
+
+    def test_ugyldige_varianter(self):
+        hode = "konsept;med_arbeidssted;mal\n"
+        for linje in ("Folka Først;ja;{navn} i {arbeidssted} om tema\n",          # mangler [SKRIV TEMA]
+                      "Folka Først;nei;{navn} i {arbeidssted} om [SKRIV TEMA]\n",  # arbeidssted uten «ja»
+                      "Folka Først;ja;{navn} om [SKRIV TEMA]\n",                   # «ja» uten arbeidssted
+                      "Folka Først;ja;{navn} {firma} i {arbeidssted} [SKRIV TEMA]\n",
+                      "Folka Først;kanskje;{navn} [SKRIV TEMA]\n",
+                      "Diverse;nei;{navn} [SKRIV TEMA]\n"):
+            with self.assertRaises(ValueError, msg=linje):
+                dt.les_varianter(hode + linje)
+
+    def test_skann_bruker_fil_id_fra_drive(self):
+        import fetch_drive
+        tre = {"root": [mappe("ff", "Folka Først")], "ff": [mappe("ff45", "Uke 45")],
+               "ff45": [video("IdEn123456", "Veksthuset Folka Først Christian Video 11.mp4")]}
+        filer, _, _ = fetch_drive.skann(FakeDrive(tre), "root", date(2026, 10, 26), 12, GJESTER_JA_NEI, MALER, varianter=VARIANTER)
+        forventet = dt.velg_variant(VARIANTER[("Folka Først", True)], "IdEn123456").format(
+            navn="Christian", yrke="regnskapsfører", arbeidssted="Eika Økonomi Øst")
+        self.assertEqual(filer[0][0].caption_skjelett.split("\n\n")[1], forventet)
+
+
 class FakeDrive:
     """Mappetre som fetch_drive.skann leser, uten nettverk. tre: id → [elementer]."""
 

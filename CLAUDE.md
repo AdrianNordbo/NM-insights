@@ -34,6 +34,7 @@ Instagram og YouTube (Shorts), og en plassholder for TikTok («kommer»); dashbo
 | drive_auth.py | Engangs OAuth-innlogging mot Drive (scope drive.metadata.readonly) med Adrians konto; lagrer secrets/drive_token.json og skriver DRIVE_* til .env |
 | fetch_drive.py | Leser mappe- og filnavn fra Drive og tolker dem. `--dry-run` viser bare; `--skriv` upserter til public.drive_videos. Kjøres manuelt på Adrians PC, ikke i Actions |
 | config/caption_maler.csv | Hashtags per konsept og yrke (`konsept;yrke;hashtags;merknad`), stil og ikke dokumentert effekt. Committes |
+| config/caption_varianter.csv | Varianter av gjestelinjen for Folka Først (`konsept;med_arbeidssted;mal`, plassholdere {navn}, {yrke}, {arbeidssted}), fire med og fire uten arbeidssted. Committes; valgfri (uten den brukes standardmalen) |
 | config/gjester.csv, config/notater/ | Private lister (gjester: `navn;yrke;arbeidssted;bruk_arbeidssted`; notater per uke: `<ÅÅÅÅ>-W<NN>.csv` med `fil;yrke;budskap`). Gitignored, committes aldri |
 | tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken; test_tiktok_fetch.py: TikTok-henting, null for Business-felt, døgn som ikke er klare; test_drive.py: uketolkning og årsskifte, filnavn, gjestestopp, tegnsett, skjelett og skriving til innboksen med falsk Drive og falsk Supabase). Uten nettverk |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
@@ -351,8 +352,12 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   for én video. Begge filene leses som UTF-8 (med eller uten BOM) og ellers som Windows-1252 (lagret i Excel), med
   advarselen «… er ikke UTF-8 (lest som Windows-1252)». Filene skrives aldri tilbake.
 - Caption-skjelett:
-  - Folka Først: «[SKRIV BUDSKAP]», «<Fornavn> jobber som <yrke>[ i <arbeidssted> når bruk_arbeidssted = ja] og
-    snakker om [SKRIV TEMA]!», hashtags.
+  - Folka Først: «[SKRIV BUDSKAP]», gjestelinjen, hashtags. Gjestelinjen velges blant variantene i
+    config/caption_varianter.csv (med arbeidssted når bruk_arbeidssted = ja, ellers uten): zlib.crc32 av fil-ID-en i
+    Drive (filnavnet når ID mangler) modulo antall varianter, så samme fil alltid får samme variant. Alle varianter har
+    bokstavelig [SKRIV TEMA]. Uten filen (eller tom fil): «<Fornavn> jobber som <yrke>[ i <arbeidssted>] og snakker
+    om [SKRIV TEMA]!». Endres variantene, oppdaterer neste --skriv skjelettet i drive_videos, men ikke i kalenderen:
+    planned_posts.caption_skjelett fryses når videoen legges inn.
   - På Gata: «Vi spør folk på gata: <tema>».
   - Sitcom: «[SKRIV SPØRSMÅL TIL FØLGERNE]».
   - Hashtags fra config/caption_maler.csv (høyst 5). #podkast bare for Folka Først.
@@ -563,9 +568,14 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
   - Manuell flytting innenfor uken (merkes «Flyttet manuelt»), status Utkast/Klar/Publisert, fjerning av video.
     CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status.
   - Skriving via server actions (app/(app)/publiseringstid/actions.ts) som kaller funksjonene i schema planlegging.
-  - Drive-innboks (databasen klar 26.10.2026, appdelen ikke bygget ennå): videoer fra Drive (dashboard.drive_innboks)
-    legges inn med «Legg inn» via plasserIUke og planlegging.legg_til_fra_drive, med caption-skjelett per post.
-    Caption skrives med lagre_caption; Klar er sperret mens teksten har `[SKRIV`.
+  - Drive-innboks (del 1 bygget 26.–28.10.2026 på branch drive-kalender, web/lib/plan/innboks.ts og
+    DriveInnboks.tsx): bare for redaktører (hentes bare når er_redaktor er sann; viewet gir uansett bare rader til
+    plan_editors). Ukevelger med én knapp per uke (sortert på år og uke, antall klare, «!» når uken har videoer som
+    ikke kan legges inn); valgt uke beholdes etter «Legg inn», blir den tom vises neste uke med videoer, og tom innboks
+    skjules. Videoene vises per konsept med gjest/yrke og utfoldbart skjelett, og «Legg inn» plasserer med plasserIUke
+    (uke og konsept fra Drive) og planlegging.legg_til_fra_drive. Mulig manuell dublett (samme uke, konsept og
+    normalisert tittel) gir «Legg inn likevel». Databasefeil vises på norsk (feilmeldingDrive). Del 2 (ikke bygget):
+    caption-felt med lagre_caption, Klar-sperre i appen og CSV-kolonner.
   - Oppfølging av tester (oppfolging.ts): testene i kalenderen matches mot innlegg og vurderes etter 7 dager.
 - Opplasting og automatisk publisering kommer senere. Det som må til: Meta-appen må få `instagram_content_publish`
   (og `pages_manage_posts` for Facebook) gjennom App Review og forretningsverifisering, og appen ut av

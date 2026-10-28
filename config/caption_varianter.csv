@@ -1,0 +1,9 @@
+konsept;med_arbeidssted;mal
+Folka Først;ja;{navn} jobber som {yrke} i {arbeidssted} og snakker om [SKRIV TEMA]!
+Folka Først;ja;Møt {navn}, {yrke} i {arbeidssted}. I dag snakker vi om [SKRIV TEMA]!
+Folka Først;ja;{navn} er {yrke} i {arbeidssted} og forteller om [SKRIV TEMA].
+Folka Først;ja;I denne episoden: {navn}, {yrke} i {arbeidssted}, om [SKRIV TEMA]!
+Folka Først;nei;{navn} jobber som {yrke} og snakker om [SKRIV TEMA]!
+Folka Først;nei;Møt {navn}, {yrke}. I dag snakker vi om [SKRIV TEMA]!
+Folka Først;nei;{navn} er {yrke} og forteller om [SKRIV TEMA].
+Folka Først;nei;I denne episoden: {navn}, {yrke}, om [SKRIV TEMA]!

@@ -40,6 +40,7 @@ FOLDER = "application/vnd.google-apps.folder"
 FIELDS = "nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,capabilities(canListChildren))"
 GJESTER_FILE = Path("config/gjester.csv")
 MALER_FILE = Path("config/caption_maler.csv")
+VARIANTER_FILE = Path("config/caption_varianter.csv")  # valgfri; uten den brukes standardmalen
 NOTATER_DIR = Path("config/notater")
 DRYRUN_FILE = Path("data/drive_dryrun.json")
 KONSEPT_REKKEFOLGE = ["Folka Først", "Sitcom", "På Gata"]
@@ -163,7 +164,7 @@ def les_lokalt(path, parse, paakrevd, advarsler=None):
         sys.exit(f"{path}: {e}")
 
 
-def skann(drive, root_id, i_dag, horisont, gjester, maler, advarsler=None, ufullstendig=None):
+def skann(drive, root_id, i_dag, horisont, gjester, maler, advarsler=None, ufullstendig=None, varianter=None):
     """
     Går gjennom Konsept > Uke NN > filer.
     Returnerer (filer med Drive-felt, merknader, ignorerte undermapper som «Sitcom/Drafts»).
@@ -215,7 +216,7 @@ def skann(drive, root_id, i_dag, horisont, gjester, maler, advarsler=None, ufull
                     merknader.append(f"{konsept} {unavn}: undermappe ignorert: {fnavn}")
                     continue
                 f = dt.tolk_fil(konsept, aar, nr, fnavn, gjester=gjester, notater=notater, maler=maler,
-                                mime=item.get("mimeType"))
+                                mime=item.get("mimeType"), varianter=varianter, fil_id=item.get("id"))
                 filer.append((f, item, f"{konsept}/{unavn}"))
             for ukjent in dt.ukjente_notater(notater, [i["name"] for i in innhold]):
                 merknader.append(f"{notatfil}: «{ukjent}» passer ingen fil i {konsept} {unavn}")
@@ -367,6 +368,7 @@ def main(argv=None):
     advarsler = []
     gjester = les_lokalt(GJESTER_FILE, dt.les_gjester, paakrevd=True, advarsler=advarsler)
     maler = les_lokalt(MALER_FILE, dt.les_maler, paakrevd=True)
+    varianter = les_lokalt(VARIANTER_FILE, dt.les_varianter, paakrevd=False)
     i_dag = args.i_dag or dt.i_dag_oslo()
 
     drive = Drive()
@@ -374,7 +376,8 @@ def main(argv=None):
     if not kan_liste(meta):
         sys.exit(f"Ingen tilgang til innholdet i mappen «{meta.get('name')}».")
     ufullstendig = []
-    filer, merknader, ignorert = skann(drive, root, i_dag, args.horisont, gjester, maler, advarsler, ufullstendig)
+    filer, merknader, ignorert = skann(drive, root, i_dag, args.horisont, gjester, maler, advarsler, ufullstendig,
+                                       varianter)
     rader = [rad(*x) for x in filer]
     drive.assert_clean(rader)
 

@@ -18,6 +18,8 @@ Struktur i Drive:  Veksthuset > <Konsept> > Uke NN > filer.
   Sitcom: «NN. Tittel.mp4», der NN er ukenummeret (lik ukemappen, ellers merknad); tittelen er resten.
   Ingen gjesteliste (navn som Markus slås ikke opp), og ikke videonr.
 - Alle navn normaliseres til NFC (filer fra Mac kan ha «ø» og «å» som to tegn).
+- Folka Først-linjen velges blant variantene i config/caption_varianter.csv (med eller uten arbeidssted), stabilt
+  per fil: crc32 av fil-ID-en i Drive (ellers filnavnet) modulo antall varianter. Uten filen brukes standardmalen.
 - Caption-skjelettet har [SKRIV BUDSKAP] og [SKRIV TEMA] (og for Sitcom [SKRIV SPØRSMÅL TIL FØLGERNE]),
   som fylles ut manuelt. Hashtags fra config/caption_maler.csv er stil, ikke dokumentert effekt.
 
@@ -27,7 +29,9 @@ ikke mønsteret). Bare 'ok' kan legges i kalenderen.
 import csv
 import io
 import re
+import string
 import unicodedata
+import zlib
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -176,6 +180,42 @@ def les_notater(tekst):
     return out
 
 
+PLASSHOLDERE = {"navn", "yrke", "arbeidssted"}
+
+
+def les_varianter(tekst):
+    """
+    Innholdet i config/caption_varianter.csv (konsept;med_arbeidssted;mal) → {(konsept, med_arbeidssted): [maler]}.
+    Malen må ha {navn} og bokstavelig [SKRIV TEMA] (sperren for Klar leter etter «[SKRIV»), og {arbeidssted} bare
+    i varianter med arbeidssted.
+    """
+    out = {}
+    for linje, r in _rader(tekst, ["konsept", "med_arbeidssted", "mal"], "caption_varianter.csv"):
+        if not any(r.values()):
+            continue
+        med = r["med_arbeidssted"].lower()
+        if r["konsept"] not in KONSEPT_MAPPER.values():
+            raise ValueError(f"caption_varianter.csv linje {linje}: ukjent konsept «{r['konsept']}»")
+        if med not in ("ja", "nei"):
+            raise ValueError(f"caption_varianter.csv linje {linje}: med_arbeidssted må være «ja» eller «nei»")
+        try:
+            felt = {f for _, f, _, _ in string.Formatter().parse(r["mal"]) if f is not None}
+        except ValueError:
+            raise ValueError(f"caption_varianter.csv linje {linje}: ugyldige klammer i malen") from None
+        if not felt <= PLASSHOLDERE or "navn" not in felt or SKRIV_TEMA not in r["mal"]:
+            raise ValueError(f"caption_varianter.csv linje {linje}: malen må ha {{navn}} og [SKRIV TEMA], "
+                             "og bare plassholderne {navn}, {yrke}, {arbeidssted}")
+        if ("arbeidssted" in felt) != (med == "ja"):
+            raise ValueError(f"caption_varianter.csv linje {linje}: {{arbeidssted}} skal være med bare når med_arbeidssted er «ja»")
+        out.setdefault((r["konsept"], med == "ja"), []).append(r["mal"])
+    return out
+
+
+def velg_variant(maler, nokkel):
+    """Stabil mellom kjøringer (crc32, ikke Pythons hash()): samme nøkkel gir alltid samme mal."""
+    return maler[zlib.crc32(nokkel.encode("utf-8")) % len(maler)]
+
+
 def les_maler(tekst):
     """Innholdet i config/caption_maler.csv → [(konsept, yrke eller '*', [hashtags])]."""
     out = []
@@ -259,12 +299,17 @@ def _uten_endelse(filnavn):
     return None
 
 
-def skjelett(konsept, *, gjest=None, yrke=None, tema=None, budskap=None, hashtags=()):
+def skjelett(konsept, *, gjest=None, yrke=None, tema=None, budskap=None, hashtags=(), varianter=None, nokkel=""):
+    """varianter: fra les_varianter (None/tom = standardmalen). nokkel: fil-ID i Drive, ellers filnavnet."""
     linje1 = budskap or SKRIV_BUDSKAP
     tags = " ".join(hashtags)
     if konsept == "Folka Først":
-        sted = f" i {gjest.arbeidssted}" if gjest.bruk_arbeidssted else ""
-        midt = f"{gjest.fornavn} jobber som {yrke}{sted} og snakker om {SKRIV_TEMA}!"
+        valg = (varianter or {}).get((konsept, gjest.bruk_arbeidssted))
+        if valg:
+            midt = velg_variant(valg, nokkel).format(navn=gjest.fornavn, yrke=yrke, arbeidssted=gjest.arbeidssted)
+        else:
+            sted = f" i {gjest.arbeidssted}" if gjest.bruk_arbeidssted else ""
+            midt = f"{gjest.fornavn} jobber som {yrke}{sted} og snakker om {SKRIV_TEMA}!"
     elif konsept == "På Gata":
         midt = f"Vi spør folk på gata: {tema}"
     else:
@@ -272,7 +317,7 @@ def skjelett(konsept, *, gjest=None, yrke=None, tema=None, budskap=None, hashtag
     return f"{linje1}\n\n{midt}\n\n{tags}".rstrip()
 
 
-def tolk_fil(konsept, aar, uke, filnavn, *, gjester, notater, maler, mime=None):
+def tolk_fil(konsept, aar, uke, filnavn, *, gjester, notater, maler, mime=None, varianter=None, fil_id=None):
     navn = nfc(filnavn)
     f = Fil(konsept, aar, uke, navn, IKKE_TOLKET)
     stamme = _uten_endelse(navn)
@@ -306,7 +351,8 @@ def tolk_fil(konsept, aar, uke, filnavn, *, gjester, notater, maler, mime=None):
             f.tolkning, f.melding = STOPP, f"Mangler yrke for {g.navn}"
             return f
         tags, kuttet = hashtags_for(maler, konsept, f.yrke)
-        f.caption_skjelett = skjelett(konsept, gjest=g, yrke=f.yrke, budskap=notat.get("budskap"), hashtags=tags)
+        f.caption_skjelett = skjelett(konsept, gjest=g, yrke=f.yrke, budskap=notat.get("budskap"), hashtags=tags,
+                                      varianter=varianter, nokkel=fil_id or navn)
     else:
         rest = PREFIKS[konsept].sub("", stamme)
         nr = VIDEO_NR_RE.search(rest)
