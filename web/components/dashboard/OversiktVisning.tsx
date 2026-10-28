@@ -148,7 +148,9 @@ export function OversiktVisning(p: OversiktProps) {
                     <dd>{c.comments == null ? "–" : formatNumber(c.comments)}</dd>
                   </div>
                   <div className="kv-sub">
-                    <dt>Delinger</dt>
+                    <dt>
+                      Delinger <Info text="Delinger regnes ulikt per plattform (TikTok teller også «Send til venner»). Tallene sammenlignes ikke på tvers." label="Om delinger" />
+                    </dt>
                     <dd>
                       {c.shares == null ? (c.engagement == null ? "–" : "ikke nok data") : formatNumber(c.shares)}
                       {c.shares != null && c.sharesMissing > 0 && (
