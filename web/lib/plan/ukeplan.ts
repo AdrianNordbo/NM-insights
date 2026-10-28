@@ -27,10 +27,14 @@ export type PlanRad = {
   grunnlag: string;
   status: Status;
   flyttetManuelt: boolean;
+  /** Skjelett fra Drive-innboksen, fryst ved innlegging; null for manuelle poster (og når viewet mangler kolonnen). */
+  captionSkjelett: string | null;
+  /** Redaktørens ferdige tekst; null = ikke skrevet (skjelettet gjelder). */
+  captionTekst: string | null;
 };
 
-/** En ny rad som skal lagres (id, status og flyttet_manuelt settes av databasen). */
-export type NyRad = Omit<PlanRad, "id" | "status" | "flyttetManuelt">;
+/** En ny rad som skal lagres (id, status, flyttet_manuelt og caption settes av databasen). */
+export type NyRad = Omit<PlanRad, "id" | "status" | "flyttetManuelt" | "captionSkjelett" | "captionTekst">;
 
 /** «Folka Først» → «Folka Først (fra 18.10)» når datoen er fra bruddatoen. */
 export function konseptNavn(konsept: string, dato: string | null): string {
@@ -109,14 +113,14 @@ export const gyldigStatus = (s: string): s is Status => (STATUSER as readonly st
 
 const ukedagFor = (dato: string) => UKEDAGER_LANG[(new Date(`${dato}T00:00:00Z`).getUTCDay() + 6) % 7];
 
-/** CSV for planen: én rad per plattform. Ikke plasserte rader står uten dato. */
+/** CSV for planen: én rad per plattform. Ikke plasserte rader står uten dato. Caption-kolonnene står bakerst. */
 export function planCsv(rader: PlanRad[]): string {
   const label = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
   const sorted = rader
     .slice()
     .sort((a, b) => (a.dato ?? "9999").localeCompare(b.dato ?? "9999") || (a.klokkeslett ?? "").localeCompare(b.klokkeslett ?? ""));
   const rows = [
-    ["Dato", "Ukedag", "Klokkeslett (Oslo)", "Plattform", "Tittel", "Type innhold", "Merking", "Grunnlag", "Status"],
+    ["Dato", "Ukedag", "Klokkeslett (Oslo)", "Plattform", "Tittel", "Type innhold", "Merking", "Grunnlag", "Status", "Caption-skjelett", "Caption (ferdig)"],
     ...sorted.map((r) => [
       r.dato ?? "",
       r.dato ? ukedagFor(r.dato) : "ikke plassert",
@@ -127,6 +131,8 @@ export function planCsv(rader: PlanRad[]): string {
       r.flyttetManuelt ? `${r.merking ?? ""} (flyttet manuelt)`.trim() : (r.merking ?? ""),
       r.grunnlag,
       r.status,
+      r.captionSkjelett ?? "",
+      r.captionTekst ?? "",
     ]),
   ];
   return "﻿" + rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
@@ -142,7 +148,10 @@ export function tittelFraFilnavn(navn: string): string {
     .slice(0, 90);
 }
 
-/** Leser en rad fra dashboard.planned_posts. Ukjente eller ufullstendige rader gir null. */
+/**
+ * Leser en rad fra dashboard.planned_posts. Ukjente eller ufullstendige rader gir null. Caption-kolonnene er
+ * valgfrie (null når de mangler eller er tomme), så raden leses også fra et view uten dem.
+ */
 export function fraView(r: Record<string, unknown>): PlanRad | null {
   const s = (k: string) => (typeof r[k] === "string" ? (r[k] as string) : null);
   const n = (k: string) => (typeof r[k] === "number" ? (r[k] as number) : null);
@@ -156,6 +165,7 @@ export function fraView(r: Record<string, unknown>): PlanRad | null {
   const status = s("status");
   if (!id || !videoId || !tittel || !konsept || !plattform || aar == null || uke == null || !status || !gyldigStatus(status)) return null;
   const merking = s("merking");
+  const tekst = (k: string) => (s(k)?.trim() ? (s(k) as string) : null);
   return {
     id,
     videoId,
@@ -170,6 +180,8 @@ export function fraView(r: Record<string, unknown>): PlanRad | null {
     grunnlag: s("grunnlag") ?? "",
     status,
     flyttetManuelt: r.flyttet_manuelt === true,
+    captionSkjelett: tekst("caption_skjelett"),
+    captionTekst: tekst("caption_tekst"),
   };
 }
 

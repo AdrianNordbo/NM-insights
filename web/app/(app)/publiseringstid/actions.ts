@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
+import { feilmeldingPlan, sjekkCaption } from "@/lib/plan/caption";
 import { feilmeldingDrive, sjekkDriveRader } from "@/lib/plan/innboks";
 import { isoUke, sammeUke } from "@/lib/plan/uke";
 import { gyldigStatus, kanFlytte, type NyRad } from "@/lib/plan/ukeplan";
@@ -95,7 +96,31 @@ export async function flyttPlassering(id: string, aar: number, uke: number, dato
 
 export async function settStatus(id: string, status: string): Promise<Svar> {
   if (!UUID.test(id) || !gyldigStatus(status)) return { ok: false, error: "Ugyldig status." };
-  return rpc("sett_status", { p_id: id, p_status: status });
+  return rpc("sett_status", { p_id: id, p_status: status }, (kode, melding) => feilmeldingPlan(kode, melding, "status"));
+}
+
+/** Lagrer ferdig caption for én plassering (tom tekst = skjelettet gjelder). Klar med [SKRIV blir Utkast i databasen. */
+export async function lagreCaption(id: string, tekst: string): Promise<Svar> {
+  if (!UUID.test(id) || typeof tekst !== "string") return { ok: false, error: "Ugyldig plassering." };
+  const feil = sjekkCaption(tekst);
+  if (feil) return { ok: false, error: feil };
+  return rpc("lagre_caption", { p_id: id, p_tekst: tekst.trim() }, (kode, melding) => feilmeldingPlan(kode, melding, "caption"));
+}
+
+/**
+ * Samme tekst på flere plattformer: ett kall per plattform, i rekkefølge, og stopp ved første feil. Ikke én
+ * transaksjon; meldingen sier hva som ble lagret før feilen.
+ */
+export async function lagreCaptions(liste: { id: string; plattform: string; tekst: string }[]): Promise<Svar> {
+  if (!Array.isArray(liste) || liste.length < 1 || liste.length > 10) return { ok: false, error: "Ugyldig plassering." };
+  const navn = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
+  const lagret: string[] = [];
+  for (const l of liste) {
+    const svar = await lagreCaption(l.id, l.tekst);
+    if (!svar.ok) return { ok: false, error: `${lagret.length ? `Lagret på ${lagret.join(", ")}. ` : ""}${navn(l.plattform)}: ${svar.error}` };
+    lagret.push(navn(l.plattform));
+  }
+  return { ok: true };
 }
 
 export async function fjernVideo(videoId: string): Promise<Svar> {

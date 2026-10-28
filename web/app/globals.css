@@ -408,3 +408,14 @@ button.secondary { font: inherit; font-size: 13px; font-weight: 650; border: 1px
   .calendar-day.outside, .calendar-day:not(:has(.slot)) { display: none; }
   .setting select, .setting input { width: 160px; }
 }
+.captions .caption-video { border-top: 1px solid var(--line); padding: 10px 0; font-size: 13px; }
+.captions .caption-tittel { cursor: pointer; padding: 2px 0; }
+.captions .caption-felt { margin-top: 12px; }
+.captions .caption-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.captions .caption-felt textarea { width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); }
+.captions .caption-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.captions .for-lang { color: var(--down); font-weight: 700; }
+.captions .caption-rest, .captions .caption-advarsel { color: var(--down); }
+.captions .caption-knapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.captions .skjelett { white-space: pre-wrap; font-size: 12px; background: var(--surface-2, var(--neutral-bg)); border-radius: 8px; padding: 8px 10px; margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .captions .caption-knapper button { width: 100%; } }

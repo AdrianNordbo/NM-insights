@@ -581,7 +581,8 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
     endrer aldri miks eller frekvens, men viser «Miks: Folka Først 2/3 …» og advarsler som «Uke 45 mangler 1
     Sitcom» / «Uke 46 har 4 Folka Først» (blokkerer ikke).
   - Manuell flytting innenfor uken (merkes «Flyttet manuelt»), status Utkast/Klar/Publisert, fjerning av video.
-    CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status.
+    CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status, og bakerst
+    «Caption-skjelett» og «Caption (ferdig)» (én rad per plattform).
   - Skriving via server actions (app/(app)/publiseringstid/actions.ts) som kaller funksjonene i schema planlegging.
   - Drive-innboks (del 1 bygget 26.–28.10.2026 på branch drive-kalender, web/lib/plan/innboks.ts og
     DriveInnboks.tsx): bare for redaktører (hentes bare når er_redaktor er sann; viewet gir uansett bare rader til
@@ -589,8 +590,21 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
     ikke kan legges inn); valgt uke beholdes etter «Legg inn», blir den tom vises neste uke med videoer, og tom innboks
     skjules. Videoene vises per konsept med gjest/yrke og utfoldbart skjelett, og «Legg inn» plasserer med plasserIUke
     (uke og konsept fra Drive) og planlegging.legg_til_fra_drive. Mulig manuell dublett (samme uke, konsept og
-    normalisert tittel) gir «Legg inn likevel». Databasefeil vises på norsk (feilmeldingDrive). Del 2 (ikke bygget):
-    caption-felt med lagre_caption, Klar-sperre i appen og CSV-kolonner.
+    normalisert tittel) gir «Legg inn likevel». Databasefeil vises på norsk (feilmeldingDrive).
+  - Caption (del 2, 28.10.2026, web/lib/plan/caption.ts og CaptionVideo.tsx): fraView leser caption_skjelett og
+    caption_tekst som valgfrie (null når de mangler). Delen «Caption» i ukekortet har én blokk per video:
+    - Redaktører: felt per plattform som starter med ferdig tekst, ellers skjelettet; etikett «Skjelett, ikke
+      endret» / «Din tekst» / «Din tekst, ikke lagret», «Gjenstår: [SKRIV …]», teller mot 2 200 tegn (Unicode-tegn som
+      i Postgres; Lagre sperret over grensen), «Tilbake til skjelettet», «Vis skjelettet» og «Bruk samme tekst på alle
+      plattformene» (bekreftelse når en annen plattform har egen tekst; ett lagre_caption-kall per plattform, stopper
+      ved første feil, ikke én transaksjon). Tekst lik skjelettet lagres som tom (skjelettet gjelder). Drive-videoer er
+      åpne, manuelle lukket. YouTube: første linje er tittelen, med advarsel over 100 tegn, tom linje og < > (eget
+      tittelfelt senere, krever migrering).
+    - Andre innloggede: teksten uten felt, merket «Caption (ferdig)», «Påbegynt, ikke ferdig» eller «Skjelett, ikke
+      ferdig»; manuelle poster uten caption vises ikke.
+    - Klar-sperre: «Klar» er grå i statusvalget med forklaring og lenke til feltet når teksten (eller skjelettet når
+      teksten er tom) har [SKRIV (samme regel som sett_status). settStatus og lagreCaption oversetter databasefeil
+      (feilmeldingPlan). Lagres [SKRIV på en Klar post, sier meldingen at den er satt tilbake til Utkast.
   - Oppfølging av tester (oppfolging.ts): testene i kalenderen matches mot innlegg og vurderes etter 7 dager.
 - Opplasting og automatisk publisering kommer senere. Det som må til: Meta-appen må få `instagram_content_publish`
   (og `pages_manage_posts` for Facebook) gjennom App Review og forretningsverifisering, og appen ut av
@@ -693,9 +707,9 @@ testet med en midlertidig, ikke-committet rute som viser de samme komponentene m
 3. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
 4. Publiseringsplan: delt kalender bygget 21.10.2026 (migrering, redaktør-seed og Exposed schemas på plass).
-   Drive-innboksen: migrering 2026-10-26 kjørt og fetch_drive.py --skriv klar (branch drive-kalender); neste er
-   appdelen (innboks, «Legg inn», caption-felt, Klar-sperre i UI, CSV-kolonner for skjelett og ferdig tekst), og så
-   merknader om endringer i Drive. Deretter: Facebook i PLAN_PLATTFORMER når kontoen er koblet, og
+   Drive-innboksen: migrering 2026-10-26 kjørt og fetch_drive.py --skriv klar (branch drive-kalender); appdelen
+   (innboks, «Legg inn», caption, Klar-sperre, CSV) er bygget på branchen (ikke pushet); neste er merknader om endringer
+   i Drive og drive_finnes i kalenderen. Deretter: Facebook i PLAN_PLATTFORMER når kontoen er koblet, og
    opplasting/automatisk publisering (se Publiseringstid).
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.

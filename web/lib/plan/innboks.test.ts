@@ -77,6 +77,8 @@ const planRad = (over: Partial<PlanRad>): PlanRad => ({
   grunnlag: "",
   status: "Utkast",
   flyttetManuelt: false,
+  captionSkjelett: null,
+  captionTekst: null,
   ...over,
 });
 
