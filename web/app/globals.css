@@ -240,6 +240,10 @@ details > summary { cursor: pointer; }
 .kv div { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+/* Likes, kommentarer og delinger: delene av Engasjement-linjen over, rykket inn */
+.kv .kv-sub { padding-left: 12px; font-size: 12px; }
+.kv .kv-sub dd { font-weight: 550; color: var(--ink-2); }
+.kv .kv-sub .note { font-weight: 400; color: var(--muted); }
 .pcard-follow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .pcard-follow .kpi-value { font-size: 22px; margin: 4px 0 2px; }
 

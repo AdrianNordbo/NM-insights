@@ -41,6 +41,12 @@ export type PlatformCard = {
   viewsChange: Change | null;
   prevLabel: string | null;
   engagement: number | null;
+  /** Delene av engasjementet (summen er engagement). null = ikke nok data. */
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  /** Total: antall innlegg uten delingstall (telt som 0 i engasjementet, som før). */
+  sharesMissing: number;
   rate: number | null;
   posts: number;
   follow: { value: string; note: string | null; source: string | null };
@@ -127,12 +133,16 @@ export function buildOversikt(valg: PlattformValgDef, periode: PeriodeDef, input
   const lifetime = (p: Platform, formats: string[]) => {
     const since = takeover[p] ?? start0;
     const rows = content.filter((r) => r.platform === p && formats.includes(r.format) && r.published_at.slice(0, 10) >= since);
-    return {
-      views: rows.reduce((s, r) => s + (r.views ?? 0), 0),
-      eng: rows.reduce((s, r) => s + (r.likes ?? 0) + (r.comments ?? 0) + (r.shares ?? 0), 0),
-    };
+    const likes = rows.reduce((s, r) => s + (r.likes ?? 0), 0);
+    const comments = rows.reduce((s, r) => s + (r.comments ?? 0), 0);
+    const shares = rows.reduce((s, r) => s + (r.shares ?? 0), 0);
+    // Delinger mangler for innlegg uten tall (f.eks. ferske YouTube-videoer uten Analytics); de telles som 0
+    const sharesMissing = rows.filter((r) => r.shares == null).length;
+    return { views: rows.reduce((s, r) => s + (r.views ?? 0), 0), eng: likes + comments + shares, likes, comments, shares, sharesMissing, n: rows.length };
   };
-  const tot = isTotal ? plats.map((p) => lifetime(p, totFmts(p))).reduce((a, b) => ({ views: a.views + b.views, eng: a.eng + b.eng })) : null;
+  const tot = isTotal
+    ? plats.map((p) => lifetime(p, totFmts(p))).reduce((a, b) => ({ ...a, views: a.views + b.views, eng: a.eng + b.eng }))
+    : null;
   const views = tot ? tot.views : cur ? cur.views : null;
   const eng = tot ? tot.eng : cur ? engasjement(cur) : null;
   const rate = alle || !views || eng == null ? null : eng / views;
@@ -199,6 +209,11 @@ export function buildOversikt(valg: PlattformValgDef, periode: PeriodeDef, input
           viewsChange: a && b ? change(a.views, b.views) : null,
           prevLabel: cmp && ownPrev ? ownPrev.label.replace(/ \(.*\)$/, "") : null,
           engagement: e,
+          likes: life ? life.likes : a ? a.likes : null,
+          comments: life ? life.comments : a ? a.comments : null,
+          // Total: ikke nok data når ingen innlegg har delingstall
+          shares: life ? (life.n > 0 && life.sharesMissing === life.n ? null : life.shares) : a ? a.shares : null,
+          sharesMissing: life ? life.sharesMissing : 0,
           rate: v ? (e ?? 0) / v : null,
           posts: own0.has
             ? listContent.filter((r) => r.platform === p && fmts(p).includes(r.format) && r.published_at.slice(0, 10) >= own0.start && r.published_at.slice(0, 10) <= own0.end).length

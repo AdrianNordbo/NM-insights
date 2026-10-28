@@ -84,6 +84,30 @@ describe("Total siden start", () => {
     expect(m.cards!.find((c) => c.platform === "instagram")!.posts).toBe(1);
     expect(m.chart.note).toBe("Grafen viser døgn fra 14.08, da alle valgte plattformer har døgntall.");
   });
+  it("plattformkortene: likes + kommentarer + delinger = engasjement, i alle perioder", () => {
+    for (const pe of ["total", "siste-7", "forrige-maaned", "forrige-uke"]) {
+      for (const c of build("alle", pe).cards!) {
+        if (c.engagement == null) continue;
+        expect((c.likes ?? 0) + (c.comments ?? 0) + (c.shares ?? 0), `${pe} ${c.platform}`).toBe(c.engagement);
+      }
+    }
+    const yt = build("alle", "total").cards!.find((c) => c.platform === "youtube")!;
+    expect([yt.likes, yt.comments, yt.shares, yt.sharesMissing]).toEqual([5, 0, 1, 0]);
+    const tt = build("alle", "siste-7").cards!.find((c) => c.platform === "tiktok")!;
+    expect([tt.likes, tt.comments, tt.shares]).toEqual([7 * 1, 0, 7 * 2]); // døgntall
+  });
+  it("Total: innlegg uten delingstall telles og påvirker ikke engasjementet; ingen tall = null (ikke 0)", () => {
+    const uten = [...content, post("youtube", "SHORTS", "2026-10-15T19:00:00", 50, { likes: 2, comments: 1, shares: null })];
+    const yt = build("alle", "total", { content: uten, listContent: uten }).cards!.find((c) => c.platform === "youtube")!;
+    expect([yt.shares, yt.sharesMissing, yt.engagement]).toEqual([1, 1, 5 + 1 + 2 + 1]);
+    const ingen = content.map((r) => (r.platform === "youtube" ? { ...r, shares: null } : r));
+    const yt0 = build("alle", "total", { content: ingen, listContent: ingen }).cards!.find((c) => c.platform === "youtube")!;
+    expect([yt0.shares, yt0.sharesMissing, yt0.likes]).toEqual([null, 1, 5]);
+  });
+  it("ingen data i perioden: delene er null, ikke 0", () => {
+    const yt = build("alle", "denne-uken").cards!.find((c) => c.platform === "youtube")!;
+    expect([yt.engagement, yt.likes, yt.comments, yt.shares]).toEqual([null, null, null, null]);
+  });
   it("Instagram Feed alene", () => {
     expect(build("instagram-feed", "total").kpi.views).toBe(300);
   });

@@ -139,6 +139,26 @@ export function OversiktVisning(p: OversiktProps) {
                     <dt>Engasjement</dt>
                     <dd>{formatNumber(c.engagement)}</dd>
                   </div>
+                  <div className="kv-sub">
+                    <dt>Likes</dt>
+                    <dd>{c.likes == null ? "–" : formatNumber(c.likes)}</dd>
+                  </div>
+                  <div className="kv-sub">
+                    <dt>Kommentarer</dt>
+                    <dd>{c.comments == null ? "–" : formatNumber(c.comments)}</dd>
+                  </div>
+                  <div className="kv-sub">
+                    <dt>Delinger</dt>
+                    <dd>
+                      {c.shares == null ? (c.engagement == null ? "–" : "ikke nok data") : formatNumber(c.shares)}
+                      {c.shares != null && c.sharesMissing > 0 && (
+                        <span className="note">
+                          {" "}
+                          ({c.sharesMissing} innlegg uten tall)
+                        </span>
+                      )}
+                    </dd>
+                  </div>
                   <div>
                     <dt>Engasjementsrate</dt>
                     <dd>{formatShare(c.rate)}</dd>

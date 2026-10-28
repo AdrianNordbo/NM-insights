@@ -551,8 +551,11 @@ JavaScript). Fire KPI-kort: Totale visninger, Engasjement, Engasjementsrate (én
 (Alle), og Nye følgere (netto). Under: børsgraf (visninger øverst, interaksjoner under, felles tidsakse, forrige
 periode stiplet, felles markør) til venstre; «Kort fortalt» (én setning per plattform) og «Anbefalinger» (de
 tre sterkeste mønstrene med lenke til Publiseringstid, så regelbaserte anbefalinger) til høyre. Deretter ett kort
-per plattform (bare for Alle, hver plattform med egen siste dag, Instagram = Reels), Ferske innlegg og «Hva funket
-sist?».
+per plattform (bare for Alle, hver plattform med egen siste dag, Instagram = Reels; Engasjement med Likes, Kommentarer
+og Delinger rykket inn under, summen er alltid lik Engasjement), Ferske innlegg og «Hva funket sist?». Delinger: uke og
+måned fra account_daily (døgntall, komplette); Total fra levetidstall per innlegg, der innlegg uten delingstall (YouTube
+uten Analytics ennå) telles som 0 i Engasjement som før og vises som «(N innlegg uten tall)»; ingen tall = «ikke nok
+data».
 
 Innholdsserier (`/innholdsserier`): per plattform og format anbefalingen, konseptene som kort (median visninger,
 stolpe, innlegg, engasjement per visning, siste 10 innlegg, aktiv/inaktiv/foreløpig, merknad om bruddet),
