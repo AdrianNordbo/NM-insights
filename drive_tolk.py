@@ -116,6 +116,57 @@ def uke_nokkel(aar, uke):
 
 
 # ---------------------------------------------------------------------------
+# Filer som er borte fra Drive
+# ---------------------------------------------------------------------------
+# En innboksrad som ikke ble sett i skanningen er enten «ikke skannet» (uken ligger utenfor vinduet: passert eller
+# lenger frem enn horisonten) og røres ikke, eller den sjekkes mot Drive: 404 eller papirkurv = «borte»
+# (finnes_i_drive = false), finnes filen = «finnes et annet sted» (flyttet ut av det som skannes; røres ikke).
+
+def skannevindu(i_dag, horisont=HORISONT_UKER):
+    """(første, siste) ISO-uke som skannes: inneværende uke og høyst horisont uker frem."""
+    start = date.fromisocalendar(*i_dag.isocalendar()[:2], 1)
+    slutt = date.fromordinal(start.toordinal() + 7 * horisont)
+    return start.isocalendar()[:2], slutt.isocalendar()[:2]
+
+
+def i_vindu(aar, uke, vindu):
+    try:
+        d = date.fromisocalendar(aar, uke, 1)
+    except (TypeError, ValueError):
+        return False
+    return date.fromisocalendar(*vindu[0], 1) <= d <= date.fromisocalendar(*vindu[1], 1)
+
+
+def del_usette(db_rader, sette_ider, vindu):
+    """
+    Innboksrader med finnes_i_drive = true som ikke ble sett i skanningen → (sjekkes, ikke_skannet).
+    sjekkes: uken er i vinduet, så filen skulle vært funnet; ikke_skannet: uken er utenfor vinduet.
+    Rader som allerede er merket borte, er ikke med.
+    """
+    sjekkes, ikke_skannet = [], []
+    for r in db_rader:
+        if r.get("finnes_i_drive") is False or r["drive_file_id"] in sette_ider:
+            continue
+        (sjekkes if i_vindu(r.get("aar"), r.get("uke"), vindu) else ikke_skannet).append(r)
+    return sjekkes, ikke_skannet
+
+
+def vurder(meta):
+    """Svar fra files.get (None = 404) → ('borte', grunn) eller ('finnes', None)."""
+    if meta is None:
+        return "borte", "slettet eller utilgjengelig (404)"
+    if meta.get("trashed"):
+        return "borte", "i papirkurven"
+    return "finnes", None
+
+
+def rad_navn(r):
+    """«2026-W45 Folka Først: Vibeke #2» eller tittel/filnavn for de andre konseptene."""
+    hva = f"{r['gjest']} #{r['videonr']}" if r.get("gjest") and r.get("videonr") is not None else (r.get("tittel") or r.get("filnavn"))
+    return f"{uke_nokkel(r['aar'], r['uke'])} {r['konsept']}: {hva}"
+
+
+# ---------------------------------------------------------------------------
 # Gjesteliste, notater og maler
 # ---------------------------------------------------------------------------
 

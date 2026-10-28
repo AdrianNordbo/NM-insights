@@ -27,6 +27,8 @@ export type InnboksRad = {
   melding: string;
   skjelett: string | null;
   iKalenderen: boolean;
+  /** false når fetch_drive.py har bekreftet at filen er borte fra Drive (404 eller papirkurv). Mangler: true. */
+  finnesIDrive: boolean;
 };
 
 const TOLKNINGER: Tolkning[] = ["ok", "stopp", "ikke tolket"];
@@ -63,8 +65,11 @@ export function fraInnboks(r: Record<string, unknown>): InnboksRad | null {
     melding: s("melding") ?? "",
     skjelett,
     iKalenderen: r.i_kalenderen === true,
+    finnesIDrive: r.finnes_i_drive !== false,
   };
 }
+
+const forUke = (a: Uke, b: Uke) => a.aar - b.aar || a.uke - b.uke;
 
 const rekkefolge = (a: InnboksRad, b: InnboksRad) =>
   a.aar - b.aar ||
@@ -72,9 +77,15 @@ const rekkefolge = (a: InnboksRad, b: InnboksRad) =>
   PLAN_KONSEPTER.indexOf(a.konsept as (typeof PLAN_KONSEPTER)[number]) - PLAN_KONSEPTER.indexOf(b.konsept as (typeof PLAN_KONSEPTER)[number]) ||
   (a.tittel ?? a.filnavn).localeCompare(b.tittel ?? b.filnavn, "nb");
 
-/** Klare (ok, ikke i kalenderen) og problemer (stopp eller ikke tolket, ikke i kalenderen). */
-export function delInnboks(rader: InnboksRad[]): { klare: InnboksRad[]; problemer: InnboksRad[] } {
-  const ute = rader.filter((r) => !r.iKalenderen);
+/** Uke før inneværende uke (inneværende uke vises fortsatt). */
+export const passert = (r: Uke, today: string) => forUke(r, isoUke(today)) < 0;
+
+/**
+ * Klare (ok, ikke i kalenderen) og problemer (stopp eller ikke tolket, ikke i kalenderen). Rader som er borte fra
+ * Drive er aldri med; med today er heller ikke rader fra passerte uker med.
+ */
+export function delInnboks(rader: InnboksRad[], today?: string): { klare: InnboksRad[]; problemer: InnboksRad[] } {
+  const ute = rader.filter((r) => !r.iKalenderen && r.finnesIDrive && !(today && passert(r, today)));
   return {
     klare: ute.filter((r) => r.tolkning === "ok").sort(rekkefolge),
     problemer: ute.filter((r) => r.tolkning !== "ok").sort(rekkefolge),
@@ -84,11 +95,9 @@ export function delInnboks(rader: InnboksRad[]): { klare: InnboksRad[]; probleme
 /** En uke i ukevelgeren: antall klare videoer og antall som ikke kan legges inn. */
 export type InnboksUke = Uke & { klare: number; problemer: number };
 
-const forUke = (a: Uke, b: Uke) => a.aar - b.aar || a.uke - b.uke;
-
 /** Ukene som har videoer i innboksen (klare eller problemer), sortert på (år, uke), så 2026-W53 kommer før 2027-W01. */
-export function innboksUker(rader: InnboksRad[]): InnboksUke[] {
-  const { klare, problemer } = delInnboks(rader);
+export function innboksUker(rader: InnboksRad[], today: string): InnboksUke[] {
+  const { klare, problemer } = delInnboks(rader, today);
   const uker = new Map<string, InnboksUke>();
   const hent = (r: InnboksRad) => {
     const key = ukeKey(r);
@@ -115,11 +124,24 @@ export function velgUke(uker: InnboksUke[], valgt: Uke | null): Uke | null {
 }
 
 /** Videoene i én uke: klare gruppert per konsept (Folka Først, Sitcom, På Gata), og de som ikke kan legges inn. */
-export function innboksForUke(rader: InnboksRad[], uke: Uke): { grupper: { konsept: string; rader: InnboksRad[] }[]; problemer: InnboksRad[] } {
-  const { klare, problemer } = delInnboks(rader.filter((r) => sammeUke(r, uke)));
+export function innboksForUke(
+  rader: InnboksRad[],
+  uke: Uke,
+  today: string,
+): { grupper: { konsept: string; rader: InnboksRad[] }[]; problemer: InnboksRad[] } {
+  const { klare, problemer } = delInnboks(rader.filter((r) => sammeUke(r, uke)), today);
   return {
     grupper: PLAN_KONSEPTER.map((konsept) => ({ konsept: konsept as string, rader: klare.filter((r) => r.konsept === konsept) })).filter((g) => g.rader.length),
     problemer,
+  };
+}
+
+/** Rader som ikke vises (og ikke er lagt inn): borte fra Drive, og fra passerte uker. */
+export function skjulteIInnboks(rader: InnboksRad[], today: string): { borte: number; passert: number } {
+  const ute = rader.filter((r) => !r.iKalenderen);
+  return {
+    borte: ute.filter((r) => !r.finnesIDrive).length,
+    passert: ute.filter((r) => r.finnesIDrive && passert(r, today)).length,
   };
 }
 

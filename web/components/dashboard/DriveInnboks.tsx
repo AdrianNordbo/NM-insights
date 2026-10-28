@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { leggTilFraDrive } from "@/app/(app)/publiseringstid/actions";
 import type { HeatSection } from "@/lib/analyse/heatmap";
-import { type InnboksRad, innboksForUke, innboksUker, muligDuplikat, plasserFraInnboks, velgUke } from "@/lib/plan/innboks";
+import { type InnboksRad, innboksForUke, innboksUker, muligDuplikat, plasserFraInnboks, skjulteIInnboks, velgUke } from "@/lib/plan/innboks";
 import { lesUke, sammeUke, ukeKey } from "@/lib/plan/uke";
 import type { PlanRad, UkeRegler } from "@/lib/plan/ukeplan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
@@ -27,10 +27,20 @@ const label = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ??
  */
 export function DriveInnboks({ innboks, rows, heat, regler, today, pending, run }: Props) {
   const [valgt, setValgt] = useState<string | null>(null);
-  const uker = innboksUker(innboks);
+  const uker = innboksUker(innboks, today);
   const uke = velgUke(uker, lesUke(valgt));
-  if (!uke) return null;
-  const { grupper, problemer } = innboksForUke(innboks, uke);
+  const skjult = skjulteIInnboks(innboks, today);
+  const skjultTekst = [skjult.borte && `${skjult.borte} borte fra Drive`, skjult.passert && `${skjult.passert} fra passerte uker`].filter(Boolean).join(" · ");
+  if (!uke) {
+    // Bare skjulte rader igjen: én diskret linje; helt tom innboks: ingenting
+    return skjultTekst ? (
+      <div className="card innboks">
+        <h2>Nye videoer fra Drive (0)</h2>
+        <p className="micro">Skjult: {skjultTekst}.</p>
+      </div>
+    ) : null;
+  }
+  const { grupper, problemer } = innboksForUke(innboks, uke, today);
   const totalt = uker.reduce((s, u) => s + u.klare, 0);
   return (
     <div className="card innboks">
@@ -57,6 +67,7 @@ export function DriveInnboks({ innboks, rows, heat, regler, today, pending, run 
           );
         })}
       </div>
+      {skjultTekst && <p className="micro" style={{ marginBottom: 0 }}>Skjult: {skjultTekst}.</p>}
       {grupper.length ? (
         grupper.map((g) => (
           <div key={g.konsept}>

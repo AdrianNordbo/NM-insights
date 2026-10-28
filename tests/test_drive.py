@@ -446,11 +446,20 @@ class Varianter(unittest.TestCase):
 class FakeDrive:
     """Mappetre som fetch_drive.skann leser, uten nettverk. tre: id → [elementer]."""
 
-    def __init__(self, tre):
+    def __init__(self, tre, filer=None):
         self.tre = tre
+        self.filer = filer or {}  # fil-ID → metadata, None (404) eller et unntak (for files.get)
+        self.sjekket = []
 
     def children(self, folder_id, what):
         return self.tre.get(folder_id, [])
+
+    def finnes(self, file_id):
+        self.sjekket.append(file_id)
+        svar = self.filer.get(file_id)
+        if isinstance(svar, Exception):
+            raise svar
+        return svar
 
 
 def mappe(id_, navn, kan_liste=True):
@@ -514,14 +523,23 @@ class Skann(unittest.TestCase):
 class FakeSupabase:
     """drive_videos i minnet, med PostgREST-upsert (merge-duplicates) og tabellens viktigste sjekker."""
 
-    def __init__(self):
+    def __init__(self, kalender=()):
         self.rader = {}
         self.kall = []
+        self.kalender = list(kalender)  # drive_file_id-er som ligger i planned_posts
 
-    def select(self, table, params):
+    def select(self, table, params, schema=None):
         self.kall.append(("select", table))
+        if table == "planned_posts":
+            return [{"drive_file_id": i} for i in self.kalender]
         cols = params["select"].split(",")
         return [{c: r.get(c) for c in cols} for r in self.rader.values()]
+
+    def update(self, table, filters, values):
+        self.kall.append(("update", table))
+        ider = filters["drive_file_id"].removeprefix("in.(").removesuffix(")").split(",")
+        for i in ider:
+            self.rader[i].update(values)
 
     def upsert(self, table, rows, on_conflict):
         self.kall.append(("upsert", table, on_conflict))
@@ -636,6 +654,132 @@ class Innboks(unittest.TestCase):
                 with self.assertRaises(SystemExit) as cm:
                     fetch_drive.main(argv)
             self.assertEqual(cm.exception.code, 2, argv)
+
+
+class Borte(unittest.TestCase):
+    """Innboksrader for filer som er borte fra Drive. i_dag 26.10.2026 (uke 44), horisont 12: vindu uke 44 – 2027-W03."""
+
+    I_DAG = date(2026, 10, 26)
+
+    @staticmethod
+    def db_rad(id_, aar, uke, finnes=True, gjest="Vibeke", nr=2):
+        return {"drive_file_id": id_, "konsept": "Folka Først", "aar": aar, "uke": uke, "mappe": f"Folka Først/Uke {uke}",
+                "filnavn": f"Veksthuset Folka Først {gjest} Video {nr}.mp4", "tittel": f"{gjest} Video {nr}", "gjest": gjest,
+                "videonr": nr, "tolkning": "ok", "melding": "", "caption_skjelett": "S", "finnes_i_drive": finnes,
+                "forst_sett": "før"}
+
+    def oppsett(self, filer=None, kalender=("kalender01",), kan_liste=True):
+        klient = FakeSupabase(kalender=kalender)
+        for r in (
+            self.db_rad("sett000001", 2026, 45, gjest="Christian", nr=11),  # finnes i skanningen
+            self.db_rad("gammel0001", 2026, 45),                            # borte (404)
+            self.db_rad("papirkurv1", 2026, 46, nr=3),                      # borte (papirkurv)
+            self.db_rad("flyttet001", 2026, 47, nr=4),                      # finnes et annet sted
+            self.db_rad("kalender01", 2026, 48, nr=5),                      # borte og i kalenderen
+            self.db_rad("fremtid001", 2027, 6, nr=6),                       # bak horisonten: ikke skannet
+            self.db_rad("passert001", 2026, 43, nr=7),                      # passert: ikke skannet
+            self.db_rad("tidlig0001", 2026, 50, finnes=False, nr=8),        # merket borte fra før
+        ):
+            klient.rader[r["drive_file_id"]] = r
+        tre = {"root": [mappe("ff", "Folka Først")], "ff": [mappe("ff45", "Uke 45", kan_liste=kan_liste)],
+               "ff45": [video("sett000001", "Veksthuset Folka Først Christian Video 11.mp4")]}
+        drive = FakeDrive(tre, filer if filer is not None else {
+            "gammel0001": None,
+            "papirkurv1": {"id": "papirkurv1", "trashed": True, "mappe": "Uke 46"},
+            "flyttet001": {"id": "flyttet001", "trashed": False, "mappe": "27 - Uke 9"},
+            "kalender01": None,
+        })
+        return klient, drive
+
+    def kjor(self, klient, drive, skriv):
+        import contextlib
+        import io as _io
+        import fetch_drive
+        ufullstendig = []
+        filer, _, _ = fetch_drive.skann(drive, "root", self.I_DAG, 12, GJESTER, MALER, ufullstendig=ufullstendig)
+        ut = _io.StringIO()
+        with contextlib.redirect_stdout(ut):
+            s = fetch_drive.oppdater_innboks(drive, [fetch_drive.rad(*x) for x in filer], ufullstendig, self.I_DAG, 12,
+                                             skriv, klient=klient, naa="2026-10-28T07:00:00+00:00")
+        return s, ut.getvalue()
+
+    def test_skannevinduet(self):
+        self.assertEqual(dt.skannevindu(self.I_DAG, 12), ((2026, 44), (2027, 3)))
+        self.assertEqual(dt.skannevindu(date(2026, 12, 30), 2), ((2026, 53), (2027, 2)))  # over årsskiftet
+        self.assertTrue(dt.i_vindu(2026, 53, ((2026, 52), (2027, 1))))
+        self.assertFalse(dt.i_vindu(2027, 53, ((2026, 44), (2027, 3))))  # uke som ikke finnes
+
+    def test_dry_run_viser_men_skriver_ingenting(self):
+        klient, drive = self.oppsett()
+        s, ut = self.kjor(klient, drive, skriv=False)
+        self.assertEqual(sorted(r["drive_file_id"] for r, _ in s["borte"]), ["gammel0001", "kalender01", "papirkurv1"])
+        self.assertEqual([(r["drive_file_id"], m) for r, m in s["annet_sted"]], [("flyttet001", "27 - Uke 9")])
+        self.assertEqual((s["ikke_skannet"], s["allerede_borte"]), (2, 1))
+        self.assertEqual({k[0] for k in klient.kall}, {"select"})
+        self.assertTrue(all(r["finnes_i_drive"] for i, r in klient.rader.items() if i != "tidlig0001"))
+        self.assertIn("Ville merket 3 som borte fra Drive", ut)
+        self.assertIn("2026-W45 Folka Først: Vibeke #2: borte (slettet eller utilgjengelig (404))", ut)
+        self.assertIn("2026-W46 Folka Først: Vibeke #3: borte (i papirkurven)", ut)
+        self.assertIn("2026-W48 Folka Først: Vibeke #5: borte (slettet eller utilgjengelig (404)) (ligger i kalenderen)", ut)
+        self.assertIn("Ikke skannet (uke utenfor uke 44 2026 – uke 3 2027, røres ikke): 2", ut)
+        self.assertIn("2026-W47 Folka Først: Vibeke #4: ligger i «27 - Uke 9»", ut)
+
+    def test_utenfor_horisonten_og_passert_sjekkes_ikke_og_roeres_ikke(self):
+        klient, drive = self.oppsett()
+        self.kjor(klient, drive, skriv=True)
+        self.assertNotIn("fremtid001", drive.sjekket)
+        self.assertNotIn("passert001", drive.sjekket)
+        self.assertTrue(klient.rader["fremtid001"]["finnes_i_drive"] and klient.rader["passert001"]["finnes_i_drive"])
+
+    def test_skriv_merker_borte_og_roerer_aldri_kalenderen(self):
+        klient, drive = self.oppsett()
+        s, ut = self.kjor(klient, drive, skriv=True)
+        self.assertEqual(s["merket"], 3)
+        self.assertEqual({i for i, r in klient.rader.items() if r["finnes_i_drive"] is False},
+                         {"gammel0001", "papirkurv1", "kalender01", "tidlig0001"})
+        self.assertTrue(klient.rader["flyttet001"]["finnes_i_drive"])
+        self.assertEqual(klient.rader["gammel0001"]["forst_sett"], "før")  # aldri slettet
+        self.assertEqual(len(klient.rader), 8)
+        # planned_posts bare lest; skriving bare til drive_videos, og upsert før update
+        self.assertEqual([k for k in klient.kall if k[1] == "planned_posts"], [("select", "planned_posts")])
+        skriv = [k for k in klient.kall if k[0] != "select"]
+        self.assertEqual(skriv, [("upsert", "drive_videos", "drive_file_id"), ("update", "drive_videos")])
+        self.assertIn("Merket 3 som borte fra Drive", ut)
+
+    def test_fil_tilbake_blir_true(self):
+        klient, drive = self.oppsett()
+        klient.rader["sett000001"]["finnes_i_drive"] = False  # var merket borte, ses nå igjen
+        self.kjor(klient, drive, skriv=True)
+        self.assertIs(klient.rader["sett000001"]["finnes_i_drive"], True)
+
+    def test_ufullstendig_skanning_skriver_ingenting(self):
+        klient, drive = self.oppsett(kan_liste=False)
+        with self.assertRaises(SystemExit) as cm:
+            self.kjor(klient, drive, skriv=True)
+        self.assertIn("ufullstendig", str(cm.exception.code))
+        self.assertEqual((klient.kall, drive.sjekket), ([], []))
+        s, ut = self.kjor(klient, drive, skriv=False)  # dry-run: melding, ingen sjekk
+        self.assertIsNone(s)
+        self.assertIn("sjekken av borte filer er hoppet over", ut)
+
+    def test_annen_feil_fra_files_get_stopper_uten_skriving(self):
+        import fetch_drive
+        filer = {"gammel0001": None, "papirkurv1": fetch_drive.DriveApiError("Internal error (HTTP 500)", 500),
+                 "flyttet001": None, "kalender01": None}
+        klient, drive = self.oppsett(filer=filer)
+        with self.assertRaises(SystemExit) as cm:
+            self.kjor(klient, drive, skriv=True)
+        self.assertIn("files.get feilet", str(cm.exception.code))
+        self.assertEqual({k[0] for k in klient.kall}, {"select"})
+        self.assertTrue(klient.rader["gammel0001"]["finnes_i_drive"])
+
+    def test_ingen_borte_gir_ingen_update(self):
+        klient, drive = self.oppsett(filer={i: {"id": i, "trashed": False, "mappe": "Annet"}
+                                            for i in ("gammel0001", "papirkurv1", "flyttet001", "kalender01")})
+        s, ut = self.kjor(klient, drive, skriv=True)
+        self.assertEqual(s["merket"], 0)
+        self.assertNotIn(("update", "drive_videos"), klient.kall)
+        self.assertIn("Merket 0 som borte fra Drive (finnes_i_drive = false).", ut)
 
 
 if __name__ == "__main__":

@@ -330,8 +330,17 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   skrives også, med melding. Skriver aldri til planned_posts. Er skanningen ufullstendig (en mappe uten tilgang),
   skrives ingenting. Utskrift: nye, oppdaterte, uendrede, stopp og ikke tolket. Supabase-feil vises med statuskode
   og kort melding, aldri «details» (raden).
-- Ikke laget ennå (utsatt): merking av filer som er slettet i Drive (finnes_i_drive = false) og merknader om nytt
-  filnavn, flytting og utdatert skjelett.
+- Borte fra Drive (28.10.2026): etter en fullstendig skanning sjekkes innboksrader med finnes_i_drive = true som ikke
+  ble sett. «Ikke skannet» = uken er utenfor skannevinduet (passert, eller bak horisonten) og røres ikke. Uke i
+  vinduet: files.get per fil; 404 («slettet eller utilgjengelig») eller papirkurv = borte → finnes_i_drive = false
+  (bare med --skriv; dry-run skriver «Ville merket N …»), filen finnes et annet sted = røres ikke, vises med mappenavn.
+  Andre feil fra files.get eller en ufullstendig skanning stopper uten å skrive. Rader slettes aldri, og sees de igjen,
+  blir de true. Både dry-run og --skriv leser drive_videos og dashboard.planned_posts (bare lesing); uten
+  Supabase-nøkler hopper dry-run over sjekken. Appen viser ikke rader med false eller fra passerte uker (før
+  inneværende uke, regnet ut i appen, ikke lagret), og nevner antallet diskret («Skjult: …»).
+- Ikke laget ennå: merknad i kalenderen når en post fra Drive peker på en fil som er borte (forslag: drive_finnes
+  bakerst i dashboard.planned_posts via left join, krever migrering), «Skjul»-knapp for enkeltrader (krever
+  migrering), og merknader om nytt filnavn og utdatert skjelett.
 - Mappestruktur: Veksthuset > <Konsept> > <Ukemappe> > filer.
   - Konseptmapper: «Folka Først», «På Gata», «Sit-com» (→ Sitcom). «Uten Kompetanse», «VM-innhold» og «Teasere»
     hoppes over stille; Sitcom/Drafts hoppes over med én linje i oppsummeringen. Andre mapper meldes som ukjente.

@@ -5,6 +5,10 @@ NM Insights - leser mappe- og filnavn fra Google Drive og tolker dem til rader f
 --skriv:   som --dry-run, og upserter så radene til public.drive_videos (nøkkel drive_file_id) med service-nøkkelen.
            Nye filer settes inn, kjente oppdateres (forst_sett beholdes). Skriver aldri til planned_posts.
            Stopper uten å skrive noe hvis skanningen var ufullstendig (f.eks. en mappe uten tilgang).
+Borte fra Drive: innboksrader som ikke ble sett, men har uke i skannevinduet, sjekkes med files.get. 404 eller
+papirkurv gir finnes_i_drive = false (bare med --skriv; dry-run viser «Ville merket N»). Rader med uke utenfor
+vinduet (passert eller bak horisonten) er «ikke skannet» og røres ikke. Rader slettes aldri; sees de igjen, blir de
+true. Både dry-run og --skriv leser drive_videos og planned_posts (bare lesing) for denne sjekken.
 Kjøres manuelt på Adrians PC, ikke i GitHub Actions: gjestelisten ligger bare lokalt. Ingen nedlasting av videoer.
 
 Struktur: DRIVE_VEKSTHUSET_FOLDER_ID (mappen «Veksthuset») > <Konsept> > Uke NN > filer.
@@ -110,6 +114,26 @@ class Drive:
             raise DriveApiError(f"{err.get('message', 'Ukjent feil fra Drive')} (HTTP {status})", status,
                                 status >= 500 or status == 429 or bool(reasons & TRANSIENT_REASONS))
         return data
+
+    def finnes(self, file_id):
+        """files.get for én fil: {id, name, trashed, mappe}, eller None ved 404. Andre feil kastes."""
+        try:
+            meta = self._get_once(f"{DRIVE_URL}/files/{file_id}",
+                                  {"fields": "id,name,trashed,parents", "supportsAllDrives": "true"})
+        except DriveApiError as e:
+            if e.status == 404:
+                return None
+            raise
+        mappe = None
+        for parent in meta.get("parents") or []:
+            try:
+                mappe = self._get_once(f"{DRIVE_URL}/files/{parent}", {"fields": "name", "supportsAllDrives": "true"}).get("name")
+            except DriveApiError as e:
+                if e.status != 404:
+                    raise
+                mappe = "(mappe uten tilgang)"
+            break
+        return {**meta, "mappe": mappe}
 
     def get(self, file_id, fields):
         return retry(lambda: self._get_once(f"{DRIVE_URL}/files/{file_id}",
@@ -303,6 +327,87 @@ def skriv_innboks(rader, ufullstendig, klient=db, naa=None):
     return teller
 
 
+GYLDIG_ID = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
+
+
+def sjekk_borte(drive, klient, rader, i_dag, horisont):
+    """
+    Leser innboksen og kalenderens Drive-koblinger (bare lesing) og sjekker radene som ikke ble sett.
+    Returnerer {borte: [(rad, grunn)], annet_sted: [(rad, mappe)], ikke_skannet: int, i_kalenderen: set, vindu}.
+    Andre feil fra files.get enn 404 kastes (DriveApiError): da er skanningen ufullstendig.
+    """
+    vindu = dt.skannevindu(i_dag, horisont)
+    db_rader = klient.select(TABELL, {"select": "drive_file_id,konsept,aar,uke,filnavn,tittel,gjest,videonr,finnes_i_drive",
+                                      "order": "drive_file_id"})
+    i_kal = {r["drive_file_id"] for r in klient.select("planned_posts", {"select": "drive_file_id",
+                                                                          "drive_file_id": "not.is.null",
+                                                                          "order": "drive_file_id"}, schema="dashboard")}
+    sjekkes, ikke_skannet = dt.del_usette(db_rader, {r["drive_file_id"] for r in rader}, vindu)
+    borte, annet_sted = [], []
+    for r in sjekkes:
+        meta = drive.finnes(r["drive_file_id"])
+        utfall, grunn = dt.vurder(meta)
+        if utfall == "borte":
+            borte.append((r, grunn))
+        else:
+            annet_sted.append((r, meta.get("mappe") or "ukjent mappe"))
+    return {"borte": borte, "annet_sted": annet_sted, "ikke_skannet": len(ikke_skannet), "i_kalenderen": i_kal,
+            "vindu": vindu, "allerede_borte": sum(r.get("finnes_i_drive") is False for r in db_rader)}
+
+
+def marker_borte(borte, klient=db):
+    """Setter finnes_i_drive = false for radene (aldri sletting). Returnerer antallet."""
+    ider = [r["drive_file_id"] for r, _ in borte]
+    if not ider:
+        return 0
+    if not all(GYLDIG_ID.match(i) for i in ider):
+        sys.exit("Ugyldig fil-ID blant radene som skulle merkes. Ingenting er merket.")
+    klient.update(TABELL, {"drive_file_id": f"in.({','.join(ider)})"}, {"finnes_i_drive": False})
+    return len(ider)
+
+
+def vis_borte(s, modus):
+    (a1, u1), (a2, u2) = s["vindu"]
+    verb = "Merket" if modus == "skriv" else "Ville merket"
+    print(f"\n{verb} {len(s['borte'])} som borte fra Drive (finnes_i_drive = false)"
+          + ("." if not s["borte"] else ":"))
+    for r, grunn in sorted(s["borte"], key=lambda x: (x[0]["aar"], x[0]["uke"], x[0]["konsept"], x[0]["drive_file_id"])):
+        kal = " (ligger i kalenderen)" if r["drive_file_id"] in s["i_kalenderen"] else ""
+        print(f"  {dt.rad_navn(r)}: borte ({grunn}){kal}")
+    print(f"Ikke skannet (uke utenfor uke {u1} {a1} – uke {u2} {a2}, røres ikke): {s['ikke_skannet']}")
+    if s["annet_sted"]:
+        print("Finnes i Drive, men utenfor skannet område (røres ikke):")
+        for r, mappe in s["annet_sted"]:
+            print(f"  {dt.rad_navn(r)}: ligger i «{mappe}»")
+    if s["allerede_borte"]:
+        print(f"Allerede merket borte fra før: {s['allerede_borte']}")
+
+
+def oppdater_innboks(drive, rader, ufullstendig, i_dag, horisont, skriv, klient=db, naa=None):
+    """
+    Sjekk av borte filer og (med skriv) skriving. Alt leses og sjekkes før noe skrives: ufullstendig skanning eller
+    feil fra files.get stopper uten å skrive. Rører aldri planned_posts (bare lesing av Drive-koblingene).
+    """
+    if ufullstendig:
+        if skriv:
+            sys.exit(f"Skanningen av Drive er ufullstendig (ingen tilgang: {', '.join(ufullstendig)}). "
+                     "Ingenting er skrevet til databasen.")
+        print(f"\nSkanningen er ufullstendig (ingen tilgang: {', '.join(ufullstendig)}); sjekken av borte filer er hoppet over.")
+        return None
+    try:
+        s = sjekk_borte(drive, klient, rader, i_dag, horisont)
+    except DriveApiError as e:
+        if skriv:
+            sys.exit(f"Skanningen er ufullstendig (files.get feilet: {e}). Ingenting er skrevet til databasen.")
+        print(f"\nSkanningen er ufullstendig (files.get feilet: {e}); sjekken av borte filer er avbrutt.")
+        return None
+    if skriv:
+        s["skrevet"] = skriv_innboks(rader, [], klient=klient, naa=naa)
+        s["merket"] = marker_borte(s["borte"], klient)
+    vis_borte(s, "skriv" if skriv else "dry-run")
+    return s
+
+
 def kort_feil(e):
     """Statuskode og kort melding fra en Supabase-feil, uten «details» (som kan inneholde hele raden)."""
     tekst = str(e)
@@ -393,15 +498,21 @@ def main(argv=None):
                                       ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"Skrev {DRYRUN_FILE} (lokal, gitignored).")
 
-    if args.skriv:
-        try:
-            t = skriv_innboks(rader, ufullstendig)
-        except db.SupabaseError as e:
-            sys.exit(f"{kort_feil(e)}. Kjør --skriv på nytt etter rettingen (upserten kan trygt gjentas).")
-        except requests.RequestException as e:  # meldingen kan inneholde URL, så bare typen vises
-            sys.exit(f"Nettverksfeil mot Supabase ({type(e).__name__}).")
+    if not db.URL or not db.KEY:
+        if args.skriv:
+            sys.exit("Mangler SUPABASE_URL eller SUPABASE_SECRET_KEY i .env-filen. Ingenting er skrevet.")
+        print("\nMangler Supabase-nøklene: sjekken av filer som er borte fra Drive er hoppet over.")
+        return
+    try:
+        s = oppdater_innboks(drive, rader, ufullstendig, i_dag, args.horisont, args.skriv)
+    except db.SupabaseError as e:
+        sys.exit(f"{kort_feil(e)}. Kjør på nytt etter rettingen (skrivingen kan trygt gjentas).")
+    except requests.RequestException as e:  # meldingen kan inneholde URL, så bare typen vises
+        sys.exit(f"Nettverksfeil mot Supabase ({type(e).__name__}).")
+    if args.skriv and s:
+        t = s["skrevet"]
         print(f"\nSkrev til {TABELL}: {t['ny']} nye, {t['oppdatert']} oppdaterte, {t['uendret']} uendrede "
-              f"({t['stopp']} stopp, {t['ikke tolket']} ikke tolket). planned_posts er ikke rørt.")
+              f"({t['stopp']} stopp, {t['ikke tolket']} ikke tolket), {s['merket']} merket borte. planned_posts er ikke rørt.")
 
 
 if __name__ == "__main__":

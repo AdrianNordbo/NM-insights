@@ -10,8 +10,10 @@ import {
   type InnboksRad,
   muligDuplikat,
   normTittel,
+  passert,
   plasserFraInnboks,
   sjekkDriveRader,
+  skjulteIInnboks,
   velgUke,
 } from "./innboks";
 import type { PlanRad } from "./ukeplan";
@@ -127,7 +129,7 @@ describe("ukevelgeren", () => {
   ];
 
   it("uker sortert på (år, uke) over årsskiftet, med antall og markering av problemer; lagt inn teller ikke", () => {
-    expect(innboksUker(rader)).toEqual([
+    expect(innboksUker(rader, TODAY)).toEqual([
       { aar: 2026, uke: 47, klare: 0, problemer: 1 },
       { aar: 2026, uke: 52, klare: 3, problemer: 1 },
       { aar: 2026, uke: 53, klare: 1, problemer: 0 },
@@ -136,24 +138,71 @@ describe("ukevelgeren", () => {
   });
 
   it("standard er første uke; valgt uke beholdes; tom uke hopper til neste; ingen etter gir nærmeste før", () => {
-    const uker = innboksUker(rader);
+    const uker = innboksUker(rader, TODAY);
     expect(velgUke(uker, null)).toEqual({ aar: 2026, uke: 47 });
     expect(velgUke(uker, { aar: 2026, uke: 53 })).toEqual({ aar: 2026, uke: 53 });
     expect(velgUke(uker, { aar: 2026, uke: 49 })).toEqual({ aar: 2026, uke: 52 }); // uke 49 ble tom etter «Legg inn»
     expect(velgUke(uker.filter((u) => u.aar === 2026), { aar: 2027, uke: 1 })).toEqual({ aar: 2026, uke: 53 });
     expect(velgUke([], { aar: 2026, uke: 52 })).toBeNull();
-    expect(velgUke(innboksUker([rad({ i_kalenderen: true })]), null)).toBeNull(); // tom innboks: seksjonen skjules
+    expect(velgUke(innboksUker([rad({ i_kalenderen: true })], TODAY), null)).toBeNull(); // tom innboks: seksjonen skjules
   });
 
   it("valgt uke viser bare sine videoer, gruppert per konsept i fast rekkefølge, og problemene for samme uke", () => {
-    const { grupper, problemer } = innboksForUke(rader, { aar: 2026, uke: 52 });
+    const { grupper, problemer } = innboksForUke(rader, { aar: 2026, uke: 52 }, TODAY);
     expect(grupper.map((g) => [g.konsept, g.rader.map((r) => r.driveFileId)])).toEqual([
       ["Folka Først", [id(4)]],
       ["Sitcom", [id(5)]],
       ["På Gata", [id(3)]],
     ]);
     expect(problemer.map((r) => r.driveFileId)).toEqual([id(6)]);
-    expect(innboksForUke(rader, { aar: 2026, uke: 47 })).toEqual({ grupper: [], problemer: [rader[7]] });
+    expect(innboksForUke(rader, { aar: 2026, uke: 47 }, TODAY)).toEqual({ grupper: [], problemer: [rader[7]] });
+  });
+});
+
+describe("borte fra Drive og passerte uker", () => {
+  const id = (n: number) => `bor${String(n).padStart(8, "0")}`;
+  const rader = [
+    rad({ drive_file_id: id(1), uke: 44 }), // inneværende uke: vises
+    rad({ drive_file_id: id(2), uke: 45, finnes_i_drive: false }), // borte
+    rad({ drive_file_id: id(3), uke: 43 }), // passert
+    rad({ drive_file_id: id(4), uke: 46 }),
+    rad({ drive_file_id: id(5), uke: 46, finnes_i_drive: false, tolkning: "stopp", caption_skjelett: null, melding: "Ukjent gjest" }), // borte problem
+    rad({ drive_file_id: id(6), uke: 42, tolkning: "ikke tolket", tittel: null, caption_skjelett: null, melding: "kopi" }), // passert problem
+    rad({ drive_file_id: id(7), uke: 45, finnes_i_drive: false, i_kalenderen: true }), // i kalenderen: telles ikke
+  ];
+
+  it("finnes_i_drive leses; mangler feltet, regnes raden som funnet", () => {
+    expect(rad({ finnes_i_drive: false }).finnesIDrive).toBe(false);
+    const utenFelt: Record<string, unknown> = { ...viewRad() };
+    delete utenFelt.finnes_i_drive;
+    expect(fraInnboks(utenFelt)?.finnesIDrive).toBe(true);
+  });
+
+  it("borte og passerte vises ikke, heller ikke under «Kan ikke legges inn»; inneværende uke vises", () => {
+    const { klare, problemer } = delInnboks(rader, TODAY);
+    expect(klare.map((r) => r.driveFileId)).toEqual([id(1), id(4)]);
+    expect(problemer).toEqual([]);
+    expect(innboksUker(rader, TODAY).map((u) => [u.uke, u.klare, u.problemer])).toEqual([
+      [44, 1, 0],
+      [46, 1, 0],
+    ]);
+    expect(innboksForUke(rader, { aar: 2026, uke: 45 }, TODAY)).toEqual({ grupper: [], problemer: [] });
+  });
+
+  it("standarduken tar bare med synlige rader", () => {
+    const uker = innboksUker(rader, TODAY);
+    expect(velgUke(uker, null)).toEqual({ aar: 2026, uke: 44 });
+    expect(velgUke(uker, { aar: 2026, uke: 45 })).toEqual({ aar: 2026, uke: 46 }); // uke 45 har bare en borte-rad
+    // Søndag 01.11 er fortsatt uke 44; mandag 02.11 er uke 44 passert
+    expect(velgUke(innboksUker(rader, "2026-11-01"), null)).toEqual({ aar: 2026, uke: 44 });
+    expect(velgUke(innboksUker(rader, "2026-11-02"), null)).toEqual({ aar: 2026, uke: 46 });
+    expect(passert({ aar: 2026, uke: 53 }, "2027-01-04")).toBe(true);
+    expect(passert({ aar: 2027, uke: 1 }, "2026-12-30")).toBe(false);
+  });
+
+  it("antall skjulte (ikke de som ligger i kalenderen)", () => {
+    expect(skjulteIInnboks(rader, TODAY)).toEqual({ borte: 2, passert: 2 });
+    expect(skjulteIInnboks(rader, "2026-11-02")).toEqual({ borte: 2, passert: 3 });
   });
 });
 
