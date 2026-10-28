@@ -17,6 +17,8 @@ Struktur i Drive:  Veksthuset > <Konsept> > Uke NN > filer.
 - På Gata: temaet er filnavnet (uten filtype, «Veksthuset På Gata»-prefiks og «Video N»).
   Sitcom: «NN. Tittel.mp4», der NN er ukenummeret (lik ukemappen, ellers merknad); tittelen er resten.
   Ingen gjesteliste (navn som Markus slås ikke opp), og ikke videonr.
+- Folka Først-kopier («… Video 2 (1).mp4»): tolkes som originalnavnet bare når originalen ikke finnes i samme
+  ukemappe og det bare er én kopi for gjesten og nummeret der; ellers «ikke tolket» med årsak.
 - Alle navn normaliseres til NFC (filer fra Mac kan ha «ø» og «å» som to tegn).
 - Folka Først-linjen velges blant variantene i config/caption_varianter.csv (med eller uten arbeidssted), stabilt
   per fil: crc32 av fil-ID-en i Drive (ellers filnavnet) modulo antall varianter. Uten filen brukes standardmalen.
@@ -267,6 +269,8 @@ PREFIKS = {
 }
 VIDEO_NR_RE = re.compile(r"\s+Video (\d+)$", re.IGNORECASE)
 SITCOM_UKE_RE = re.compile(r"^(\d{1,2})\.\s+(.+)$")  # «45. Tittel»: ukenummeret først i Sitcom-filnavn
+# « (N)» rett før filtypen (Drives navn på en kopi)
+KOPI_NR_RE = re.compile(r"^(?P<stamme>.+) \((?P<k>\d+)\)(?P<ext>\.(?:mp4|mov|m4v))$", re.IGNORECASE)
 KOPI_RE = re.compile(r"\(\d+\)$|\bkopi\b|\bcopy\b|\bv\d+$", re.IGNORECASE)
 
 
@@ -286,6 +290,7 @@ class Fil:
     tema: str | None = None
     caption_skjelett: str | None = None
     merknader: list = field(default_factory=list)
+    kopi_av: str | None = None  # originalnavnet når filen er en kopi som er tolket som originalen
 
 
 def er_video(filnavn, mime=None):
@@ -317,20 +322,59 @@ def skjelett(konsept, *, gjest=None, yrke=None, tema=None, budskap=None, hashtag
     return f"{linje1}\n\n{midt}\n\n{tags}".rstrip()
 
 
-def tolk_fil(konsept, aar, uke, filnavn, *, gjester, notater, maler, mime=None, varianter=None, fil_id=None):
+def _ff_nokkel(filnavn):
+    """(gjest, nr) for et Folka Først-navn uten kopi-merke, ellers None."""
+    m = FF_RE.match(filnavn)
+    return (m["gjest"].lower(), int(m["nr"])) if m else None
+
+
+def kopi_hindring(filnavn, mappe_filnavn):
+    """
+    For en Folka Først-kopi («… Video 2 (1).mp4»): None når den kan tolkes som originalen (ingen original og bare
+    én kopi for gjesten og nummeret i samme ukemappe), ellers årsaken. Uten mappeinnhold kan det ikke sjekkes.
+    """
+    mk = KOPI_NR_RE.match(filnavn)
+    original = mk["stamme"] + mk["ext"]
+    nokkel = _ff_nokkel(original)
+    if mappe_filnavn is None:
+        return f"Ser ut som en kopi av «{original}»; kan ikke sjekke ukemappen"
+    andre = [nfc(n) for n in mappe_filnavn]
+    if any(_ff_nokkel(n) == nokkel for n in andre):
+        return f"Ser ut som en kopi; originalen finnes i samme mappe ({original})"
+    kopier = [n for n in andre if (k := KOPI_NR_RE.match(n)) and _ff_nokkel(k["stamme"] + k["ext"]) == nokkel]
+    if len(kopier) > 1:
+        return f"Ser ut som en kopi; {len(kopier)} kopier av samme video i mappen ({', '.join(sorted(kopier))})"
+    return None
+
+
+def tolk_fil(konsept, aar, uke, filnavn, *, gjester, notater, maler, mime=None, varianter=None, fil_id=None,
+             mappe_filnavn=None):
+    """mappe_filnavn: alle filnavn i samme ukemappe (trengs for å tolke Folka Først-kopier)."""
     navn = nfc(filnavn)
     f = Fil(konsept, aar, uke, navn, IKKE_TOLKET)
-    stamme = _uten_endelse(navn)
+    tolket_navn = navn
+    if konsept == "Folka Først" and er_video(navn, mime):
+        mk = KOPI_NR_RE.match(navn)
+        if mk and FF_RE.match(mk["stamme"] + mk["ext"]):
+            hindring = kopi_hindring(navn, mappe_filnavn)
+            if hindring:
+                f.melding = hindring
+                return f
+            tolket_navn = mk["stamme"] + mk["ext"]
+            f.kopi_av = tolket_navn
+            mo = FF_RE.match(tolket_navn)
+            f.merknader.append(f"kopi tolket som «{mo['gjest']} Video {mo['nr']}» (ingen original i mappen)")
+    stamme = _uten_endelse(tolket_navn)
     if stamme is None or not er_video(navn, mime):
         f.melding = "Ikke en videofil (.mp4, .mov eller .m4v)"
         return f
     if KOPI_RE.search(stamme):
         f.melding = "Ser ut som en kopi eller ekstra versjon («(1)», «kopi», «v2»)"
         return f
-    notat = notater.get(navn.lower(), {})
+    notat = notater.get(navn.lower()) or notater.get(tolket_navn.lower(), {})
 
     if konsept == "Folka Først":
-        m = FF_RE.match(navn)
+        m = FF_RE.match(tolket_navn)
         if not m:
             f.melding = "Passer ikke mønsteret «Veksthuset Folka Først <gjest> Video <nr>.mp4»"
             return f

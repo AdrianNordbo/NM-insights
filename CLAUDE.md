@@ -339,7 +339,13 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     «27 - Uke 1») har eksplisitt år 20ÅÅ og tolkes ikke fremover; passert = ignorert med melding. Uken må finnes i
     året (uke 53 bare i noen år) og ligge høyst HORISONT_UKER = 12 uker frem (`--horisont`).
   - Løse filer i en konseptmappe (utenfor ukemappe) ignoreres med melding.
-- Filnavn (alle normalisert til NFC; «(1)», «kopi» og «v2» gir «ikke tolket»):
+- Filnavn (alle normalisert til NFC; «kopi» og «v2» gir «ikke tolket», og «(N)» gjør det også, unntatt kopiregelen
+  for Folka Først under):
+  - Folka Først-kopi («<gjest> Video <nr> (N).mp4», Drives navn på en kopi): tolkes som originalnavnet bare når det
+    ikke finnes en fil for samme gjest og nummer i samme ukemappe og det bare er én kopi av den der. Da blir tittel og
+    skjelett som for originalen, filnavn beholder det faktiske navnet, og dry-run får merknaden «… tolket som
+    «<gjest> Video <nr>» (ingen original i mappen)». Ellers «ikke tolket» med årsak (originalen finnes, eller flere
+    kopier). 28.10.2026: 10 slike filer (9 innenfor 12 uker), ingen med original.
   - Folka Først: «Veksthuset Folka Først <gjest> Video <nr>.mp4». Tittel «<gjest> Video <nr>» (navnet fra filnavnet).
   - På Gata (i ukemapper): temaet er filnavnet uten filtype, eventuelt «Veksthuset På Gata»-prefiks og «Video N».
     Tittel = temaet.

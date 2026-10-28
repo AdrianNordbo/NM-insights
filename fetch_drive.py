@@ -216,7 +216,12 @@ def skann(drive, root_id, i_dag, horisont, gjester, maler, advarsler=None, ufull
                     merknader.append(f"{konsept} {unavn}: undermappe ignorert: {fnavn}")
                     continue
                 f = dt.tolk_fil(konsept, aar, nr, fnavn, gjester=gjester, notater=notater, maler=maler,
-                                mime=item.get("mimeType"), varianter=varianter, fil_id=item.get("id"))
+                                mime=item.get("mimeType"), varianter=varianter, fil_id=item.get("id"),
+                                mappe_filnavn=[i["name"] for i in innhold if i["mimeType"] != FOLDER])
+                if f.kopi_av and f.tolkning == dt.OK:
+                    kort = lambda n: re.sub(r"^Veksthuset Folka Først ", "", n, flags=re.I)  # noqa: E731
+                    merknader.append(f"{konsept} {unavn}: «{kort(fnavn)}» tolket som «{kort(f.kopi_av).rsplit('.', 1)[0]}» "
+                                     "(ingen original i mappen)")
                 filer.append((f, item, f"{konsept}/{unavn}"))
             for ukjent in dt.ukjente_notater(notater, [i["name"] for i in innhold]):
                 merknader.append(f"{notatfil}: «{ukjent}» passer ingen fil i {konsept} {unavn}")

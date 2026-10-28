@@ -154,7 +154,7 @@ class FolkaForst(unittest.TestCase):
     def test_ikke_tolket(self):
         for navn, grunn in [
             ("Veksthuset Folka Først Christian.mp4", "Passer ikke mønsteret"),
-            ("Veksthuset Folka Først Christian Video 11 (1).mp4", "kopi"),
+            ("Veksthuset Folka Først Christian Video 11 (1).mp4", "kan ikke sjekke ukemappen"),  # uten mappeinnhold
             ("Veksthuset Folka Først Christian Video 11 kopi.mp4", "kopi"),
             ("Folka Først Christian Video 11.mp4", "Passer ikke mønsteret"),
             ("Veksthuset Folka Først Christian2 Video 11.mp4", "tall eller tegn"),
@@ -287,6 +287,75 @@ class ListerOgMaler(unittest.TestCase):
     def test_ukjente_notater(self):
         notater = dt.les_notater("fil;yrke;budskap\nFinnes ikke.mp4;;x\nA.mp4;;y\n")
         self.assertEqual(dt.ukjente_notater(notater, ["A.mp4"]), ["finnes ikke.mp4"])
+
+
+class Kopier(unittest.TestCase):
+    """Folka Først-filer med « (N)» før filtypen (Drives navn på en kopi)."""
+
+    def kopi(self, navn, mappe, konsept="Folka Først"):
+        return dt.tolk_fil(konsept, 2026, 45, navn, gjester=GJESTER, notater={}, maler=MALER, mappe_filnavn=mappe)
+
+    def test_kopi_uten_original_tolkes_som_originalen(self):
+        navn = "Veksthuset Folka Først Vibeke Video 2 (1).mp4"
+        f = self.kopi(navn, [navn, "Veksthuset Folka Først Christian Video 3.mp4"])
+        self.assertEqual((f.tolkning, f.gjest, f.videonr, f.tittel, f.filnavn), ("ok", "Vibeke", 2, "Vibeke Video 2", navn))
+        self.assertEqual(f.kopi_av, "Veksthuset Folka Først Vibeke Video 2.mp4")
+        self.assertEqual(f.melding, "kopi tolket som «Vibeke Video 2» (ingen original i mappen)")
+        self.assertNotIn("(1)", f.tittel)
+        self.assertNotIn("(1)", f.caption_skjelett)
+        vanlig = self.kopi("Veksthuset Folka Først Vibeke Video 2.mp4", ["Veksthuset Folka Først Vibeke Video 2.mp4"])
+        self.assertEqual(f.caption_skjelett, vanlig.caption_skjelett)
+
+    def test_kopi_med_original_er_ikke_tolket(self):
+        navn = "Veksthuset Folka Først Vibeke Video 2 (1).mp4"
+        for original in ("Veksthuset Folka Først Vibeke Video 2.mp4", "Veksthuset Folka Først Vibeke Video 2.mov"):
+            f = self.kopi(navn, [navn, original])
+            self.assertEqual(f.tolkning, "ikke tolket", original)
+            self.assertIn("originalen finnes i samme mappe", f.melding)
+
+    def test_flere_kopier_er_ikke_tolket(self):
+        a, b = "Veksthuset Folka Først Vibeke Video 2 (1).mp4", "Veksthuset Folka Først Vibeke Video 2 (2).mp4"
+        for navn in (a, b):
+            f = self.kopi(navn, [a, b])
+            self.assertEqual(f.tolkning, "ikke tolket")
+            self.assertIn("2 kopier av samme video i mappen", f.melding)
+        # Kopier av ulike videoer i samme mappe hindrer ikke hverandre
+        c = "Veksthuset Folka Først Vibeke Video 3 (1).mp4"
+        self.assertEqual(self.kopi(c, [a, c]).tolkning, "ok")
+
+    def test_nfc(self):
+        nfd = unicodedata.normalize("NFD", "Veksthuset Folka Først Vibeke Video 2 (1).mp4")
+        f = self.kopi(nfd, [nfd])
+        self.assertEqual((f.tolkning, f.tittel), ("ok", "Vibeke Video 2"))
+        self.assertTrue(unicodedata.is_normalized("NFC", f.filnavn))
+        # Original i NFD og kopi i NFC: originalen gjenkjennes
+        orig_nfd = unicodedata.normalize("NFD", "Veksthuset Folka Først Vibeke Video 2.mp4")
+        self.assertEqual(self.kopi("Veksthuset Folka Først Vibeke Video 2 (1).mp4", [orig_nfd]).tolkning, "ikke tolket")
+
+    def test_andre_kopimerker_og_andre_konsepter_er_uendret(self):
+        for navn in ("Veksthuset Folka Først Vibeke Video 2 kopi.mp4", "Veksthuset Folka Først Vibeke Video 2 v2.mp4"):
+            self.assertEqual(self.kopi(navn, [navn]).tolkning, "ikke tolket", navn)
+        self.assertEqual(self.kopi("Impulskjøp (1).mp4", ["Impulskjøp (1).mp4"], konsept="På Gata").tolkning, "ikke tolket")
+        self.assertEqual(self.kopi("45. Kaffe (1).mp4", ["45. Kaffe (1).mp4"], konsept="Sitcom").tolkning, "ikke tolket")
+
+    def test_ukjent_gjest_i_kopi_stopper_som_for_vanlig_fil(self):
+        navn = "Veksthuset Folka Først Ola Video 2 (1).mp4"
+        f = self.kopi(navn, [navn])
+        self.assertEqual((f.tolkning, f.melding), ("stopp", "Ukjent gjest: Ola"))
+
+    def test_skann_gir_merknad(self):
+        import fetch_drive
+        tre = {"root": [mappe("ff", "Folka Først")], "ff": [mappe("ff45", "Uke 45")],
+               "ff45": [video("k1234567890", "Veksthuset Folka Først Vibeke Video 2 (1).mp4"),
+                        video("k2234567890", "Veksthuset Folka Først Christian Video 3 (1).mp4"),
+                        video("k3234567890", "Veksthuset Folka Først Christian Video 3.mp4")]}
+        filer, merknader, _ = fetch_drive.skann(FakeDrive(tre), "root", date(2026, 10, 26), 12, GJESTER, MALER)
+        rader = {fetch_drive.rad(*x)["drive_file_id"]: fetch_drive.rad(*x) for x in filer}
+        self.assertEqual((rader["k1234567890"]["tolkning"], rader["k1234567890"]["tittel"], rader["k1234567890"]["filnavn"]),
+                         ("ok", "Vibeke Video 2", "Veksthuset Folka Først Vibeke Video 2 (1).mp4"))
+        self.assertEqual(rader["k2234567890"]["tolkning"], "ikke tolket")
+        self.assertIn("Folka Først Uke 45: «Vibeke Video 2 (1).mp4» tolket som «Vibeke Video 2» (ingen original i mappen)", merknader)
+        self.assertEqual(sum("tolket som" in m for m in merknader), 1)
 
 
 VARIANTER = dt.les_varianter(Path("config/caption_varianter.csv").read_text(encoding="utf-8"))
