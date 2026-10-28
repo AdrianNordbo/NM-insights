@@ -6,6 +6,7 @@ import { formatDayMonth, formatTimes } from "@/lib/format";
 import { FORMAT_NAME, PLATFORM_NAME } from "@/lib/navn";
 import { KONSEPTBRUDD } from "@/lib/regler/konsepter";
 import type { PlattformValgDef } from "@/lib/regler/plattformer";
+import type { InnboksRad } from "@/lib/plan/innboks";
 import type { PlanRad } from "@/lib/plan/ukeplan";
 import type { Visning } from "@/lib/sider";
 import { Filtre } from "./Filtre";
@@ -33,7 +34,7 @@ export type PubliseringstidProps = {
   planHeat: Record<string, HeatSection>;
   planConcepts: string[];
   followContent: ContentLatestRow[];
-  plan: { rows: PlanRad[] | null; editor: boolean };
+  plan: { rows: PlanRad[] | null; editor: boolean; innboks: InnboksRad[] | null };
   today: string;
 };
 
@@ -62,7 +63,7 @@ export function PubliseringstidVisning(p: PubliseringstidProps) {
       {p.visning === "heatmap" && <HeatmapFane {...p} />}
       {p.visning === "kalender" && (
         p.plan.rows ? (
-          <KalenderDelt heat={p.planHeat} rows={p.plan.rows} editor={p.plan.editor} today={p.today} followContent={p.followContent} />
+          <KalenderDelt heat={p.planHeat} rows={p.plan.rows} editor={p.plan.editor} today={p.today} followContent={p.followContent} innboks={p.plan.innboks} />
         ) : (
           <>
             <p className="notice">Den delte kalenderen er ikke satt opp ennå. Utkastet under lagres bare i denne nettleseren.</p>

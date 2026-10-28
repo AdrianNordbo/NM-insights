@@ -5,6 +5,8 @@ import { useMemo, useState, useTransition } from "react";
 import { fjernVideo, flyttPlassering, leggTilVideo, settStatus } from "@/app/(app)/publiseringstid/actions";
 import { blokkFor, HEAT_MIN_N, type HeatSection, TIDSBLOKKER, UKEDAGER, UKEDAGER_LANG } from "@/lib/analyse/heatmap";
 import type { ContentLatestRow } from "@/lib/data/types";
+import { captionVideoer, klarSperre } from "@/lib/plan/caption";
+import type { InnboksRad } from "@/lib/plan/innboks";
 import { formatDayMonth, formatNumber, formatTimes } from "@/lib/format";
 import { folgOpp, type LagretTest, trengerFlere } from "@/lib/plan/oppfolging";
 import { isoUke, kommendeUker, lesUke, type Uke, ukeDager, ukeKey, ukeLabel } from "@/lib/plan/uke";
@@ -13,12 +15,15 @@ import { MAKS_TESTER_PER_UKE, OPPFOLGING_DAGER, ukedag } from "@/lib/plan/utkast
 import { KONSEPTBRUDD, laasPeriode } from "@/lib/regler/konsepter";
 import { PLAN_KONSEPTER, STATUSER, TESTER_PER_UKE } from "@/lib/regler/plan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
+import { CaptionVideo } from "./CaptionVideo";
+import { DriveInnboks } from "./DriveInnboks";
 
-type Props = { heat: Record<string, HeatSection>; rows: PlanRad[]; editor: boolean; today: string; followContent: ContentLatestRow[] };
+/** innboks: Drive-innboksen, bare for redaktører (null for andre og når viewet mangler). */
+type Props = { heat: Record<string, HeatSection>; rows: PlanRad[]; editor: boolean; today: string; followContent: ContentLatestRow[]; innboks?: InnboksRad[] | null };
 
 const label = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
 
-export function KalenderDelt({ heat, rows, editor, today, followContent }: Props) {
+export function KalenderDelt({ heat, rows, editor, today, followContent, innboks = null }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [melding, setMelding] = useState<string | null>(null);
@@ -35,6 +40,7 @@ export function KalenderDelt({ heat, rows, editor, today, followContent }: Props
   const [concept, setConcept] = useState<string>(PLAN_KONSEPTER[0]);
   const [platforms, setPlatforms] = useState<string[]>(PLAN_PLATTFORMER.map((p) => p.key));
   const ukeRader = rows.filter((r) => r.aar === uke.aar && r.uke === uke.uke);
+  const captions = captionVideoer(ukeRader, editor);
   const b = KONSEPTBRUDD[0];
   const lock = b ? laasPeriode(b) : null;
 
@@ -42,7 +48,8 @@ export function KalenderDelt({ heat, rows, editor, today, followContent }: Props
     start(async () => {
       const svar = await job();
       setMelding(svar.ok ? ok : (svar.error ?? "Klarte ikke å lagre."));
-      if (svar.ok) router.refresh();
+      // Også ved feil: en delvis lagring (samme caption på flere plattformer) skal vises
+      router.refresh();
     });
 
   const leggTil = () => {
@@ -97,6 +104,17 @@ export function KalenderDelt({ heat, rows, editor, today, followContent }: Props
           </select>
         </label>
       </div>
+
+      {editor && innboks && (
+        <>
+          <DriveInnboks innboks={innboks} rows={rows} heat={heat} regler={regler} today={today} pending={pending} run={run} />
+          {melding && (
+            <p className="small" role="status" style={{ margin: "-6px 0 16px" }}>
+              {melding}
+            </p>
+          )}
+        </>
+      )}
 
       {editor && (
         <div className="planning-grid">
@@ -287,6 +305,25 @@ export function KalenderDelt({ heat, rows, editor, today, followContent }: Props
               ))}
           </div>
         )}
+
+        {captions.length > 0 && (
+          <div className="plan-explanation captions">
+            <h3>Caption</h3>
+            <p className="micro" style={{ marginTop: 0 }}>
+              {editor
+                ? `Feltet starter med skjelettet fra Drive. Skriv ferdig per plattform og lagre; [SKRIV …] må bort før posten kan settes til Klar. Maks 2 200 tegn. På YouTube blir første linje tittelen.`
+                : "Ferdig caption per plattform, eller skjelettet fra Drive når den ikke er skrevet ennå."}
+            </p>
+            {editor && melding && (
+              <p className="small" role="status">
+                {melding}
+              </p>
+            )}
+            {captions.map((v) => (
+              <CaptionVideo key={v.videoId} video={v} editor={editor} pending={pending} run={run} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 17 }}>
@@ -341,6 +378,7 @@ function Redigering({
 }) {
   const [dato, setDato] = useState(rad.dato ?? ukeDager(uke)[0]);
   const [kl, setKl] = useState(rad.klokkeslett ?? "19:00");
+  const sperre = rad.status === "Klar" ? null : klarSperre(rad);
   return (
     <details className="more">
       <summary>Endre</summary>
@@ -349,7 +387,9 @@ function Redigering({
           <span className="sr-only">Status</span>
           <select value={rad.status} disabled={pending} onChange={(e) => run(() => settStatus(rad.id, e.target.value), `Status satt til ${e.target.value}.`)}>
             {STATUSER.map((s) => (
-              <option key={s}>{s}</option>
+              <option key={s} disabled={s === "Klar" && !!sperre}>
+                {s}
+              </option>
             ))}
           </select>
         </label>
@@ -371,6 +411,11 @@ function Redigering({
           Fjern video
         </button>
       </div>
+      {sperre && (
+        <p className="micro" style={{ marginTop: 6 }}>
+          <a href={`#caption-${rad.id}`}>{sperre}</a>
+        </p>
+      )}
     </details>
   );
 }

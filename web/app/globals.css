@@ -346,6 +346,22 @@ button.secondary { font: inherit; font-size: 13px; font-weight: 650; border: 1px
 .steps { margin: 12px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
 .example { margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border-radius: 10px; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
 .empty-state { color: var(--muted); margin-top: 14px; }
+.innboks { margin-top: 17px; margin-bottom: 17px; }
+.innboks .innboks-rad { align-items: center; }
+.innboks .innboks-rad > div { min-width: 0; }
+.innboks .skjelett { white-space: pre-wrap; font-size: 12px; background: var(--surface-2, var(--neutral-bg)); border-radius: 8px; padding: 8px 10px; }
+.innboks .checks { margin-top: 8px; }
+.innboks .checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.innboks .checks input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.innboks .break { margin-bottom: 0; }
+.ukevelger { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.ukevelger button { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 9px; padding: 8px 12px; min-height: 40px; cursor: pointer; }
+.ukevelger button.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ukevelger .antall { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--neutral-bg); color: var(--ink-2); font-size: 12px; text-align: center; }
+.ukevelger button.aktiv .antall { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.ukevelger button.aktiv .varsel { background: #fff; color: var(--down); }
+.ukevelger .varsel { width: 18px; height: 18px; border-radius: 999px; background: var(--down-bg); color: var(--down); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 640px) { .innboks .innboks-rad { flex-direction: column; align-items: stretch; } .innboks .innboks-rad button { width: 100%; } }
 
 /* ===== Smalere skjermer ===================================================== */
 @media (max-width: 1100px) {
@@ -392,3 +408,14 @@ button.secondary { font: inherit; font-size: 13px; font-weight: 650; border: 1px
   .calendar-day.outside, .calendar-day:not(:has(.slot)) { display: none; }
   .setting select, .setting input { width: 160px; }
 }
+.captions .caption-video { border-top: 1px solid var(--line); padding: 10px 0; font-size: 13px; }
+.captions .caption-tittel { cursor: pointer; padding: 2px 0; }
+.captions .caption-felt { margin-top: 12px; }
+.captions .caption-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.captions .caption-felt textarea { width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--ink); }
+.captions .caption-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.captions .for-lang { color: var(--down); font-weight: 700; }
+.captions .caption-rest, .captions .caption-advarsel { color: var(--down); }
+.captions .caption-knapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.captions .skjelett { white-space: pre-wrap; font-size: 12px; background: var(--surface-2, var(--neutral-bg)); border-radius: 8px; padding: 8px 10px; margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .captions .caption-knapper button { width: 100%; } }

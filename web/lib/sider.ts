@@ -10,6 +10,7 @@ import { buildOversikt } from "./oversikt/periodemodell";
 import { buildRecent } from "./oversikt/sist";
 import { lesValg, perioder } from "./oversikt/valg";
 import { addDays } from "./format";
+import { fraInnboks, type InnboksRad } from "./plan/innboks";
 import { fraView, type PlanRad } from "./plan/ukeplan";
 import { PLAN_KONSEPTER } from "./regler/plan";
 import { iValg, PLAN_PLATTFORMER, PLATTFORM_VALG, plattformValg } from "./regler/plattformer";
@@ -52,8 +53,16 @@ export function innholdsserierSide(raw: Raadata, params: Params, today: string) 
 export type Visning = "monstre" | "heatmap" | "kalender";
 const VISNINGER: Visning[] = ["monstre", "heatmap", "kalender"];
 
-/** plan: rader fra dashboard.planned_posts (null når viewet ikke finnes ennå) og om brukeren er redaktør. */
-export function publiseringstidSide(raw: Raadata, params: Params, today: string, plan: { rader: Record<string, unknown>[] | null; editor: boolean } = { rader: null, editor: false }) {
+/**
+ * plan: rader fra dashboard.planned_posts (null når viewet ikke finnes ennå), om brukeren er redaktør, og
+ * Drive-innboksen (bare for redaktører; null når den ikke er hentet eller viewet mangler).
+ */
+export function publiseringstidSide(
+  raw: Raadata,
+  params: Params,
+  today: string,
+  plan: { rader: Record<string, unknown>[] | null; editor: boolean; innboks?: Record<string, unknown>[] | null } = { rader: null, editor: false },
+) {
   const v = plattformValg(params.plattform);
   const f = forbered(raw, today);
   const visning: Visning = VISNINGER.find((x) => x === params.visning) ?? "monstre";
@@ -84,6 +93,11 @@ export function publiseringstidSide(raw: Raadata, params: Params, today: string,
     planConcepts,
     followContent,
     today,
-    plan: { rows: plan.rader ? plan.rader.map(fraView).filter((r): r is PlanRad => r != null) : null, editor: plan.editor },
+    plan: {
+      rows: plan.rader ? plan.rader.map(fraView).filter((r): r is PlanRad => r != null) : null,
+      editor: plan.editor,
+      // Gjest, yrke og skjelett sendes aldri til andre enn redaktører
+      innboks: plan.editor && plan.innboks ? plan.innboks.map(fraInnboks).filter((r): r is InnboksRad => r != null) : null,
+    },
   };
 }

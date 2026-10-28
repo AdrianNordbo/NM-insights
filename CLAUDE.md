@@ -30,7 +30,13 @@ Instagram og YouTube (Shorts), og en plassholder for TikTok («kommer»); dashbo
 | tiktok_link.py | Engangslenke for TikTok-kobling: portallenken (TIKTOK_AUTH_URL) + tilfeldig state + disable_auto_auth=1. Lagrer bare hashen i tiktok_oauth_states (30 min, én gang) |
 | tiktok_crypto.py | Kryptering av refresh-tokenet (X25519 + HKDF-SHA256 + AES-256-GCM, format «v1.…»). Samme format som web/lib/tiktok/crypto.ts |
 | retry.py | Felles retry (2, 5 og 10 s ved forbigående feil) og `Failures` (enkeltkall hoppes over og logges; rød kjøring bare ved > 3 feilede kall eller ingenting lagret). Brukes av fetch_instagram/youtube/daily |
-| tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken; test_tiktok_fetch.py: TikTok-henting, null for Business-felt, døgn som ikke er klare). Uten nettverk |
+| drive_tolk.py | Rene funksjoner for Drive-innboksen: konsept- og ukemapper, filnavn, gjesteoppslag, notater, tegnsett-fallback, hashtags og caption-skjelett (se «Google Drive») |
+| drive_auth.py | Engangs OAuth-innlogging mot Drive (scope drive.metadata.readonly) med Adrians konto; lagrer secrets/drive_token.json og skriver DRIVE_* til .env |
+| fetch_drive.py | Leser mappe- og filnavn fra Drive og tolker dem. `--dry-run` viser bare; `--skriv` upserter til public.drive_videos. Kjøres manuelt på Adrians PC, ikke i Actions |
+| config/caption_maler.csv | Hashtags per konsept og yrke (`konsept;yrke;hashtags;merknad`), stil og ikke dokumentert effekt. Committes |
+| config/caption_varianter.csv | Varianter av gjestelinjen for Folka Først (`konsept;med_arbeidssted;mal`, plassholdere {navn}, {yrke}, {arbeidssted}), fire med og fire uten arbeidssted. Committes; valgfri (uten den brukes standardmalen) |
+| config/gjester.csv, config/notater/ | Private lister (gjester: `navn;yrke;arbeidssted;bruk_arbeidssted`; notater per uke: `<ÅÅÅÅ>-W<NN>.csv` med `fil;yrke;budskap`). Gitignored, committes aldri |
+| tests/ | `python -m unittest` (test_retry.py: retry og feilklassifisering; test_fetch_daily.py; test_tiktok.py: kryptering, også mot web-formatet, og engangslenken; test_tiktok_fetch.py: TikTok-henting, null for Business-felt, døgn som ikke er klare; test_drive.py: uketolkning og årsskifte, filnavn, gjestestopp, tegnsett, skjelett og skriving til innboksen med falsk Drive og falsk Supabase). Uten nettverk |
 | db.py | Tynn PostgREST-klient mot Supabase (select med sidedeling, upsert i biter, get_account) |
 | concepts.py | Regelbasert konseptmerking + is_vm, med `platform`-parameter (instagram/youtube/tiktok). `python concepts.py` merker data/posts.json på nytt lokalt |
 | concept_overrides.csv | Manuelle konseptrettelser (`id;concept;dato;first_line;kommentar`), vinner alltid over automatikken. Instagram og YouTube med ID alene; TikTok som `tiktok:<item_id>` |
@@ -43,7 +49,7 @@ Instagram og YouTube (Shorts), og en plassholder for TikTok («kommer»); dashbo
 | supabase/checks/ | Kontrollspørringer for SQL Editor: dashboard_access.sql (rettigheter, blokk A–G) og dashboard_data.sql (tall i viewene) |
 | .github/workflows/fetch-instagram.yml | Daglig kjøring av Instagram, YouTube og TikTok (egne jobber) |
 | web/ | Dashboardet (Next.js på Vercel), se «Dashboard (web/)» |
-| secrets/ | youtube_client_secret.json (OAuth-klient) og youtube_token.json. Gitignored, skal aldri committes |
+| secrets/ | youtube_client_secret.json (OAuth-klient, brukes også for Drive), youtube_token.json og drive_token.json. Gitignored, skal aldri committes |
 
 Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i terminalen):
 ```
@@ -52,6 +58,9 @@ Kommandoer (Windows, Git Bash; sett `PYTHONIOENCODING=utf-8` for æøå i termin
 .venv/Scripts/python fetch_tiktok.py [--backfill] [--dry-run]
 .venv/Scripts/python fetch_daily.py --only tiktok [--backfill] [--dry-run]
 .venv/Scripts/python tiktok_link.py --account-id 3                # ny TikTok-kobling (engangslenke)
+.venv/Scripts/python drive_auth.py                                # engangsinnlogging mot Drive
+.venv/Scripts/python fetch_drive.py --dry-run                     # vis tolkningen av Drive, skriver ingenting
+.venv/Scripts/python fetch_drive.py --skriv                       # skriv tolkningen til drive_videos
 .venv/Scripts/python -m unittest -v                              # Python-tester
 .venv/Scripts/python analyze.py
 .venv/Scripts/python report.py --periode måned [--måned 2026-09]   # standard: forrige måned
@@ -197,7 +206,7 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     Varighet for Reels hentes fra TikTok/YouTube-versjonen (`duration_source`): manuell rad i reel_links går
     foran automatisk kobling (samme kunde og konsept, publisert innen 60 min, entydig). Bare egenskap ved videoen,
     aldri til å sammenligne visninger på tvers. reel_links har 7 manuelle rader (bare service_role; supabase/seed/reel_links.sql).
-  - Delt publiseringskalender (2026-10-21_planned_posts.sql, IKKE KJØRT per 21.10.2026):
+  - Delt publiseringskalender (2026-10-21_planned_posts.sql, kjørt; K1–K5 kontrollert av Adrian):
     `public.planned_posts` (én rad per video per plattform: video_id, aar, uke, tittel, konsept, plattform,
     planlagt_dato + klokkeslett (null = ikke plassert i uken), merking «Basert på data»/«Test», grunnlag, status
     Utkast/Klar/Publisert, flyttet_manuelt, opprettet_av, opprettet, oppdatert). Constraint: en plassering ligger
@@ -207,6 +216,26 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     `planlegging` med `er_redaktor()`, `legg_til(jsonb)`, `flytt(uuid, date, time)`, `sett_status(uuid, text)`
     og `fjern_video(uuid)` (SECURITY DEFINER, search_path = '', krever redaktør). Etter kjøring må
     «planlegging» legges til under Exposed schemas. Kontroll: blokk K i supabase/checks/dashboard_access.sql.
+  - Drive-innboks og caption (2026-10-26_drive_kalender.sql, kjørt 26.10.2026; DR1–DR7 grønne):
+    - `public.drive_videos`: én rad per videofil i Drive, nøkkel `drive_file_id` (fil-ID-en i Drive, fast ved nytt
+      navn og flytting). konsept, aar/uke (fra ukemappen), mappe, filnavn, drive_lenke, tittel, gjest, yrke, videonr,
+      tema, tolkning ('ok'/'stopp'/'ikke tolket'), melding (NOT NULL, standard ''), caption_skjelett,
+      finnes_i_drive, endret_i_drive, forst_sett, sist_sett. Rader som er ok må ha tittel og skjelett (constraint).
+      Bare service_role (skrives av fetch_drive.py --skriv).
+    - `planned_posts` fikk `drive_file_id` (FK til drive_videos), `caption_skjelett` (fryst ved innlegging) og
+      `caption_tekst` (Adrians ferdige tekst), null for eldre rader. Unik indeks (drive_file_id, plattform) der
+      drive_file_id ikke er null, så en Drive-fil aldri legges inn to ganger.
+    - `dashboard.planned_posts`: samme 15 kolonner i samme rekkefølge, de tre nye bakerst.
+    - `dashboard.drive_innboks` (security_invoker = false): rader bare når innlogget bruker står i plan_editors
+      (andre innloggede og SQL Editor får 0 rader); `i_kalenderen` sier om filen alt er lagt inn.
+    - `planlegging.legg_til_fra_drive(text, jsonb)`: samme validering som legg_til, pluss: filen er ok i innboksen,
+      ikke lagt inn fra før, alle radene samme video, uken fra Drive-mappen og Drive-konseptet (også med bruddnavn).
+      Kopierer skjelettet.
+    - `planlegging.lagre_caption(uuid, text)`: lagrer ferdig tekst (tom = null); en post som er Klar settes tilbake
+      til Utkast hvis teksten (eller skjelettet) fortsatt har `[SKRIV`.
+    - `planlegging.sett_status`: som før, pluss sperren: ikke Klar mens caption_tekst, eller skjelettet når teksten
+      er tom, inneholder `[SKRIV`. Poster uten caption (lagt inn manuelt) kan settes til Klar som før.
+    - Tilbakerulling står kommentert ut nederst i migreringsfilen. Kontroll: blokk DR (blokk D fantes fra før).
   - Ingen engasjementsrate på tvers av plattformer. Eneste engasjementsmål er median_engagement_per_view
     i concept_summary, som er per plattform + format.
   - Schemaet er lagt til under «Exposed schemas» (30.09.2026) og leses over REST med
@@ -218,7 +247,8 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
     trenger derfor eksplisitt grant.
   - `authenticated` har bare USAGE på schema dashboard og SELECT på viewene der (også post_features), og USAGE på schema
     `tilkobling` med EXECUTE på `claim_tiktok_state` og `store_tiktok_token` (TikTok-koblingen), og (etter
-    2026-10-21_planned_posts.sql) USAGE på schema `planlegging` med EXECUTE på de fem kalenderfunksjonene. anon har ingenting.
+    2026-10-21_planned_posts.sql) USAGE på schema `planlegging` med EXECUTE på de sju kalenderfunksjonene (fem fra
+    21.10, legg_til_fra_drive og lagre_caption fra 26.10). anon har ingenting.
   - Dashboard-viewene og «latest»-viewene kjører med eierens rettigheter (security_invoker = false). Det
     er det som lar authenticated lese sammenstilte tall uten tilgang til rådata. Supabases security
     advisor flagger dem som «security definer views»; det er forventet.
@@ -283,6 +313,72 @@ Playwright og imageio-ffmpeg (for record_demo.py) er installert i .venv, men st�
   TIKTOK_TOKEN_PUBLIC_KEY.
   `web/scripts/check-no-secrets.mjs` stopper bygget hvis nøkkelen med full tilgang eller den private
   TikTok-nøkkelen finnes i web/.
+
+### Google Drive (videoer til publiseringskalenderen)
+- Bare metadata (mappe- og filnavn), aldri nedlasting. Scope `drive.metadata.readonly` (restricted hos Google, men
+  personlig bruk under 100 brukere krever ikke verifisering; innloggingen viser «ikke verifisert»-siden). Samme
+  OAuth-klient (Desktop) i Google Cloud-prosjektet «NM Insights» som YouTube; Drive API er slått på der.
+- Adrian logger inn med sin egen konto (mappen er delt med ham og eies av en annen). drive_auth.py skriver
+  DRIVE_CLIENT_ID, DRIVE_CLIENT_SECRET og DRIVE_REFRESH_TOKEN til .env; DRIVE_VEKSTHUSET_FOLDER_ID (mappen
+  «Veksthuset») legges inn i .env manuelt.
+- Kjøres manuelt på Adrians PC, ikke i GitHub Actions: gjestelisten (config/gjester.csv) og notatene skal ikke dit.
+  `fetch_drive.py --dry-run` viser tolkningen og skriver data/drive_dryrun.json; `--skriv` gjør det samme og upserter
+  til public.drive_videos med service-nøkkelen. Uten flagg vises hjelpen; begge flagg samtidig er ikke tillatt.
+- `--skriv`: nøkkel drive_file_id. Nye filer settes inn, kjente oppdateres (også uke og mappe hvis filen er flyttet),
+  forst_sett beholdes, sist_sett og finnes_i_drive = true settes for alt som ses. Tom streng blir null (melding er ''),
+  lengdegrensene holdes, og en ok-rad uten gyldig tittel eller skjelett blir «ikke tolket». Stopp- og ikke tolket-rader
+  skrives også, med melding. Skriver aldri til planned_posts. Er skanningen ufullstendig (en mappe uten tilgang),
+  skrives ingenting. Utskrift: nye, oppdaterte, uendrede, stopp og ikke tolket. Supabase-feil vises med statuskode
+  og kort melding, aldri «details» (raden).
+- Borte fra Drive (28.10.2026): etter en fullstendig skanning sjekkes innboksrader med finnes_i_drive = true som ikke
+  ble sett. «Ikke skannet» = uken er utenfor skannevinduet (passert, eller bak horisonten) og røres ikke. Uke i
+  vinduet: files.get per fil; 404 («slettet eller utilgjengelig») eller papirkurv = borte → finnes_i_drive = false
+  (bare med --skriv; dry-run skriver «Ville merket N …»), filen finnes et annet sted = røres ikke, vises med mappenavn.
+  Andre feil fra files.get eller en ufullstendig skanning stopper uten å skrive. Rader slettes aldri, og sees de igjen,
+  blir de true. Både dry-run og --skriv leser drive_videos og dashboard.planned_posts (bare lesing); uten
+  Supabase-nøkler hopper dry-run over sjekken. Appen viser ikke rader med false eller fra passerte uker (før
+  inneværende uke, regnet ut i appen, ikke lagret), og nevner antallet diskret («Skjult: …»).
+- Ikke laget ennå: merknad i kalenderen når en post fra Drive peker på en fil som er borte (forslag: drive_finnes
+  bakerst i dashboard.planned_posts via left join, krever migrering), «Skjul»-knapp for enkeltrader (krever
+  migrering), og merknader om nytt filnavn og utdatert skjelett.
+- Mappestruktur: Veksthuset > <Konsept> > <Ukemappe> > filer.
+  - Konseptmapper: «Folka Først», «På Gata», «Sit-com» (→ Sitcom). «Uten Kompetanse», «VM-innhold» og «Teasere»
+    hoppes over stille; Sitcom/Drafts hoppes over med én linje i oppsummeringen. Andre mapper meldes som ukjente.
+  - «Uke NN» tolkes fremover fra inneværende ISO-uke (passert uke i år = neste år). «ÅÅ - Uke N» (f.eks.
+    «27 - Uke 1») har eksplisitt år 20ÅÅ og tolkes ikke fremover; passert = ignorert med melding. Uken må finnes i
+    året (uke 53 bare i noen år) og ligge høyst HORISONT_UKER = 12 uker frem (`--horisont`).
+  - Løse filer i en konseptmappe (utenfor ukemappe) ignoreres med melding.
+- Filnavn (alle normalisert til NFC; «kopi» og «v2» gir «ikke tolket», og «(N)» gjør det også, unntatt kopiregelen
+  for Folka Først under):
+  - Folka Først-kopi («<gjest> Video <nr> (N).mp4», Drives navn på en kopi): tolkes som originalnavnet bare når det
+    ikke finnes en fil for samme gjest og nummer i samme ukemappe og det bare er én kopi av den der. Da blir tittel og
+    skjelett som for originalen, filnavn beholder det faktiske navnet, og dry-run får merknaden «… tolket som
+    «<gjest> Video <nr>» (ingen original i mappen)». Ellers «ikke tolket» med årsak (originalen finnes, eller flere
+    kopier). 28.10.2026: 10 slike filer (9 innenfor 12 uker), ingen med original.
+  - Folka Først: «Veksthuset Folka Først <gjest> Video <nr>.mp4». Tittel «<gjest> Video <nr>» (navnet fra filnavnet).
+  - På Gata (i ukemapper): temaet er filnavnet uten filtype, eventuelt «Veksthuset På Gata»-prefiks og «Video N».
+    Tittel = temaet.
+  - Sitcom: «NN. Tittel.mp4», der NN er ukenummeret (ikke episode, lagres ikke i videonr). Er NN ulik ukemappen,
+    får filen en merknad, men er fortsatt ok, og uken avgjøres av mappen. Uten prefiks er tittelen hele navnet.
+    Bare filtypen fjernes («igjen....mp4» → «igjen...»). Navn i Sitcom-filer slås aldri opp i gjestelisten.
+- Gjester: config/gjester.csv slås opp med helt likt navn. Ukjent navn gir stopp «Ukjent gjest», tomt yrke gir stopp
+  «Mangler yrke for <navn>»; aldri gjetting. Samme fornavn: etternavnsinitial («Line H») i listen og filnavnet, ellers
+  «Flere gjester heter Line». config/notater/<ÅÅÅÅ>-W<NN>.csv (fil;yrke;budskap) kan overstyre yrket og gi budskapet
+  for én video. Begge filene leses som UTF-8 (med eller uten BOM) og ellers som Windows-1252 (lagret i Excel), med
+  advarselen «… er ikke UTF-8 (lest som Windows-1252)». Filene skrives aldri tilbake.
+- Caption-skjelett:
+  - Folka Først: «[SKRIV BUDSKAP]», gjestelinjen, hashtags. Gjestelinjen velges blant variantene i
+    config/caption_varianter.csv (med arbeidssted når bruk_arbeidssted = ja, ellers uten): zlib.crc32 av fil-ID-en i
+    Drive (filnavnet når ID mangler) modulo antall varianter, så samme fil alltid får samme variant. Alle varianter har
+    bokstavelig [SKRIV TEMA]. Uten filen (eller tom fil): «<Fornavn> jobber som <yrke>[ i <arbeidssted>] og snakker
+    om [SKRIV TEMA]!». Endres variantene, oppdaterer neste --skriv skjelettet i drive_videos, men ikke i kalenderen:
+    planned_posts.caption_skjelett fryses når videoen legges inn.
+  - På Gata: «Vi spør folk på gata: <tema>».
+  - Sitcom: «[SKRIV SPØRSMÅL TIL FØLGERNE]».
+  - Hashtags fra config/caption_maler.csv (høyst 5). #podkast bare for Folka Først.
+  - En post kan ikke settes til Klar mens teksten har `[SKRIV` (sperret i sett_status).
+- Folka Først fra Drive får bruddnavnet «Folka Først (fra 18.10)» og låsen 19.10–15.11 av kalenderkoden
+  (plasserIUke), som for manuelt innlagte videoer. drive_videos.konsept er grunnkonseptet fra mappen.
 
 ### TikTok (Accounts API v1.3)
 - App «NM Insights» i TikTok API for Business er godkjent med user.info.basic, user.info.username,
@@ -485,8 +581,30 @@ Publiseringstid (`/publiseringstid?visning=monstre|heatmap|kalender`):
     endrer aldri miks eller frekvens, men viser «Miks: Folka Først 2/3 …» og advarsler som «Uke 45 mangler 1
     Sitcom» / «Uke 46 har 4 Folka Først» (blokkerer ikke).
   - Manuell flytting innenfor uken (merkes «Flyttet manuelt»), status Utkast/Klar/Publisert, fjerning av video.
-    CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status.
+    CSV med dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status, og bakerst
+    «Caption-skjelett» og «Caption (ferdig)» (én rad per plattform).
   - Skriving via server actions (app/(app)/publiseringstid/actions.ts) som kaller funksjonene i schema planlegging.
+  - Drive-innboks (del 1 bygget 26.–28.10.2026 på branch drive-kalender, web/lib/plan/innboks.ts og
+    DriveInnboks.tsx): bare for redaktører (hentes bare når er_redaktor er sann; viewet gir uansett bare rader til
+    plan_editors). Ukevelger med én knapp per uke (sortert på år og uke, antall klare, «!» når uken har videoer som
+    ikke kan legges inn); valgt uke beholdes etter «Legg inn», blir den tom vises neste uke med videoer, og tom innboks
+    skjules. Videoene vises per konsept med gjest/yrke og utfoldbart skjelett, og «Legg inn» plasserer med plasserIUke
+    (uke og konsept fra Drive) og planlegging.legg_til_fra_drive. Mulig manuell dublett (samme uke, konsept og
+    normalisert tittel) gir «Legg inn likevel». Databasefeil vises på norsk (feilmeldingDrive).
+  - Caption (del 2, 28.10.2026, web/lib/plan/caption.ts og CaptionVideo.tsx): fraView leser caption_skjelett og
+    caption_tekst som valgfrie (null når de mangler). Delen «Caption» i ukekortet har én blokk per video:
+    - Redaktører: felt per plattform som starter med ferdig tekst, ellers skjelettet; etikett «Skjelett, ikke
+      endret» / «Din tekst» / «Din tekst, ikke lagret», «Gjenstår: [SKRIV …]», teller mot 2 200 tegn (Unicode-tegn som
+      i Postgres; Lagre sperret over grensen), «Tilbake til skjelettet», «Vis skjelettet» og «Bruk samme tekst på alle
+      plattformene» (bekreftelse når en annen plattform har egen tekst; ett lagre_caption-kall per plattform, stopper
+      ved første feil, ikke én transaksjon). Tekst lik skjelettet lagres som tom (skjelettet gjelder). Drive-videoer er
+      åpne, manuelle lukket. YouTube: første linje er tittelen, med advarsel over 100 tegn, tom linje og < > (eget
+      tittelfelt senere, krever migrering).
+    - Andre innloggede: teksten uten felt, merket «Caption (ferdig)», «Påbegynt, ikke ferdig» eller «Skjelett, ikke
+      ferdig»; manuelle poster uten caption vises ikke.
+    - Klar-sperre: «Klar» er grå i statusvalget med forklaring og lenke til feltet når teksten (eller skjelettet når
+      teksten er tom) har [SKRIV (samme regel som sett_status). settStatus og lagreCaption oversetter databasefeil
+      (feilmeldingPlan). Lagres [SKRIV på en Klar post, sier meldingen at den er satt tilbake til Utkast.
   - Oppfølging av tester (oppfolging.ts): testene i kalenderen matches mot innlegg og vurderes etter 7 dager.
 - Opplasting og automatisk publisering kommer senere. Det som må til: Meta-appen må få `instagram_content_publish`
   (og `pages_manage_posts` for Facebook) gjennom App Review og forretningsverifisering, og appen ut av
@@ -588,8 +706,10 @@ testet med en midlertidig, ikke-committet rute som viser de samme komponentene m
    report.py bruker fortsatt new_followers (ikke netto).
 3. Før Veksthuset inviteres: sjekk Invite user-malen og Email OTP Expiration (3600 s) i Supabase
    (se «Innlogging i dashboardet»). SMTP og Magic Link-malen er på plass, og Oversiktssiden er ferdig.
-4. Publiseringsplan: delt kalender bygget 21.10.2026 (krever 2026-10-21_planned_posts.sql + redaktør-seed +
-   «planlegging» under Exposed schemas). Neste: Facebook i PLAN_PLATTFORMER når kontoen er koblet, og
+4. Publiseringsplan: delt kalender bygget 21.10.2026 (migrering, redaktør-seed og Exposed schemas på plass).
+   Drive-innboksen: migrering 2026-10-26 kjørt og fetch_drive.py --skriv klar (branch drive-kalender); appdelen
+   (innboks, «Legg inn», caption, Klar-sperre, CSV) er bygget på branchen (ikke pushet); neste er merknader om endringer
+   i Drive og drive_finnes i kalenderen. Deretter: Facebook i PLAN_PLATTFORMER når kontoen er koblet, og
    opplasting/automatisk publisering (se Publiseringstid).
    - Første versjon er regelbasert. Hver anbefaling merkes «Basert på data» eller «Test» (med en hypotese).
    - Planen er et utkast Adrian vurderer, aldri noe som går rett til produsenten.

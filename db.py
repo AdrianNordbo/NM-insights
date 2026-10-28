@@ -34,15 +34,16 @@ def _check(resp):
         raise SupabaseError(f"Supabase svarte {resp.status_code}: {resp.text[:500]}")
 
 
-def select(table, params):
+def select(table, params, schema=None):
     """Henter alle rader som matcher PostgREST-filtrene i params, side for side.
-    Ta med "order" i params for stabil sidedeling."""
+    Ta med "order" i params for stabil sidedeling. schema: f.eks. "dashboard" (Accept-Profile)."""
     rows, offset = [], 0
+    headers = {**_headers(), **({"Accept-Profile": schema} if schema else {})}
     while True:
         resp = requests.get(
             f"{URL}/rest/v1/{table}",
             params={**params, "limit": PAGE_SIZE, "offset": offset},
-            headers=_headers(),
+            headers=headers,
             timeout=60,
         )
         _check(resp)
@@ -77,6 +78,20 @@ def upsert(table, rows, on_conflict, ignore_duplicates=False, returning=None):
         if returning:
             saved.extend(resp.json())
     return saved
+
+
+def update(table, filters, values):
+    """Oppdaterer kolonnene i values for radene som matcher PostgREST-filtrene (PATCH). Krever minst ett filter."""
+    if not filters:
+        raise SupabaseError("update uten filter er ikke tillatt.")
+    resp = requests.patch(
+        f"{URL}/rest/v1/{table}",
+        params=filters,
+        json=values,
+        headers=_headers("return=minimal"),
+        timeout=60,
+    )
+    _check(resp)
 
 
 def get_account(platform, platform_account_id):

@@ -38,6 +38,8 @@ const rad = (over: Partial<PlanRad>): PlanRad => ({
   grunnlag: "",
   status: "Utkast",
   flyttetManuelt: false,
+  captionSkjelett: null,
+  captionTekst: null,
   ...over,
 });
 
@@ -128,9 +130,16 @@ describe("CSV og fil", () => {
   it("kolonnene dato, ukedag, klokkeslett, plattform, tittel, konsept, merking, grunnlag og status", () => {
     const csv = planCsv([rad({ flyttetManuelt: true, status: "Klar", grunnlag: "G" }), rad({ id: "2", plattform: "tiktok", dato: null, klokkeslett: null, merking: null })]);
     const lines = csv.replace("﻿", "").split("\r\n");
-    expect(lines[0]).toBe('"Dato";"Ukedag";"Klokkeslett (Oslo)";"Plattform";"Tittel";"Type innhold";"Merking";"Grunnlag";"Status"');
-    expect(lines[1]).toBe('"2026-11-03";"tirsdag";"19:00";"Instagram";"T";"Sitcom";"Basert på data (flyttet manuelt)";"G";"Klar"');
-    expect(lines[2]).toBe('"";"ikke plassert";"";"TikTok";"T";"Sitcom";"";"";"Utkast"');
+    expect(lines[0]).toBe('"Dato";"Ukedag";"Klokkeslett (Oslo)";"Plattform";"Tittel";"Type innhold";"Merking";"Grunnlag";"Status";"Caption-skjelett";"Caption (ferdig)"');
+    expect(lines[1]).toBe('"2026-11-03";"tirsdag";"19:00";"Instagram";"T";"Sitcom";"Basert på data (flyttet manuelt)";"G";"Klar";"";""');
+    expect(lines[2]).toBe('"";"ikke plassert";"";"TikTok";"T";"Sitcom";"";"";"Utkast";"";""');
+  });
+
+  it("caption-kolonnene står bakerst, med linjeskift og anførselstegn i felt", () => {
+    const csv = planCsv([rad({ captionSkjelett: "[SKRIV BUDSKAP]\n\n#podkast", captionTekst: 'Hei «alle»\nSi "ja"' })]);
+    const lines = csv.replace("﻿", "").split("\r\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toBe('"2026-11-03";"tirsdag";"19:00";"Instagram";"T";"Sitcom";"Basert på data";"";"Utkast";"[SKRIV BUDSKAP]\n\n#podkast";"Hei «alle»\nSi ""ja"""');
   });
 
   it("tittel fra filnavnet (filen leses ikke)", () => {
@@ -143,7 +152,15 @@ describe("lesing fra viewet", () => {
   it("gyldige rader leses, ufullstendige forkastes", () => {
     const r = fraView({ id: "1", video_id: "v", aar: 2026, uke: 45, tittel: "T", konsept: "Sitcom", plattform: "instagram", planlagt_dato: "2026-11-03", klokkeslett: "19:00:00", merking: "Test", grunnlag: "g", status: "Klar", flyttet_manuelt: true });
     expect(r).toMatchObject({ klokkeslett: "19:00", merking: "Test", status: "Klar", flyttetManuelt: true });
+    expect(r).toMatchObject({ captionSkjelett: null, captionTekst: null }); // viewet uten caption-kolonnene
     expect(fraView({ id: "1" })).toBeNull();
     expect(fraView({ id: "1", video_id: "v", aar: 2026, uke: 45, tittel: "T", konsept: "S", plattform: "i", status: "Ukjent" })).toBeNull();
+  });
+
+  it("caption-kolonnene er valgfrie; tom tekst blir null", () => {
+    const base = { id: "1", video_id: "v", aar: 2026, uke: 45, tittel: "T", konsept: "Sitcom", plattform: "instagram", status: "Utkast" };
+    expect(fraView({ ...base, caption_skjelett: "[SKRIV X]", caption_tekst: "Ferdig" })).toMatchObject({ captionSkjelett: "[SKRIV X]", captionTekst: "Ferdig" });
+    expect(fraView({ ...base, caption_skjelett: "S", caption_tekst: "  " })).toMatchObject({ captionSkjelett: "S", captionTekst: null });
+    expect(fraView({ ...base, caption_skjelett: null, caption_tekst: 5 })).toMatchObject({ captionSkjelett: null, captionTekst: null });
   });
 });

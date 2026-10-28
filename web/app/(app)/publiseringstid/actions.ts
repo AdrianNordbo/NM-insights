@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
+import { feilmeldingPlan, sjekkCaption } from "@/lib/plan/caption";
+import { feilmeldingDrive, sjekkDriveRader } from "@/lib/plan/innboks";
 import { isoUke, sammeUke } from "@/lib/plan/uke";
 import { gyldigStatus, kanFlytte, type NyRad } from "@/lib/plan/ukeplan";
 import { PLAN_PLATTFORMER } from "@/lib/regler/plattformer";
@@ -15,11 +17,12 @@ export type Svar = { ok: true } | { ok: false; error: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FEIL = "Klarte ikke å lagre. Prøv igjen, eller sjekk at du er redaktør.";
 
-async function rpc(fn: string, args: Record<string, unknown>): Promise<Svar> {
+async function rpc(fn: string, args: Record<string, unknown>, feilmelding?: (code: string, message: string) => string): Promise<Svar> {
   try {
     const { error } = await (await createClient()).schema("planlegging").rpc(fn, args);
     if (error) {
       console.error(`planlegging.${fn} feilet:`, JSON.stringify({ code: error.code, message: error.message }));
+      if (feilmelding) return { ok: false, error: feilmelding(error.code, error.message) };
       return { ok: false, error: error.message.includes("redaktør") ? "Bare redaktører kan endre kalenderen." : FEIL };
     }
     revalidatePath("/publiseringstid");
@@ -59,6 +62,31 @@ export async function leggTilVideo(rader: NyRad[]): Promise<Svar> {
   });
 }
 
+/** Legger inn én video fra Drive-innboksen. Databasen avviser dubletter, feil uke og videoer som ikke er tolket ok. */
+export async function leggTilFraDrive(driveFileId: string, rader: NyRad[]): Promise<Svar> {
+  const feil = sjekkDriveRader(driveFileId, rader);
+  if (feil) return { ok: false, error: feil };
+  return rpc(
+    "legg_til_fra_drive",
+    {
+      p_drive_file_id: driveFileId,
+      p_rader: rader.map((r) => ({
+        video_id: r.videoId,
+        aar: r.aar,
+        uke: r.uke,
+        tittel: r.tittel.trim(),
+        konsept: r.konsept,
+        plattform: r.plattform,
+        planlagt_dato: r.dato ?? "",
+        klokkeslett: r.klokkeslett ?? "",
+        merking: r.merking ?? "",
+        grunnlag: r.grunnlag,
+      })),
+    },
+    feilmeldingDrive,
+  );
+}
+
 export async function flyttPlassering(id: string, aar: number, uke: number, dato: string, klokkeslett: string): Promise<Svar> {
   if (!UUID.test(id)) return { ok: false, error: "Ugyldig plassering." };
   const feil = kanFlytte({ aar, uke }, dato, klokkeslett);
@@ -68,7 +96,31 @@ export async function flyttPlassering(id: string, aar: number, uke: number, dato
 
 export async function settStatus(id: string, status: string): Promise<Svar> {
   if (!UUID.test(id) || !gyldigStatus(status)) return { ok: false, error: "Ugyldig status." };
-  return rpc("sett_status", { p_id: id, p_status: status });
+  return rpc("sett_status", { p_id: id, p_status: status }, (kode, melding) => feilmeldingPlan(kode, melding, "status"));
+}
+
+/** Lagrer ferdig caption for én plassering (tom tekst = skjelettet gjelder). Klar med [SKRIV blir Utkast i databasen. */
+export async function lagreCaption(id: string, tekst: string): Promise<Svar> {
+  if (!UUID.test(id) || typeof tekst !== "string") return { ok: false, error: "Ugyldig plassering." };
+  const feil = sjekkCaption(tekst);
+  if (feil) return { ok: false, error: feil };
+  return rpc("lagre_caption", { p_id: id, p_tekst: tekst.trim() }, (kode, melding) => feilmeldingPlan(kode, melding, "caption"));
+}
+
+/**
+ * Samme tekst på flere plattformer: ett kall per plattform, i rekkefølge, og stopp ved første feil. Ikke én
+ * transaksjon; meldingen sier hva som ble lagret før feilen.
+ */
+export async function lagreCaptions(liste: { id: string; plattform: string; tekst: string }[]): Promise<Svar> {
+  if (!Array.isArray(liste) || liste.length < 1 || liste.length > 10) return { ok: false, error: "Ugyldig plassering." };
+  const navn = (k: string) => PLAN_PLATTFORMER.find((p) => p.key === k)?.label ?? k;
+  const lagret: string[] = [];
+  for (const l of liste) {
+    const svar = await lagreCaption(l.id, l.tekst);
+    if (!svar.ok) return { ok: false, error: `${lagret.length ? `Lagret på ${lagret.join(", ")}. ` : ""}${navn(l.plattform)}: ${svar.error}` };
+    lagret.push(navn(l.plattform));
+  }
+  return { ok: true };
 }
 
 export async function fjernVideo(videoId: string): Promise<Svar> {
